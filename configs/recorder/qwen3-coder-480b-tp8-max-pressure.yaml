@@ -1,0 +1,6 @@
+# SSD stress timing: sends each session's next turn without its recorded gap.
+extends: qwen3-coder-480b-tp8-base.yaml
+
+workload:
+  max_concurrent_sessions: 80
+  timing_mode: max-pressure

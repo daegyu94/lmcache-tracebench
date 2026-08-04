@@ -1,0 +1,14 @@
+# WildClaw-only trace with recorded inter-turn gaps.
+extends: qwen3-coder-480b-tp8-base.yaml
+
+lmcache:
+  l2:
+    base_path: /mnt/std-ssd/lmcache-trace/wildclaw
+
+workload:
+  source: wildclaw
+  mixed_session_order: original
+  num_sessions: null
+  max_concurrent_sessions: 20
+  timing_mode: respect-gaps
+  pre_gap_scale: 1.0

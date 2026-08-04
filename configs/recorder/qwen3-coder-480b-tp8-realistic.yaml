@@ -1,0 +1,7 @@
+# Realistic timing: preserves recorded inter-turn gaps.
+extends: qwen3-coder-480b-tp8-base.yaml
+
+workload:
+  max_concurrent_sessions: 20
+  timing_mode: respect-gaps
+  pre_gap_scale: 1.0

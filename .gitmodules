@@ -1,0 +1,4 @@
+[submodule "third_party/Tensormesh-Benchmark"]
+	path = third_party/Tensormesh-Benchmark
+	url = git@github.com:daegyu94/Tensormesh-Benchmark.git
+	branch = tracebench

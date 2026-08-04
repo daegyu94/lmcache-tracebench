@@ -1,0 +1,7 @@
+# Default PyPI runtime set verified on Ubuntu 24.04.
+# Copy this file and pass --runtime-requirements to setup_runtime.sh to override it.
+lmcache==0.5.1
+vllm==0.24.0
+torch==2.11.0
+datasets==5.0.1
+fsspec[http]==2026.6.0

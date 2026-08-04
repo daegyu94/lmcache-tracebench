@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+outputs/
+*.lct
+requirements/runtime.local.txt
+
+# Local dataset/cache state
+.cache/
+third_party/Tensormesh-Benchmark/.venv/
+third_party/Tensormesh-Benchmark/.pytest_cache/
