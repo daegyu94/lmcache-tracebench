@@ -1,0 +1,44 @@
+# Optional node-level replay profiling. Remote agents use Linux sysfs counters.
+# Both defaults are five seconds: one snapshot and one TSV diff per interval.
+sample_interval_seconds: 5
+report_interval_seconds: 5
+remote_tmp_root: /tmp/lmcache-tracebench-profile
+ssh_user: benchmark
+
+nodes:
+  - name: storage_node1
+    host: storage_node1
+    devices:
+      - /dev/nvme0n1
+      - /dev/nvme0n2
+    interfaces:
+      - bond0
+  - name: storage_node2
+    host: storage_node2
+    devices:
+      - /dev/nvme0n1
+      - /dev/nvme0n2
+    interfaces:
+      - bond0
+  - name: storage_node3
+    host: storage_node3
+    devices:
+      - /dev/nvme0n1
+      - /dev/nvme0n2
+    interfaces:
+      - bond0
+  - name: storage_node4
+    host: storage_node4
+    devices:
+      - /dev/nvme0n1
+      - /dev/nvme0n2
+    interfaces:
+      - bond0
+
+# Uncomment this block when client-side network traffic is also needed.
+# It measures node1's interface using the same TSV schema.
+# replay_node:
+#   name: replay_node
+#   host: node1
+#   interfaces:
+#     - bond0

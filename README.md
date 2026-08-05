@@ -319,6 +319,28 @@ python -m replayer.main \
   --config configs/replayer/smoke.yaml
 ```
 
+Replay 중 storage node의 NVMe와 network counter를 수집하려면 --profile을
+추가합니다. 각 node의 preflight가 먼저 실행되며, 기본값은 5초마다 counter를
+샘플링하고 같은 5초 구간의 diff를 tab-delimited TSV로 기록합니다.
+
+```bash
+python -m replayer.main --trace outputs/smoke/storage.lct --config configs/replayer/smoke.yaml --profile configs/profiling/storage.yaml
+```
+
+Profiler는 storage node의 /sys counter를 사용하므로 iostat나 nvme-cli가
+필수는 아닙니다. 결과는 profile_summary.json과 profile/<node>/disk.tsv,
+profile/<node>/network.tsv에 저장됩니다. 원격 node에는 project checkout이나
+Python이 필요하지 않습니다. 원격 agent의 samples와 log는 run별 /tmp 디렉터리에
+저장됩니다. shell agent를 /tmp 아래에 자동 배포해 실행하며, bash, awk, cat,
+date, sleep, readlink와 sysfs counter를 preflight에서 확인합니다. 프로젝트
+전체를 전송하지 않습니다.
+/tmp/lmcache-tracebench-profile/<run-id>/에 임시 저장되며, 수집·집계가 성공한
+뒤 삭제됩니다. 실패하면 장애 분석을 위해 원격 결과를 보존합니다.
+
+Replay client의 network도 비교하려면 profile config의 replay_node에 node1과
+interface를 추가합니다. 기본 설정에는 포함되지 않습니다. bond0와 해당 slave
+interface를 동시에 지정하면 traffic이 중복 집계되므로 둘 중 하나만 선택하세요.
+
 결과는 `outputs/smoke-replay/trace_replay_summary.json`과
 `outputs/smoke-replay/trace_replay_ops.csv`에 저장됩니다. 먼저 실행 command만 보려면
 끝에 `--dry-run`을 추가합니다.

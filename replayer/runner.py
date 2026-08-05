@@ -7,8 +7,12 @@ import re
 import subprocess
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .config import ReplayerConfig
+
+if TYPE_CHECKING:
+    from traceprof.config import ProfilerConfig
 
 
 _PROGRESS_RE = re.compile(r"\[(\d+)/(\d+)\]\s+(?:OK|FAIL)\s+")
@@ -47,7 +51,12 @@ def build_command(config: ReplayerConfig, trace_path: str) -> list[str]:
     ]
 
 
-def run_command(config: ReplayerConfig, trace_path: str) -> int:
+def run_command(
+    config: ReplayerConfig,
+    trace_path: str,
+    *,
+    profiler_config: ProfilerConfig | None = None,
+) -> int:
     """Execute replay, persist LMCache logs, and return its exit code."""
     trace = Path(trace_path).expanduser()
     if not trace.is_file():
@@ -58,45 +67,85 @@ def run_command(config: ReplayerConfig, trace_path: str) -> int:
     started_at = time.monotonic()
     last_update_at = 0.0
     progress_seen = False
+    profiler = None
+    profiler_started = False
+    profiler_error: BaseException | None = None
 
-    with log_path.open("w", encoding="utf-8") as log_file:
-        with subprocess.Popen(
-            build_command(config, str(trace)),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        ) as process:
-            assert process.stdout is not None
-            for line in process.stdout:
-                log_file.write(line)
-                log_file.flush()
-                progress = _progress_from_log_line(line)
-                if progress is None:
-                    continue
-                completed, total = progress
-                now = time.monotonic()
-                if completed < total and now - last_update_at < 0.5:
-                    continue
-                elapsed = now - started_at
-                percent = 100.0 * completed / total if total else 0.0
-                print(
-                    f"\r[progress] records={completed}/{total} "
-                    f"({percent:.1f}%) elapsed={elapsed:.1f}s",
-                    end="",
-                    flush=True,
-                )
-                progress_seen = True
-                last_update_at = now
-            return_code = process.wait()
+    if profiler_config is not None:
+        from traceprof.controller import RemoteProfiler
+
+        profiler = RemoteProfiler(profiler_config, output_dir=output_dir)
+
+    return_code: int | None = None
+    try:
+        if profiler is not None:
+            profiler.preflight()
+            profiler.start()
+            profiler_started = True
+
+        with log_path.open("w", encoding="utf-8") as log_file:
+            with subprocess.Popen(
+                build_command(config, str(trace)),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            ) as process:
+                assert process.stdout is not None
+                for line in process.stdout:
+                    log_file.write(line)
+                    log_file.flush()
+                    progress = _progress_from_log_line(line)
+                    if progress is None:
+                        continue
+                    completed, total = progress
+                    now = time.monotonic()
+                    if completed < total and now - last_update_at < 0.5:
+                        continue
+                    elapsed = now - started_at
+                    percent = 100.0 * completed / total if total else 0.0
+                    print(
+                        f"\r[progress] records={completed}/{total} "
+                        f"({percent:.1f}%) elapsed={elapsed:.1f}s",
+                        end="",
+                        flush=True,
+                    )
+                    progress_seen = True
+                    last_update_at = now
+                return_code = process.wait()
+    finally:
+        if profiler is not None:
+            try:
+                if profiler_started:
+                    profiler.stop()
+                    profiler.collect()
+                    profiler.aggregate()
+                    profiler.cleanup()
+                    print(
+                        "[INFO] Profile summary: "
+                        f"{output_dir / 'profile_summary.json'}",
+                        flush=True,
+                    )
+            except BaseException as exc:
+                profiler_error = exc
+                print(f"[ERROR] Profiler finalization failed: {exc}", flush=True)
 
     if progress_seen:
         print()
-    if return_code == 0:
+    if profiler_error is not None:
+        print(
+            f"[ERROR] Replay exit code {return_code}; profiler finalization failed. "
+            f"LMCache log: {log_path}"
+        )
+    elif return_code == 0:
         print(f"[INFO] Replay complete. LMCache log: {log_path}")
     else:
         print(
             f"[ERROR] Replay failed with exit code {return_code}. "
             f"LMCache log: {log_path}"
         )
+    if return_code is None:
+        return 1
+    if profiler_error is not None and return_code == 0:
+        return 1
     return return_code
