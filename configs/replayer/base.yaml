@@ -1,0 +1,10 @@
+# Common replay settings. Backend-specific files extend this configuration.
+# Every bundled backend configuration enables its direct-I/O option by default.
+lmcache_binary: lmcache
+output_dir: outputs/replay
+l1_size_gb: 20
+l1_init_size_gb: 20
+eviction_policy: noop
+# L1 is only transient staging; stored KV is read from and written to L2.
+l2_store_policy: skip_l1
+l1_align_bytes: 4096

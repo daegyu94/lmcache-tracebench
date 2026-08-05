@@ -283,7 +283,7 @@ vLLM이나 GPU server를 다시 시작하지 않으며, `configs/replayer/smoke.
 
 ```bash
 python -m replayer.main \
-  outputs/smoke/storage.lct \
+  --trace outputs/smoke/storage.lct \
   --config configs/replayer/smoke.yaml
 ```
 
@@ -294,15 +294,19 @@ python -m replayer.main \
 ## Replayer
 
 Replayer는 저장된 `.lct`를 LMCache `trace replay` command로 한 번 실행합니다.
-실행 시 `fs_native` adapter와 replayer 설정의 L1 크기를 적용합니다.
+공용 `base.yaml`을 상속하는 `fs-native.yaml` 또는 `nixl-hf3fs.yaml`을 선택합니다.
+각 storage record는 trace의 monotonic timestamp 간격에 맞춰 재생되며, replay host가
+더 느리면 원래 schedule보다 뒤처진 상태로 계속 진행합니다.
 
 ```bash
 python -m replayer.main \
-  path/to/storage.lct \
-  --config configs/replayer/example.yaml
+  --trace path/to/storage.lct \
+  --config configs/replayer/fs-native.yaml
 ```
 
 실행 전 command만 확인하려면 `--dry-run`을 추가합니다.
+실행 중에는 터미널에 record 진행률을 표시하며, LMCache 원문 로그는
+`output_dir/lmcache-replay.log`에 저장됩니다.
 
 ## Tests
 

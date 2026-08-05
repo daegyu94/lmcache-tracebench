@@ -542,14 +542,14 @@ backend에 재생할 수 있습니다.
 
 ### 프로젝트 Replayer로 재생
 
-현재 프로젝트 Replayer는 `fs_native` adapter를 지원합니다. 다음 명령은
+프로젝트 Replayer는 `fs_native`와 NIXL adapter 설정을 지원합니다. 다음 명령은
 `configs/replayer/smoke.yaml`에 지정된 별도 L2 경로에 trace를 재생합니다.
 
 ```bash
 source .venv/bin/activate
 
 python -m replayer.main \
-  outputs/qwen3-coder-tp8-smoke/storage.lct \
+  --trace outputs/qwen3-coder-tp8-smoke/storage.lct \
   --config configs/replayer/smoke.yaml
 ```
 
@@ -616,11 +616,10 @@ pNFS mount를 NIXL의 `POSIX` backend를 통해 접근하려면 adapter 부분�
 --l2-adapter '{"type":"nixl_store_dynamic","backend":"POSIX","backend_params":{"file_path":"/mnt/pnfs/lmcache-replay","use_direct_io":"false","max_capacity_gb":"30720"}}'
 ```
 
-위 NIXL 예시는 PoC/B300 환경을 위한 목표 실행 형태이며 현재 프로젝트의
-`python -m replayer.main` wrapper는 아직 `l2_type: fs_native`만 허용합니다. 따라서
-NIXL adapter가 준비된 cluster에서는 우선 `lmcache trace replay`를 직접 사용하거나,
-Replayer config가 임의의 adapter JSON을 받도록 확장해야 합니다. Backend 이름과
-parameter는 cluster에 설치된 LMCache/NIXL 버전에서 다시 확인해야 합니다.
+NIXL과 HF3FS가 설치된 cluster에서는 공용 설정을 상속하는
+`configs/replayer/nixl-hf3fs.yaml`을 사용할 수 있습니다. `file_path`와
+`max_capacity_gb`는 해당 cluster에 맞게 변경하세요. Backend 이름과 parameter는
+설치된 LMCache/NIXL 버전에서 확인해야 합니다.
 
 ### Replay 비교 시 주의 사항
 

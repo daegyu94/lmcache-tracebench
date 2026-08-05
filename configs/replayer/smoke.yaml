@@ -1,14 +1,10 @@
-# Replay configuration for configs/recorder/smoke.yaml output.
-# Use a separate L2 directory so replay does not alter the recorded run's L2 files.
-lmcache_binary: lmcache
+# Minimal replay configuration for the 1-GPU smoke trace.
+extends: base.yaml
 output_dir: outputs/smoke-replay
 l1_size_gb: 1
 l1_init_size_gb: 1
-eviction_policy: noop
-l2_store_policy: skip_l1
-l1_align_bytes: 4096
-l2_type: fs_native
-l2_base_path: /mnt/std-ssd/lmcache-trace-smoke-replay
-l2_num_workers: 1
-l2_extra:
+l2_adapter:
+  type: fs_native
+  base_path: /mnt/std-ssd/lmcache-trace-smoke-replay
+  num_workers: 1
   use_odirect: true

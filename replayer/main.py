@@ -10,7 +10,7 @@ from .runner import build_command, run_command
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("trace", help="path to a .lct trace")
+    parser.add_argument("--trace", required=True, help="path to a .lct trace")
     parser.add_argument("--config", required=True, help="replayer YAML config")
     parser.add_argument("--dry-run", action="store_true")
     return parser
