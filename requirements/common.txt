@@ -1,0 +1,6 @@
+# Dependencies shared by recorder and storage-trace replayer environments.
+# LMCache's CUDA package may install its declared CUDA/NIXL runtime dependencies
+# transitively; backend-specific requirements are listed in the profile files.
+lmcache==0.5.1
+torch==2.11.0
+fsspec[http]==2026.6.0

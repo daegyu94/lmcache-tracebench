@@ -1,0 +1,6 @@
+# Recorder-only runtime. The common LMCache/PyTorch set is included first.
+-r common.txt
+vllm==0.24.0
+datasets==5.0.1
+openai>=1.0
+pyarrow>=12.0

@@ -24,30 +24,49 @@ git submodule update --init --recursive
 
 ## Prerequisites
 
-Ubuntu 24.04, CUDA가 연결된 NVIDIA GPU, Python 3.12가 필요합니다. Recorder는 활성화한
-프로젝트 `.venv`의 `python`으로 LMCache MP와 vLLM을 실행하므로, 두 package도
-같은 `.venv`에 설치합니다.
+Ubuntu 24.04와 Python 3.12가 필요합니다. Recorder는 CUDA가 연결된 NVIDIA GPU가
+필요하지만, storage trace Replayer는 `fs_native` 기준 GPU·vLLM·모델 없이 실행할 수
+있습니다. 모든 profile은 같은 프로젝트 `.venv`를 사용합니다.
+
+설치 profile은 공통 runtime과 역할별 runtime으로 나뉩니다.
+
+| Profile | 설치 내용 | 실행 환경 |
+| --- | --- | --- |
+| `common` | LMCache trace CLI, PyTorch, 공통 Python package | Recorder/Replayer의 기반 |
+| `recorder` | common + vLLM, dataset, OpenAI/TensorMesh package | GPU에서 trace 생성; 기본 profile |
+| `replayer-fs-native` | common + 추가 package 없음 | `fs_native`/O_DIRECT trace replay |
+| `replayer-nixl-hf3fs` | common + NIXL package | NIXL+HF3FS trace replay |
+
+Recorder 설치:
 
 ```bash
-bash scripts/setup_runtime.sh
+bash scripts/setup_runtime.sh --profile recorder
 ```
 
-스크립트는 `.venv` 생성, `pip` 보강, project·LMCache·vLLM·TensorMesh 의존성
-설치와 runtime/GPU 검증을 수행합니다. 설치하지 않고 현재 환경만 확인하려면
-`bash scripts/setup_runtime.sh --check`을 사용합니다.
-
-`requirements/runtime.txt`는 이 환경에서 확인한 기본 runtime 조합을 고정합니다:
-LMCache 0.5.1, vLLM 0.24.0, PyTorch 2.11.0. `lmcache-cli`가 아니라 GPU server와
-trace 기능을 포함하는 `lmcache`를 사용합니다. CUDA 12.9 전용 wheel이 필요한
-서버는 [LMCache 설치 문서](https://docs.lmcache.ai/getting_started/installation.html)를 따릅니다.
-
-다른 버전을 시험하려면 기본 파일을 수정하지 말고 개인 requirements 파일을 만들고
-그 파일을 지정합니다.
+Replayer 설치:
 
 ```bash
-cp requirements/runtime.txt requirements/runtime.local.txt
-# requirements/runtime.local.txt에서 lmcache, vllm 등의 version을 수정
-bash scripts/setup_runtime.sh --runtime-requirements requirements/runtime.local.txt
+# fs_native
+bash scripts/setup_runtime.sh --profile replayer-fs-native
+
+# NIXL + HF3FS
+bash scripts/setup_runtime.sh --profile replayer-nixl-hf3fs
+```
+
+`bash scripts/setup_runtime.sh`처럼 profile을 생략하면 기존 동작과 호환되도록
+`recorder`가 선택됩니다. 현재 환경만 검사하려면 각 명령에 `--check`를 추가합니다.
+의존성 정의는 `requirements/common.txt`, `requirements/recorder.txt`,
+`requirements/replayer-fs-native.txt`, `requirements/replayer-nixl-hf3fs.txt`에
+분리되어 있으며, 기존 `requirements/runtime.txt`는 Recorder용 통합 profile입니다.
+
+다른 버전을 시험하려면 해당 profile 파일을 복사해 지정합니다.
+
+```bash
+cp requirements/recorder.txt requirements/recorder.local.txt
+# requirements/recorder.local.txt에서 lmcache, vllm 등의 version을 수정
+bash scripts/setup_runtime.sh \
+  --profile recorder \
+  --runtime-requirements requirements/recorder.local.txt
 ```
 
 `--runtime-requirements`는 `--check`와 함께도 사용할 수 있습니다. 버전을 바꾼 뒤에는
@@ -55,13 +74,16 @@ bash scripts/setup_runtime.sh --runtime-requirements requirements/runtime.local.
 
 ### LMCache tracebench fork 사용
 
-L2 replay latency 통계(`--l2-stats-out`)가 필요한 경우에는 PyPI의 LMCache 대신
-tracebench fork의 `v0.5.1-tracebench` 태그를 설치합니다. 먼저 기본 runtime을
-설치해 `.venv`와 vLLM/PyTorch를 준비한 뒤, 기존 의존성을 바꾸지 않도록 LMCache만
-교체합니다.
+L2 operation profiling과 replay latency 통계(`--l2-stats-out`)를 사용하려면 PyPI의
+기본 LMCache 대신 tracebench fork의 `v0.5.1-tracebench` 태그를 설치합니다. 이
+변경사항은 별도로 LMCache 소스를 checkout하거나 patch할 필요 없이 pip의 Git URL
+형태로 설치할 수 있습니다. 먼저 사용할 profile을 설치해 `.venv`와 공통 의존성을
+준비한 뒤, 기존 의존성을 바꾸지 않도록 LMCache만 교체합니다.
 
 ```bash
-bash scripts/setup_runtime.sh
+# recorder라면 --profile recorder, fs_native replayer라면
+# --profile replayer-fs-native를 사용합니다.
+bash scripts/setup_runtime.sh --profile recorder
 source .venv/bin/activate
 python -m pip install --force-reinstall --no-deps --no-build-isolation \
   "lmcache @ git+https://github.com/daegyu94/LMCache.git@v0.5.1-tracebench"
