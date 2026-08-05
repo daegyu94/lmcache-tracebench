@@ -6,12 +6,14 @@ import os
 import signal
 import socket
 import subprocess
+import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, TextIO
 
 
 @dataclass
@@ -22,11 +24,27 @@ class ManagedProcess:
     command: list[str]
     process: subprocess.Popen[str]
     log_file: object
+    output_thread: threading.Thread | None = None
 
     def close_log(self) -> None:
+        if self.output_thread is not None:
+            self.output_thread.join(timeout=5)
         close = getattr(self.log_file, "close", None)
         if close is not None:
             close()
+
+
+def _tee_output(stream: TextIO, log_file: TextIO) -> None:
+    """Write a child process's raw terminal output to its log and stdout."""
+    while True:
+        chunk = stream.buffer.read1(4096)
+        if not chunk:
+            return
+        text = chunk.decode("utf-8", errors="replace")
+        log_file.write(text)
+        log_file.flush()
+        sys.stdout.write(text)
+        sys.stdout.flush()
 
 
 def start_process(
@@ -35,8 +53,9 @@ def start_process(
     *,
     env: Mapping[str, str],
     log_path: str | Path,
+    stream_output: bool = False,
 ) -> ManagedProcess:
-    """Start a command with a dedicated, line-buffered log file."""
+    """Start a command with a dedicated log, optionally mirroring output."""
     path = Path(log_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     log_file = path.open("w", encoding="utf-8", buffering=1)
@@ -44,7 +63,7 @@ def start_process(
         process = subprocess.Popen(
             command,
             env=dict(env),
-            stdout=log_file,
+            stdout=subprocess.PIPE if stream_output else log_file,
             stderr=subprocess.STDOUT,
             text=True,
             start_new_session=True,
@@ -52,7 +71,16 @@ def start_process(
     except Exception:
         log_file.close()
         raise
-    return ManagedProcess(name, list(command), process, log_file)
+    output_thread = None
+    if stream_output:
+        assert process.stdout is not None
+        output_thread = threading.Thread(
+            target=_tee_output,
+            args=(process.stdout, log_file),
+            daemon=True,
+        )
+        output_thread.start()
+    return ManagedProcess(name, list(command), process, log_file, output_thread)
 
 
 def _log_tail(path: str | Path, max_bytes: int = 4000) -> str:

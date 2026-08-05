@@ -10,6 +10,7 @@ from recorder.mooncake import (
     prepare_mooncake_workload,
     write_mooncake_request_stats,
 )
+from recorder.mooncake_cli import main as mooncake_cli_main
 
 
 def _write_trace(path: Path) -> None:
@@ -41,7 +42,7 @@ def _write_trace(path: Path) -> None:
 
 def test_mooncake_config_loads():
     config = load_config(
-        "configs/recorder/qwen3-coder-480b-tp8-mooncake-toolagent.yaml"
+        "configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml"
     )
 
     assert config.workload.backend == "mooncake"
@@ -83,6 +84,32 @@ def test_prepare_and_build_mooncake_timed_trace(tmp_path: Path):
     assert command[command.index("--num-prompts") + 1] == "2"
     assert command[command.index("--timed-trace-sec-multiplier") + 1] == "0.0001"
     assert command[command.index("--max-concurrency") + 1] == "8"
+    assert "--disable-tqdm" not in command
+
+
+def test_mooncake_download_cli_validates_without_recorder_config(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    _write_trace(tmp_path / "conversation_trace.jsonl")
+    _write_trace(tmp_path / "toolagent_trace.jsonl")
+
+    assert (
+        mooncake_cli_main(
+            [
+                "--path",
+                str(tmp_path),
+                "--no-download",
+            ]
+        )
+        == 0
+    )
+    summaries = json.loads(capsys.readouterr().out)["traces"]
+    assert [summary["trace"] for summary in summaries] == [
+        "conversation",
+        "toolagent",
+    ]
+    assert all(summary["total_requests"] == 3 for summary in summaries)
+    assert all(summary["selected_requests"] == 3 for summary in summaries)
 
 
 def test_rejects_out_of_order_mooncake_timestamps(tmp_path: Path):

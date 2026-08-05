@@ -380,6 +380,7 @@ def run_live(
                 workload_command,
                 env=env,
                 log_path=run_dir / "workload.log",
+                stream_output=True,
             )
             workload_return_code = workload_process.process.wait()
             return_codes["workload"] = workload_return_code

@@ -211,7 +211,6 @@ def build_mooncake_benchmark_command(
         str(0.001 * mooncake.time_scale),
         "--ignore-eos",
         "--disable-shuffle",
-        "--disable-tqdm",
         "--temperature",
         "0",
         "--save-result",
