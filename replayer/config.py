@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -87,5 +87,39 @@ def load_config(path: str | Path | None = None) -> ReplayerConfig:
     if not isinstance(raw, dict):
         raise ValueError("replayer config must contain a mapping")
     config = ReplayerConfig(**raw)
+    config.validate()
+    return config
+
+
+def apply_overrides(
+    config: ReplayerConfig,
+    *,
+    base_path: str | None = None,
+    output_dir: str | None = None,
+) -> ReplayerConfig:
+    """Return config with CLI path overrides applied."""
+    if base_path is not None:
+        if not base_path:
+            raise ValueError("base_path must not be empty")
+        adapter = dict(config.l2_adapter)
+        adapter_type = adapter.get("type")
+        if adapter_type == "fs_native":
+            adapter["base_path"] = base_path
+        elif adapter_type == "nixl_store_dynamic":
+            backend_params = adapter.get("backend_params")
+            if not isinstance(backend_params, dict):
+                raise ValueError(
+                    "nixl_store_dynamic adapter requires backend_params mapping"
+                )
+            adapter["backend_params"] = {**backend_params, "file_path": base_path}
+        else:
+            raise ValueError(
+                "--base-path is supported for fs_native and nixl_store_dynamic adapters"
+            )
+        config = replace(config, l2_adapter=adapter)
+    if output_dir is not None:
+        if not output_dir:
+            raise ValueError("output_dir must not be empty")
+        config = replace(config, output_dir=output_dir)
     config.validate()
     return config

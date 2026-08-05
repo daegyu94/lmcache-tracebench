@@ -23,6 +23,34 @@ def test_trace_option_is_reflected_in_dry_run(capsys, tmp_path):
     assert str(trace) in capsys.readouterr().out
 
 
+def test_path_overrides_are_reflected_in_dry_run(capsys, tmp_path):
+    trace = tmp_path / "storage.lct"
+    trace.touch()
+    base_path = tmp_path / "l2"
+    output_dir = tmp_path / "output"
+
+    assert (
+        main(
+            [
+                "--trace",
+                str(trace),
+                "--config",
+                "configs/replayer/smoke.yaml",
+                "--base-path",
+                str(base_path),
+                "--output-dir",
+                str(output_dir),
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert f'"base_path":"{base_path}"' in output
+    assert f"--output-dir {output_dir}" in output
+
+
 def test_backend_configs_extend_common_base():
     fs_native = load_config("configs/replayer/fs-native.yaml")
     nixl_hf3fs = load_config("configs/replayer/nixl-hf3fs.yaml")

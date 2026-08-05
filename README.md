@@ -484,12 +484,16 @@ Replayer는 저장된 `.lct`를 LMCache `trace replay` command로 한 번 실행
 ```bash
 python -m replayer.main \
   --trace path/to/storage.lct \
-  --config configs/replayer/fs-native.yaml
+  --config configs/replayer/fs-native.yaml \
+  --base-path /mnt/std-ssd/lmcache-trace-replay \
+  --output-dir outputs/replay
 ```
 
 실행 전 command만 확인하려면 `--dry-run`을 추가합니다.
 실행 중에는 터미널에 record 진행률을 표시하며, LMCache 원문 로그는
-`output_dir/lmcache-replay.log`에 저장됩니다.
+`output_dir/lmcache-replay.log`에 저장됩니다. `--base-path`는 `fs_native`의
+`l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
+`--output-dir`는 summary, operation CSV와 로그를 저장할 directory를 덮어씁니다.
 
 ### Replay backend
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from .config import load_config
+from .config import apply_overrides, load_config
 from .runner import build_command, run_command
 
 
@@ -12,6 +12,14 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trace", required=True, help="path to a .lct trace")
     parser.add_argument("--config", required=True, help="replayer YAML config")
+    parser.add_argument(
+        "--base-path",
+        help="override fs_native base_path or NIXL backend_params.file_path",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="override the directory for replay output and logs",
+    )
     parser.add_argument(
         "--profile",
         "--profile-config",
@@ -25,6 +33,9 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     config = load_config(args.config)
+    config = apply_overrides(
+        config, base_path=args.base_path, output_dir=args.output_dir
+    )
     profiler_config = None
     if args.profile_config:
         from traceprof.config import load_config as load_profile_config
