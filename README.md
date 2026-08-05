@@ -53,6 +53,38 @@ bash scripts/setup_runtime.sh --runtime-requirements requirements/runtime.local.
 `--runtime-requirements`는 `--check`와 함께도 사용할 수 있습니다. 버전을 바꾼 뒤에는
 스크립트가 실행하는 `pip check`와 아래 smoke test를 반드시 통과시키세요.
 
+### LMCache tracebench fork 사용
+
+L2 replay latency 통계(`--l2-stats-out`)가 필요한 경우에는 PyPI의 LMCache 대신
+tracebench fork의 `v0.5.1-tracebench` 태그를 설치합니다. 먼저 기본 runtime을
+설치해 `.venv`와 vLLM/PyTorch를 준비한 뒤, 기존 의존성을 바꾸지 않도록 LMCache만
+교체합니다.
+
+```bash
+bash scripts/setup_runtime.sh
+source .venv/bin/activate
+python -m pip install --force-reinstall --no-deps --no-build-isolation \
+  "lmcache @ git+https://github.com/daegyu94/LMCache.git@v0.5.1-tracebench"
+```
+
+`--no-build-isolation`은 현재 설치된 PyTorch/CUDA 환경에 맞춰 LMCache native
+extension을 빌드하기 위한 옵션이며, `--no-deps`는 검증된 vLLM/PyTorch 조합을
+LMCache 설치 과정에서 교체하지 않도록 합니다. 설치 후에는 다음 명령으로 확인합니다.
+
+```bash
+python -c "import lmcache, lmcache.c_ops; print('LMCache import: OK')"
+lmcache trace replay --help | rg -- '--l2-stats-out'
+python -m pip check
+```
+
+`setuptools-scm` 설정상 하이픈이 포함된 태그의 package metadata가 `0.1.dev...`로
+표시될 수 있지만, 설치된 소스는 `v0.5.1-tracebench` 태그의 커밋입니다. 설치 출처를
+확인하려면 다음을 실행합니다.
+
+```bash
+python -c "import importlib.metadata as m; print(m.distribution('lmcache').read_text('direct_url.json'))"
+```
+
 실행 전 확인:
 
 ```bash
