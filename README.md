@@ -154,42 +154,59 @@ bash scripts/release_asset.sh download \
 
 ### Mooncake real-world workload
 
-`workload.backend: mooncake`는 실제 온라인 요청에서 익명화한 `timestamp`,
-`input_length`, `output_length`, `hash_ids`를 사용합니다. `hash_ids`는 512-token
-prefix block 단위라 실제 prompt text 없이도 요청 간 KV prefix reuse를 보존합니다.
-Mooncake source code를 실행하거나 vendor하지 않으며, JSONL은
-`workload.mooncake.path`에 한 번 내려받아 이후 실행에서 재사용합니다.
+`workload.backend: mooncake`는 실제 online request의 timestamp, token 길이와 익명화된
+prefix 구조를 vLLM `timed_trace`로 실행합니다. Trace schema, synthetic prompt 생성,
+timing/scaling, KV 용량 계산과 결과 해석은
+[`docs/wiki/Home.md`](docs/wiki/Home.md#mooncake)를 기준으로 합니다.
 
-Tool/Agent trace 1,000개 요청으로 시작하려면 다음 config를 사용합니다.
+모델이나 LMCache config 없이 JSONL을 다운로드하고 검증하려면 다음 전용 command를
+사용합니다. 기본 실행은 Conversation과 Tool/Agent trace를 모두 내려받아 각각
+`conversation_trace.jsonl`, `toolagent_trace.jsonl`로 저장합니다.
+
+```bash
+python -m recorder.mooncake_cli \
+  --path /mnt/std-ssd/traces/mooncake
+```
+
+`--trace toolagent` 또는 `--trace conversation`으로 하나만 선택할 수 있습니다.
+`--path`는 다운로드 디렉터리를 명시하기 위해 필수입니다.
+이미 받은 파일만 검증하려면 `--no-download`를 추가합니다.
+
+공통 config로 Tool/Agent trace 1,000개 요청을 시작하려면:
 
 ```bash
 python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-mooncake-toolagent.yaml \
+  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
+  --mooncake-trace toolagent \
+  --mooncake-path /mnt/std-ssd/traces/mooncake/toolagent_trace.jsonl \
   --output-dir outputs/qwen3-coder-tp8-mooncake-toolagent
 ```
 
-전체 23,608개 요청은 config의 `workload.mooncake.num_requests`를 `null`로
-설정합니다. `time_scale: 1.0`은 실제 약 1시간 arrival timeline을 유지하고,
-`0.1`은 요청 간격을 10배 압축합니다. 전체 trace는 입력만 약 2.03억 token이므로
-L2 용량을 확인한 뒤 `1,000 → 5,000 → null` 순서로 늘리세요.
-
-서버를 띄우지 않고 trace 다운로드·검증과 LMCache, vLLM, workload command를
-확인하려면:
+Conversation은 같은 config에서 JSONL만 바꿉니다.
 
 ```bash
 python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-mooncake-toolagent.yaml \
-  --output-dir outputs/qwen3-coder-tp8-mooncake-toolagent \
-  --dry-run \
-  --load-workload
+  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
+  --mooncake-trace conversation \
+  --mooncake-path /mnt/std-ssd/traces/mooncake/conversation_trace.jsonl \
+  --output-dir outputs/qwen3-coder-tp8-mooncake-conversation
 ```
+
+공통 config는 L2 `base_path`의 `{trace}`를 선택한 trace 이름으로 치환하므로,
+Tool/Agent와 Conversation은 각각 `mooncake-toolagent`, `mooncake-conversation`
+디렉터리를 사용합니다.
+
+전체 recorder 실행에서도 파일이 없으면 같은 다운로드·검증 로직을 자동으로
+수행합니다. `recorder.main --load-workload`는 Tensormesh dataset 확인 전용입니다.
+기존 `qwen3-coder-480b-tp8-mooncake-toolagent.yaml`은 실행 중인 작업과 기존 command
+호환을 위해 유지하지만, 새 실행에는 공통 config를 사용하세요.
 
 Mooncake 실행은 기존 결과에 더해 `vllm_benchmark.json`을 생성합니다.
 
 `--output-dir`에는 `storage.lct`, `manifest.json`,
 `request_stats.jsonl`, `session_outcomes.jsonl`, `lmcache.log`, `vllm.log`,
 `workload.log`, `commands.json`, `workload.json`이 생성됩니다.
-workload 실행 중에는 `progress_interval_seconds`에 따라 기본 5초마다 완료 session,
+Tensormesh workload 실행 중에는 `progress_interval_seconds`에 따라 기본 5초마다 완료 session,
 처리 turn, 성공·실패 수와 경과 시간이 stdout의 같은 줄에서 갱신됩니다. turn별 상세
 내용은 화면에 반복 출력하지 않고 `workload.log`와 JSONL 결과에 기록합니다.
 

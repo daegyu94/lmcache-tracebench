@@ -19,8 +19,8 @@ LMCache Tracebench는 vLLM과 LMCache MP 환경에서 실제에 가까운 LLM wo
 ## 구성
 
 ```text
-Tensormesh workload
-        ↓
+Tensormesh V3 / Mooncake timed trace
+                  ↓
 Recorder → vLLM API server → LMCache MP → L2 storage
                                       ↓
                                   storage.lct
@@ -277,7 +277,173 @@ Source별 record에는 다음 config를 사용합니다.
 
 ### Mooncake
 
-> **TBD:** workload 정의, trace 출처, 실행 방식과 권장 설정을 추후 정리합니다.
+Mooncake backend는
+[`kvcache-ai/Mooncake` FAST'25 release](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release/traces)의
+실제 online serving trace를 입력 workload로 사용합니다. Mooncake source code 자체를
+실행하거나 이 저장소에 vendor하지 않고, 공식 JSONL만 다운로드해 vLLM의
+`timed_trace` dataset으로 실행합니다.
+
+Mooncake JSONL과 Recorder가 만드는 `storage.lct`는 서로 다른 trace입니다.
+
+- **Mooncake workload trace:** 요청 도착 시각, token 길이와 공유 prefix 구조를 정의하는
+  JSONL 입력
+- **LMCache storage trace:** workload 실행 중 발생한 `StorageManager` API sequence를
+  기록한 binary 출력
+
+#### Workload 종류
+
+공식 trace는 다음 두 파일로 나뉩니다.
+
+| Trace | 성격 | 요청 수 | 입력 token | 출력 token |
+| --- | --- | ---: | ---: | ---: |
+| `toolagent_trace.jsonl` | Tool 사용 및 agent serving workload | 23,608 | 202,940,084 | 4,299,817 |
+| `conversation_trace.jsonl` | 대화형 serving workload | 12,031 | 144,793,823 | 4,122,048 |
+
+두 trace는 독립된 timestamp와 prefix-reuse 분포를 가지므로 각각 record합니다. 두
+JSONL을 단순히 합치면 arrival timeline과 hash namespace의 의미가 달라지므로, 별도의
+mixed workload 정책 없이 병합하지 않습니다.
+
+#### JSONL schema와 prompt 재구성
+
+각 line은 request 하나이며 주요 field는 다음과 같습니다.
+
+| Field | 의미 |
+| --- | --- |
+| `timestamp` | Trace 시작 이후 request 도착 시각이며 원본 단위는 millisecond입니다. |
+| `input_length` | vLLM에 전송할 prompt token 수입니다. |
+| `output_length` | EOS와 관계없이 생성할 output token 수입니다. |
+| `hash_ids` | 512-token block 단위의 익명화된 prompt content 식별자입니다. 같은 hash sequence는 같은 synthetic token prefix로 확장됩니다. |
+
+실제 prompt text는 포함되지 않습니다. vLLM `timed_trace` loader는 각 `hash_id`를
+deterministic seed로 사용해 tokenizer vocabulary에서 synthetic token을 생성합니다.
+Recorder는 `chunk_hash_size: 512`를 전달하므로 같은 hash block은 같은 512-token
+sequence가 되고, 서로 다른 request 사이의 prefix sharing 구조가 보존됩니다.
+
+vLLM 구현은 token seed를 만들 때 Python `hash()`를 사용합니다. 따라서 Recorder는
+실행마다 같은 synthetic prompt를 만들도록 `PYTHONHASHSEED=0`을 고정합니다. 이 값을
+바꾸면 요청 길이와 arrival time은 같아도 token sequence와 LMCache key가 달라질 수
+있습니다.
+
+#### 다운로드와 검증
+
+다음 command는 모델이나 LMCache server를 시작하지 않고 두 JSONL을 지정한
+디렉터리에 다운로드한 뒤 전체 row의 schema와 timestamp 순서를 검증합니다.
+
+```bash
+python -m recorder.mooncake_cli \
+  --path /mnt/std-ssd/traces/mooncake
+```
+
+결과 파일은 다음과 같습니다.
+
+```text
+/mnt/std-ssd/traces/mooncake/
+├── conversation_trace.jsonl
+└── toolagent_trace.jsonl
+```
+
+하나만 받으려면 `--trace toolagent` 또는 `--trace conversation`을 지정합니다. 기존
+파일을 다시 다운로드하지 않고 검증만 하려면 `--no-download`를 추가합니다.
+
+#### Timing, concurrency와 scaling
+
+공통 config는 `configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml`입니다.
+
+| 설정 | 의미 |
+| --- | --- |
+| `num_requests` | JSONL 처음부터 실행할 request 수입니다. `null`이면 전체 trace를 사용합니다. |
+| `time_scale` | 원본 request 간격에 곱하는 비율입니다. `1.0`은 원본 timeline, `0.1`은 간격을 10배 압축합니다. |
+| `chunk_hash_size` | `hash_ids` 하나를 확장할 token 수이며 공식 Mooncake trace에는 512를 사용합니다. |
+| `max_concurrent_requests` | 동시에 처리할 수 있는 client request 상한입니다. 도착 시각이 겹쳐도 이 값보다 많은 request를 동시에 보내지 않습니다. |
+
+`num_requests`는 shuffle된 sample 수가 아니라 trace 앞부분의 길이입니다. Recorder는
+request 순서를 섞지 않고 원본 timestamp 순서를 유지합니다. 먼저 `1,000`, 이후
+`5,000`, 마지막으로 `null` 순서로 늘리면 storage 용량과 실행 시간을 확인하면서
+확장할 수 있습니다. `time_scale`은 request set과 token 수는 바꾸지 않으며, request
+arrival 간격과 그에 따른 concurrency 및 I/O timing을 조절합니다.
+
+#### Record 실행
+
+Tool/Agent record:
+
+```bash
+python -m recorder.main \
+  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
+  --mooncake-trace toolagent \
+  --mooncake-path /mnt/std-ssd/traces/mooncake/toolagent_trace.jsonl \
+  --output-dir "/mnt/misc/lmcache-tracebench/outputs/mooncake-toolagent-$(date +%Y%m%d-%H%M%S)"
+```
+
+Conversation record:
+
+```bash
+python -m recorder.main \
+  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
+  --mooncake-trace conversation \
+  --mooncake-path /mnt/std-ssd/traces/mooncake/conversation_trace.jsonl \
+  --output-dir "/mnt/misc/lmcache-tracebench/outputs/mooncake-conversation-$(date +%Y%m%d-%H%M%S)"
+```
+
+공통 config의 L2 `base_path`에는 `{trace}` placeholder가 있습니다. Recorder가 선택한
+trace 이름으로 치환하므로 storage 경로는 자동으로 분리됩니다.
+
+| Trace | L2 경로 |
+| --- | --- |
+| Tool/Agent | `/mnt/std-ssd/lmcache-trace/mooncake-toolagent` |
+| Conversation | `/mnt/std-ssd/lmcache-trace/mooncake-conversation` |
+
+두 경로 모두 `reset_on_start: true`이므로 같은 trace를 다시 시작하면 해당 L2
+directory의 기존 KV object를 지우고 시작합니다. 서로 다른 trace를 동시에 실행하면
+GPU, LMCache port와 vLLM port가 충돌하므로 한 server에서는 순차 실행해야 합니다.
+
+#### KV cache 용량 추정
+
+Qwen3-Coder-480B-A35B-Instruct-AWQ의 현재 FP16 KV cache는 전체 TP=8 합계로 token당
+다음 크기입니다.
+
+```text
+62 layers × K/V 2 × KV heads 8 × head_dim 128 × 2 bytes
+= 253,952 bytes/token
+```
+
+Mooncake `hash_ids`의 고유 512-token block을 기준으로 계산한 nominal unique prefix KV
+크기는 다음과 같습니다. 실제 filesystem 사용량은 LMCache 256-token chunk의 partial
+block, object metadata, reuse 여부와 실행 성공 상태에 따라 달라질 수 있습니다.
+
+| Trace 범위 | 고유 prefix KV 추정 | 중복 제거 없는 논리 KV 처리량 |
+| --- | ---: | ---: |
+| Tool/Agent 처음 1,000 requests | 약 1.59 TB | 약 2.54 TB |
+| Conversation 처음 1,000 requests | 약 2.80 TB | 약 3.58 TB |
+| Tool/Agent 전체 23,608 requests | 약 23.83 TB | 약 52.63 TB |
+| Conversation 전체 12,031 requests | 약 23.77 TB | 약 37.82 TB |
+
+여기서 고유 prefix KV는 capacity planning용 working-set 근사치입니다. 논리 KV
+처리량은 request마다 input과 output KV를 중복 제거 없이 계산한 상한으로, 실제 L2
+write byte와 동일하지 않습니다. Record가 끝난 후 실제 L2 점유량은 다음처럼
+확인합니다.
+
+```bash
+du -sb /mnt/std-ssd/lmcache-trace/mooncake-toolagent
+du -sb /mnt/std-ssd/lmcache-trace/mooncake-conversation
+```
+
+#### 진행 상황과 결과
+
+Mooncake workload가 시작되면 vLLM benchmark의 tqdm progress bar가 완료 request 수,
+전체 request 수, 처리율과 경과 시간을 표시합니다. 같은 출력은 `workload.log`에도
+저장됩니다. 모델 loading과 LMCache 준비 단계는 기존 `[INFO]` status로 확인합니다.
+
+일반 Recorder 결과에 더해 `vllm_benchmark.json`이 생성됩니다. 주요 파일은 다음과
+같습니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `storage.lct` | Replay할 LMCache storage trace |
+| `vllm_benchmark.json` | vLLM benchmark 요약 및 detailed array |
+| `request_stats.jsonl` | Mooncake request별 input/output 길이, 시작 시각, TTFT, ITL과 error |
+| `workload.json` | 선택한 trace, request 수, token 통계와 timestamp 범위 |
+| `manifest.json` | 성공·실패 수, process return code와 trace 생성 상태 |
+| `lmcache.log`, `vllm.log`, `workload.log` | 각 process의 실행 log |
 
 ## 실행 환경
 
