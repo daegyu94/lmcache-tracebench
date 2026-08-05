@@ -72,7 +72,7 @@ bash scripts/setup_runtime.sh \
 `--runtime-requirements`는 `--check`와 함께도 사용할 수 있습니다. 버전을 바꾼 뒤에는
 스크립트가 실행하는 `pip check`와 아래 smoke test를 반드시 통과시키세요.
 
-### LMCache tracebench fork 사용
+### L2 profiling용 LMCache tracebench fork 사용
 
 L2 operation profiling과 replay latency 통계(`--l2-stats-out`)를 사용하려면 PyPI의
 기본 LMCache 대신 tracebench fork의 `v0.5.1-tracebench` 태그를 설치합니다. 이
@@ -362,6 +362,8 @@ date, sleep, readlink와 sysfs counter를 preflight에서 확인합니다. 프�
 Replay client의 network도 비교하려면 profile config의 replay_node에 node1과
 interface를 추가합니다. 기본 설정에는 포함되지 않습니다. bond0와 해당 slave
 interface를 동시에 지정하면 traffic이 중복 집계되므로 둘 중 하나만 선택하세요.
+Counter 의미와 L2 operation 계측의 차이는 [L2 및 disk/network profiling 문서](docs/wiki/Home.md#l2-및-disknetwork-profiling)를
+참고하세요.
 
 결과는 `outputs/smoke-replay/trace_replay_summary.json`과
 `outputs/smoke-replay/trace_replay_ops.csv`에 저장됩니다. 먼저 실행 command만 보려면

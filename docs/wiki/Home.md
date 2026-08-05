@@ -161,6 +161,131 @@ Distributed L2 backend를 자세히 비교하려면 Replay 환경의 LMCache에 
 결과는 **Replay 중 실행되는 LMCache와 distributed storage에서 새로 측정**하는 것이
 이 실험의 기본 원칙입니다.
 
+### L2 및 disk/network profiling
+
+Replay에서 말하는 profiling은 두 계층으로 나누어 보는 것이 좋습니다.
+
+1. **L2 operation profiling**은 LMCache adapter 또는 storage controller에서 `get`,
+   `put` 요청의 queue wait, I/O 시작·완료 시각, object 크기와 latency를 수집합니다.
+   이 계측이 있어야 특정 L2 요청의 처리 시간과 p50/p90/p99를 분석할 수 있습니다.
+2. **Node profiling**은 Replay 전후의 Linux sysfs counter를 읽어 storage node의
+   block device 처리량과 network interface의 RX/TX 처리량을 기록합니다. 현재
+   Tracebench의 `--profile`이 제공하는 기능은 이 두 번째 계층입니다.
+
+`--profile`은 L2 adapter 내부의 요청 latency를 직접 측정하지 않습니다. 대신 같은
+시간축의 node-level counter를 제공하므로, L2 operation 계측과 함께 사용하면
+adapter의 대기 시간과 실제 storage/network 병목을 비교할 수 있습니다.
+
+#### L2 profiling용 LMCache 설치
+
+L2 operation profiling과 replay latency 통계(`--l2-stats-out`)를 사용하려면
+Tracebench 변경사항이 포함된 LMCache `v0.5.1-tracebench` tag를 설치합니다. 이
+LMCache는 pip의 Git URL로 설치할 수 있으므로 별도의 소스 checkout이나 patch 적용은
+필요하지 않습니다. 설치 명령과 runtime 호환성 확인 방법은
+[README의 LMCache tracebench fork 설치 절차](../../README.md#l2-profiling용-lmcache-tracebench-fork-사용)를
+따릅니다.
+
+`--no-deps`는 이미 검증한 vLLM/PyTorch 조합을 유지하기 위한 옵션이고,
+`--no-build-isolation`은 현재 환경의 PyTorch/CUDA에 맞춰 LMCache native extension을
+빌드하기 위한 옵션입니다. 따라서 node-level profiler를 사용할 때도 replay host의
+project `.venv`에는 이 LMCache fork와 replayer dependencies가 설치되어 있어야
+합니다. 반면 profiling 대상 remote node에는 Python이나 LMCache 설치가 필요하지
+않습니다.
+
+#### Node profiler 실행
+
+기본 설정은 [`configs/profiling/storage.yaml`](../../configs/profiling/storage.yaml)에
+있습니다. `nodes`에 profiling 대상 storage node를 지정하고, 각 node에 측정할
+block device와 network interface를 적습니다.
+
+```yaml
+sample_interval_seconds: 5
+report_interval_seconds: 5
+remote_tmp_root: /tmp/lmcache-tracebench-profile
+
+nodes:
+  - name: storage_node1
+    host: storage_node1
+    devices:
+      - /dev/nvme0n1
+      - /dev/nvme0n2
+    interfaces:
+      - bond0
+```
+
+Replay와 동시에 profiler를 시작하려면 다음처럼 `--profile`을 추가합니다.
+`--profile-config`도 같은 옵션의 긴 이름으로 사용할 수 있습니다.
+
+```bash
+python -m replayer.main \
+  --trace outputs/smoke/storage.lct \
+  --config configs/replayer/smoke.yaml \
+  --profile configs/profiling/storage.yaml
+```
+
+실행 순서는 다음과 같습니다.
+
+1. 각 node에 SSH로 접속해 counter와 필요한 명령을 preflight합니다.
+2. replay를 시작하기 직전에 모든 profiler agent를 실행합니다.
+3. replay가 끝나면 agent를 중지하고 결과를 replay host로 수집합니다.
+4. node별 결과를 `profile_summary.json`으로 집계합니다.
+5. 수집과 집계가 모두 성공하면 원격 `/tmp` run directory를 삭제합니다.
+
+원격 node에는 프로젝트 checkout이나 Python이 필요하지 않습니다. Replay host가
+run별 shell agent 하나를 `/tmp` 아래에 `scp`로 배포하고, 원격에서는 `bash`, `awk`,
+`cat`, `date`, `sleep`과 Linux sysfs만 사용합니다. Preflight 또는 집계에 실패하면
+원격 결과를 삭제하지 않고 장애 분석을 위해 보존합니다.
+
+#### Counter와 TSV 해석
+
+Profiler는 외부 `iostat`나 `nvme-cli` 대신 다음 sysfs counter를 직접 읽습니다.
+
+| 대상 | Counter | 계산되는 값 |
+| --- | --- | --- |
+| Block device | `/sys/class/block/<device>/stat` | read/write I/O 수, sector 수, I/O time |
+| Network interface | `/sys/class/net/<interface>/statistics/` | RX/TX byte, packet, error, drop |
+
+Block device의 sector 증가량은 512 byte로 환산합니다. 매 sample 시점에 counter를
+snapshot하고, report interval마다 이전 snapshot과의 diff를 계산해 rate를 기록합니다.
+기본값은 sampling과 report 모두 5초이며, 마지막의 짧은 구간도 종료 시 flush합니다.
+
+각 node 결과는 replay의 `output_dir/profile/<node>/` 아래에 저장됩니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `disk.tsv` | device별 구간 read/write byte, IOPS, MiB/s, I/O utilization |
+| `network.tsv` | interface별 구간 RX/TX byte, packet/s, MiB/s, error, drop |
+| `samples.jsonl` | sample timestamp와 monotonic timestamp |
+| `summary.json` | node별 전체 구간 byte와 평균 MiB/s |
+| `agent.log` | profiler 시작·종료 로그 |
+
+`disk.tsv`와 `network.tsv`는 tab-delimited 형식이며, 각 행은 실제 측정된
+`interval_s`를 기준으로 계산됩니다. `profile_summary.json`에는 node별 결과와 함께
+`cluster_disk_totals`, `cluster_interface_totals`,
+`interface_totals_by_role`가 포함됩니다. `replay_node`를 설정하면 replay host의
+network도 `role: replay`로 별도 집계할 수 있습니다.
+
+```yaml
+replay_node:
+  name: replay_node
+  host: node1
+  interfaces:
+    - eth1
+```
+
+#### 측정 시 주의 사항
+
+- Node counter는 해당 device와 interface의 전체 traffic입니다. 다른 process의 I/O나
+  network traffic이 포함되므로 LMCache L2만의 처리량으로 해석하지 않습니다.
+- `bond0`와 그 slave interface를 동시에 지정하면 동일한 traffic이 중복 집계될 수
+  있으므로 bond 또는 slave 중 하나만 선택합니다.
+- NVMe device는 실제 I/O가 발생하는 storage node에서 지정합니다. pNFS나 distributed
+  filesystem처럼 client/server 경로가 나뉘는 경우에는 replay node network와 storage
+  node network를 각각 측정하면 병목 위치를 비교하기 쉽습니다.
+- 정확한 L2 요청 latency가 필요하면 이 profiler만으로 충분하지 않습니다. 앞의
+  "L2 분석을 위한 Replay 계측"에 설명한 adapter/controller 계측을 함께 수집해야
+  합니다.
+
 ### GPU memory downscaling
 
 Record 환경에서는 B300 GPU 한 장의 VRAM 중 약 25%를 하나의 model instance가
