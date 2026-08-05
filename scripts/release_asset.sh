@@ -223,10 +223,11 @@ run_upload() {
   file_dir="$(cd -- "$(dirname -- "$file_path")" && pwd -P)"
   local upload_dir
   upload_dir="$(mktemp -d "$file_dir/.lmcache-tracebench-release.XXXXXX")"
-  cleanup_upload() {
-    rm -rf -- "$upload_dir"
-  }
-  trap cleanup_upload EXIT
+  # Expand the generated directory now: a function-local variable is no longer
+  # defined when the EXIT trap runs after run_upload returns.
+  local cleanup_command
+  printf -v cleanup_command 'rm -rf -- %q' "$upload_dir"
+  trap "$cleanup_command" EXIT
 
   if ((file_size_bytes >= max_release_asset_bytes)); then
     printf '[INFO] Splitting trace into parts of at most 1900 MiB\n'
