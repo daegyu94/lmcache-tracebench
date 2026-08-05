@@ -185,8 +185,9 @@ Record 환경에서는 B300 GPU 한 장의 VRAM 중 약 25%를 하나의 model i
 
 ### Tensormesh V3
 
-현재 기본 workload backend입니다. SWE-bench, GAIA, WildClaw 계열의 session을
-혼합해 multi-turn 요청과 prefix reuse가 포함된 workload를 생성합니다.
+현재 기본 workload backend입니다. SWE-bench, GAIA, WildClaw source별 multi-turn
+session을 사용해 prefix reuse가 포함된 workload를 생성합니다. Source를 섞는 mixed
+workload의 구성과 해석은 현재 **TBD**입니다.
 
 #### LMCache Agentic Trace
 
@@ -225,13 +226,40 @@ Source별 workload 특성은 다음과 같습니다.
 - **WildClaw:** Search, code generation, productivity와 creative task가 섞인 multi-tool
   agent trajectory
 
+#### Source별 record 결과
+
+다음은 `source-traces-20260804-082231` 실행에서 source별로 모든 session을 record한
+실측 결과입니다. KV cache 점유량은 PM1753의 해당 L2 directory에 대해 `du -sh`로
+측정했고, trace 크기는 각 결과 directory의 `storage.lct` 파일 크기입니다.
+
+| Source | L2 KV cache 경로 | KV cache 점유량 | `storage.lct` 크기 |
+| --- | --- | ---: | ---: |
+| GAIA | `/mnt/std-ssd/lmcache-trace/gaia` | 537G | 135M |
+| SWE-bench | `/mnt/std-ssd/lmcache-trace/swebench` | 4.9T | 5.9G |
+| WildClaw | `/mnt/std-ssd/lmcache-trace/wildclaw` | 56G | 24M |
+
+L2 KV cache 점유량은 record 과정에서 `fs_native` adapter가 PM1753에 실제로 저장한
+KV object의 filesystem 사용량입니다. 반면 `storage.lct`는 payload를 복사하지 않고
+`StorageManager` API 호출과 인자만 저장하므로 KV cache보다 훨씬 작습니다. 특히
+SWE-bench 결과는 이 dataset revision과 record 설정에서 가장 큰 storage workload를
+형성했으며, replay 시 L2 용량 계획과 trace 파일 전송 시간을 별도로 고려해야 합니다.
+
+이 수치는 위 timestamped 실행 및 현재 dataset revision에 대한 관측값입니다. model,
+session 수, LMCache chunk size, cache policy 또는 dataset revision이 바뀌면 두 크기도
+달라질 수 있습니다.
+
+#### Mixed workload
+
+> **TBD:** source별 trace를 기반으로 한 mixed workload의 source 비율, session ordering,
+> timing policy와 대표성 검증을 추후 정의합니다.
+
 Recorder는 원래 agent나 tool을 다시 실행하지 않습니다. Dataset에 저장된 누적
 message를 OpenAI-compatible API request로 직접 보내며, `respect-gaps` 모드에서는
 `pre_gap`을 반영해 tool 실행 시간을 모사합니다. `max-pressure` 모드에서는 이 간격을
 제거해 같은 prefix-growth workload로 storage와 serving system에 더 높은 부하를
 가합니다.
 
-LMCache Agentic Trace에서 우선 record할 실험은 다음 두 가지입니다.
+Source별 LMCache Agentic Trace에서 우선 record할 실험은 다음 두 가지입니다.
 
 - **Max pressure:** 별도의 client-side thinking/tool gap 없이 다음 request를 즉시 보내고
   높은 concurrency를 적용해 강한 pressure를 만듭니다. 이때 server 내부에서 발생하는
@@ -239,13 +267,13 @@ LMCache Agentic Trace에서 우선 record할 실험은 다음 두 가지입니�
 - **Realistic timing:** 실제 `pre_gap`을 적용해 tool 실행과 agent thinking에 해당하는
   request 간격을 보존합니다.
 
-이에 대응하는 대표 config는 다음과 같습니다.
+Source별 record에는 다음 config를 사용합니다.
 
 | Config | 용도 |
 | --- | --- |
-| `qwen3-coder-480b-tp8-smoke.yaml` | TP=8 환경의 짧은 사전 검증 |
-| `qwen3-coder-480b-tp8-realistic.yaml` | 원래 요청 간격을 반영한 실행 |
-| `qwen3-coder-480b-tp8-max-pressure.yaml` | 높은 동시성으로 최대 부하 측정 |
+| `qwen3-coder-480b-tp8-gaia.yaml` | GAIA source의 원래 요청 간격을 반영한 실행 |
+| `qwen3-coder-480b-tp8-swebench.yaml` | SWE-bench source의 원래 요청 간격을 반영한 실행 |
+| `qwen3-coder-480b-tp8-wildclaw.yaml` | WildClaw source의 원래 요청 간격을 반영한 실행 |
 
 ### Mooncake
 
@@ -277,14 +305,14 @@ bash scripts/setup_runtime.sh --check
 
 ## Recorder 실행
 
-TP=8 smoke workload 실행 예시입니다.
+TP=8 GAIA source record 실행 예시입니다.
 
 ```bash
 source .venv/bin/activate
 
 python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-smoke.yaml \
-  --output-dir outputs/qwen3-coder-tp8-smoke
+  --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
+  --output-dir outputs/qwen3-coder-tp8-gaia
 ```
 
 실제 process를 시작하지 않고 LMCache와 vLLM command만 확인하려면
@@ -292,8 +320,8 @@ python -m recorder.main \
 
 ```bash
 python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-realistic.yaml \
-  --output-dir outputs/qwen3-coder-tp8-realistic \
+  --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
+  --output-dir outputs/qwen3-coder-tp8-gaia \
   --dry-run
 ```
 

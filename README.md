@@ -81,17 +81,12 @@ TP=8 config는 L2 write가 진행되는 동안 사용할 L1 staging 공간을 20
 
 ```bash
 python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-realistic.yaml \
-  --output-dir outputs/example
+  --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
+  --output-dir outputs/gaia
 ```
 
 `configs/recorder/qwen3-coder-480b-tp8-base.yaml`은 공통 TP=8 runtime·LMCache 설정이며 직접 실행하지
-않습니다. all workload는 아래 두 override config로 실행합니다.
-
-| Config | Timing | Concurrent sessions |
-| --- | --- | ---: |
-| `configs/recorder/qwen3-coder-480b-tp8-realistic.yaml` | `respect-gaps`, `pre_gap_scale: 1` | 20 |
-| `configs/recorder/qwen3-coder-480b-tp8-max-pressure.yaml` | `max-pressure` | 80 |
+않습니다. Mixed workload의 source 비율, session ordering과 대표성 검증은 현재 **TBD**입니다.
 
 SWE-bench, GAIA, WildClaw를 각각 독립 trace로 기록하려면 다음 source별 config를
 사용합니다. 각 config는 별도 L2 경로를 사용합니다.
@@ -112,15 +107,6 @@ bash scripts/record_source_traces.sh \
 각 결과는 timestamped directory 아래 `gaia/`, `wildclaw/`, `swebench/`에 저장됩니다.
 작은 working set의 GAIA부터 시작하며, 한 source가 실패하면 script는 즉시 멈춥니다. 이때
 실패한 source만 해당 config로 다시 실행하면 됩니다.
-
-현재 dataset revision의 모든 session을 실행하기 전에 동일한 TP=8 환경에서 mixed workload 100개로
-확인하려면 다음 config를 사용합니다.
-
-```bash
-python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-smoke.yaml \
-  --output-dir outputs/qwen3-coder-tp8-smoke
-```
 
 ### Mooncake real-world workload
 
