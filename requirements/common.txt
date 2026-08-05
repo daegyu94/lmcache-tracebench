@@ -1,6 +1,10 @@
 # Dependencies shared by recorder and storage-trace replayer environments.
-# LMCache's CUDA package may install its declared CUDA/NIXL runtime dependencies
-# transitively; backend-specific requirements are listed in the profile files.
-lmcache==0.5.1
+# The tracebench fork provides L2 operation profiling and replay latency stats.
+lmcache @ git+https://github.com/daegyu94/LMCache.git@v0.5.1-tracebench
 torch==2.11.0
 fsspec[http]==2026.6.0
+# Keep a profile switch compatible with the vLLM runtime left by recorder.
+fastapi[standard]>=0.133.0,<0.137.0
+numba==0.65.0
+numpy==2.2.6
+setuptools>=77.0.3,<81.0.0

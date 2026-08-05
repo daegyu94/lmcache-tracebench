@@ -1,2 +1,0 @@
-# fs_native replay has no additional Python dependency beyond the common set.
--r common.txt

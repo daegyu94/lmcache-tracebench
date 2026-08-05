@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or verify the runtime needed for LMCache MP trace generation.
+# Install or verify the recorder or replayer runtime.
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,7 +13,7 @@ extra_requirements=()
 
 usage() {
     echo "Usage: bash scripts/setup_runtime.sh [--check] [--profile PROFILE] [--runtime-requirements PATH]" >&2
-    echo "Profiles: common, recorder (default), replayer-fs-native, replayer-nixl-hf3fs" >&2
+    echo "Profiles: recorder (default), replayer" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -51,10 +51,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${profile}" in
-    common)
-        default_runtime_requirements="${project_root}/requirements/common.txt"
-        project_install="${project_root}[test]"
-        ;;
     recorder)
         default_runtime_requirements="${project_root}/requirements/recorder.txt"
         project_install="${project_root}[test,live]"
@@ -63,12 +59,8 @@ case "${profile}" in
             "${project_root}/third_party/Tensormesh-Benchmark/src/requirements.txt"
         )
         ;;
-    replayer-fs-native)
-        default_runtime_requirements="${project_root}/requirements/replayer-fs-native.txt"
-        project_install="${project_root}[test]"
-        ;;
-    replayer-nixl-hf3fs)
-        default_runtime_requirements="${project_root}/requirements/replayer-nixl-hf3fs.txt"
+    replayer)
+        default_runtime_requirements="${project_root}/requirements/replayer.txt"
         project_install="${project_root}[test]"
         ;;
     *)
@@ -114,10 +106,12 @@ if [[ "${check_only}" == false ]]; then
     fi
 
     "${venv_python}" -m pip install --upgrade pip
-    "${venv_python}" -m pip install \
-        -e "${project_install}" \
+    # Reinstall the selected runtime so a previously installed LMCache build or
+    # version cannot leak across recorder/replayer profile changes.
+    "${venv_python}" -m pip install --upgrade --force-reinstall --no-build-isolation \
         -r "${runtime_requirements}" \
         "${extra_requirements[@]}"
+    "${venv_python}" -m pip install -e "${project_install}"
 fi
 
 if [[ ! -x "${venv_python}" ]]; then
@@ -129,12 +123,9 @@ if [[ "${profile}" == "recorder" ]]; then
     "${venv_python}" -c \
         "import lmcache, lmcache.c_ops, vllm, openai, datasets; print('recorder imports: OK')"
     "${venv_python}" -m vllm.entrypoints.openai.api_server --help >/dev/null
-elif [[ "${profile}" == "replayer-nixl-hf3fs" ]]; then
-    "${venv_python}" -c \
-        "import lmcache, lmcache.c_ops, nixl; print('NIXL replayer imports: OK')"
 else
     "${venv_python}" -c \
-        "import lmcache, lmcache.c_ops; print('replayer imports: OK')"
+        "import importlib.util, lmcache, lmcache.c_ops; assert importlib.util.find_spec('nixl'); print('replayer imports: OK')"
 fi
 "${venv_python}" -c \
     "from importlib.metadata import version; print('runtime versions:', ', '.join(f'{name}={version(name)}' for name in ('lmcache', 'torch', 'fsspec')))"
