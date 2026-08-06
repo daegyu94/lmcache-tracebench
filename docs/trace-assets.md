@@ -8,7 +8,7 @@
 gh auth login
 ```
 
-## Release 생성
+## Create a release
 
 ```bash
 bash scripts/release_asset.sh release \
@@ -16,7 +16,7 @@ bash scripts/release_asset.sh release \
   --title "Tensormesh benchmark traces (2026-08-05)"
 ```
 
-## Trace upload
+## Upload trace assets
 
 기록한 trace 하나를 기존 GitHub Release의 asset으로 등록하려면 다음을 실행합니다.
 `--filename`은 Release에 표시할 asset 이름이고, `--filepath`은 로컬 파일 경로입니다.
@@ -34,7 +34,7 @@ file을 추가할 수 있습니다. GitHub Release asset 하나는 2 GiB 미만�
 file은 script가 자동으로 최대 1900 MiB 크기의 `NAME.part-001`, `NAME.part-002` 형식 asset으로
 분할해 업로드합니다. Split part는 업로드가 끝나면 삭제됩니다.
 
-## Trace download
+## Download trace assets
 
 Release에서 trace를 내려받으려면 다음을 실행합니다. split asset은 자동으로 결합해
 `--output-dir`에 원본 파일을 만들며, `--keep-parts`를 지정하지 않으면 다운로드한 part를

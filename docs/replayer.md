@@ -27,9 +27,9 @@ Storage trace에는 실제 KV payload, API 반환값·exception, record 환경�
 시각이 포함되지 않습니다. 따라서 `.lct`는 storage workload 재현 입력으로
 사용하고, L2 성능은 replay 중 adapter·backend에서 새로 측정해야 합니다.
 
-## Replayer
+## Replay
 
-Replayer는 저장된 `.lct`를 LMCache `trace replay` command로 한 번 실행합니다.
+Replayer는 저장된 `.lct`를 LMCache `trace replay` 명령으로 한 번 실행합니다.
 공용 `base.yaml`을 상속하는 `fs-native.yaml` 또는 `nixl-hf3fs.yaml`을 선택합니다.
 각 storage record는 trace의 monotonic timestamp 간격에 맞춰 재생되며, replay host가
 더 느리면 원래 schedule보다 뒤처진 상태로 계속 진행합니다.
@@ -42,13 +42,13 @@ python -m replayer.main \
   --output-dir outputs/replay
 ```
 
-실행 전 command만 확인하려면 `--dry-run`을 추가합니다.
+실행 전 명령만 확인하려면 `--dry-run`을 추가합니다.
 실행 중에는 터미널에 record 진행률을 표시하며, LMCache 원문 로그는
 `output_dir/lmcache-replay.log`에 저장됩니다. `--base-path`는 `fs_native`의
 `l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
-`--output-dir`는 summary, operation CSV와 로그를 저장할 directory를 덮어씁니다.
+`--output-dir`는 summary, operation CSV와 로그를 저장할 디렉터리를 덮어씁니다.
 
-## Replay backend
+## Backend configuration
 
 Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config의 adapter로
 새 `StorageManager`를 만듭니다. 따라서 로컬 SSD의 `fs_native`로 record한 trace를
@@ -83,7 +83,7 @@ alignment, eviction/store policy와 trace timing을 같게 유지한 채 L2 adap
 바꿉니다. Record 환경의 cache file은 필요하지 않으며 `.lct` schema와 호환되는
 LMCache version을 사용해야 합니다.
 
-## Replay profiling
+## Profiling
 
 Replay 계측은 두 계층으로 구분합니다.
 

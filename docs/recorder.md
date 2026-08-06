@@ -3,8 +3,6 @@
 설치 profile과 공통 경로 표기는 [README](../README.md)의
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
-## Recorder
-
 Recorder는 LMCache MP와 vLLM을 시작하고 OpenAI-compatible endpoint로 workload를
 전송합니다. 예제 config의 `lmcache.l2.reset_on_start: true`는 실행 전에 기존
 `base_path`를 비우므로, 필요한 데이터는 백업하거나 이 값을 `false`로 바꾸세요.
@@ -46,7 +44,7 @@ python -m recorder.main \
   --output-dir outputs/gaia
 ```
 
-실행할 command만 확인하려면 `--dry-run`을 추가합니다.
+실행 명령만 확인하려면 `--dry-run`을 추가합니다.
 
 `configs/recorder/qwen3-coder-480b-tp8-base.yaml`은 공통 TP=8 runtime·LMCache
 설정이며 직접 실행하지 않습니다.
@@ -76,7 +74,7 @@ bash scripts/record_source_traces.sh \
   --output-root /MNTPNT/lmcache-tracebench/outputs
 ```
 
-각 결과는 timestamped directory 아래 `gaia/`, `wildclaw/`, `swebench/`에 저장됩니다.
+각 결과는 timestamped 디렉터리 아래 `gaia/`, `wildclaw/`, `swebench/`에 저장됩니다.
 작은 working set의 GAIA부터 시작하며, 한 source가 실패하면 script는 즉시 멈춥니다. 이때
 실패한 source만 해당 config로 다시 실행하면 됩니다.
 
@@ -135,7 +133,7 @@ vendor하지 않고
 두 trace는 독립된 timeline과 prefix-reuse 분포를 가지므로 각각 record합니다.
 별도의 mixed workload 정책 없이 JSONL을 합치지 않습니다.
 
-각 JSONL line은 request 하나이며 주요 field는 다음과 같습니다.
+각 JSONL 행은 request 하나이며 주요 field는 다음과 같습니다.
 
 | Field | 의미 |
 | --- | --- |
@@ -166,13 +164,13 @@ scaling 설정은 다음과 같습니다.
 | 설정 | 의미 |
 | --- | --- |
 | `num_requests` | JSONL 처음부터 실행할 request 수. `null`은 전체 trace |
-| `time_scale` | Request 간격 배율. `1.0`은 원본 timeline, `0.1`은 10배 압축 |
+| `time_scale` | request 간격 배율. `1.0`은 원본 timeline, `0.1`은 10배 압축 |
 | `chunk_hash_size` | `hash_id` 하나를 확장할 token 수. 공식 trace는 512 |
 | `max_concurrent_requests` | 동시에 처리할 client request 상한 |
 
 `num_requests`는 shuffle sample이 아니라 timestamp 순서를 유지한 trace prefix입니다.
 `1,000`, `5,000`, `null` 순서로 늘려 storage 용량과 실행 시간을 확인할 수
-있습니다. `time_scale`은 request set과 token 수는 바꾸지 않고 arrival 간격과
+있습니다. `time_scale`은 request 수와 token 수는 바꾸지 않고 arrival 간격과
 그에 따른 concurrency·I/O timing만 조절합니다.
 
 공통 config를 복제하지 않고 run별 값을 바꾸려면 `--mooncake-num-requests`와

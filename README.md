@@ -1,7 +1,7 @@
 # LMCache Tracebench
 
 vLLM + LMCache MP 환경에서 Tensormesh-Benchmark V3 또는 Mooncake FAST'25
-workload를 실행하고 LMCache storage trace를 기록·재생하는 도구입니다.
+workload를 실행하고 LMCache storage trace를 기록하고 재생하는 도구입니다.
 
 ## Overview
 
@@ -41,9 +41,10 @@ git submodule update --init --recursive
 
 ## Prerequisites
 
-Ubuntu 24.04와 Python 3.12가 필요합니다. Recorder는 CUDA가 연결된 NVIDIA GPU가
-필요하지만, storage trace Replayer는 `fs_native` 기준 GPU·vLLM·모델 없이 실행할 수
-있습니다. 모든 profile은 같은 프로젝트 `.venv`를 사용합니다.
+현재 저장소는 Ubuntu 24.04와 Python 3.12 환경에서 검증했습니다. Recorder는 CUDA가
+연결된 NVIDIA GPU가 필요하지만, storage trace Replayer는 `fs_native` 기준
+GPU·vLLM·모델 없이 실행할 수 있습니다. 모든 profile은 같은 프로젝트 `.venv`를
+사용합니다.
 
 이 문서와 상세 가이드의 `/MNTPNT`는 실제 storage mount 경로로 바꿔 사용합니다.
 
@@ -158,7 +159,7 @@ python -m recorder.main \
 성공하면 `outputs/smoke/storage.lct`와 `outputs/smoke/manifest.json`이 생성됩니다.
 문제가 생기면 `outputs/smoke/lmcache.log`와 `outputs/smoke/vllm.log`를 먼저 확인합니다.
 
-방금 record한 trace를 새 StorageManager에 replay하려면 다음을 실행합니다. Replay는
+방금 기록한 trace를 새 StorageManager에 replay하려면 다음을 실행합니다. Replay는
 vLLM이나 GPU server를 다시 시작하지 않으며, `configs/replayer/smoke.yaml`의 별도 L2
 경로를 사용합니다.
 
@@ -178,9 +179,9 @@ python -m replayer.main \
   --profile configs/profiling/storage.yaml
 ```
 
-설정, 결과 파일과 counter 해석은 [Replay profiling](docs/replayer.md#replay-profiling)을
+설정, 결과 파일과 counter 해석은 [Replay profiling](docs/replayer.md#profiling)을
 참고하세요. 결과는 `outputs/smoke-replay/trace_replay_summary.json`과
-`outputs/smoke-replay/trace_replay_ops.csv`에 저장됩니다. 먼저 실행 command만 보려면
+`outputs/smoke-replay/trace_replay_ops.csv`에 저장됩니다. 먼저 실행 명령만 보려면
 끝에 `--dry-run`을 추가합니다.
 
 ## Tests
