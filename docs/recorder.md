@@ -286,8 +286,6 @@ LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다
 
 | Trace 범위 | 고유 prefix KV 추정 | 중복 제거 없는 논리 KV 처리량 |
 | --- | ---: | ---: |
-| Tool/Agent 처음 1,000 requests | 약 1.59 TB | 약 2.54 TB |
-| Conversation 처음 1,000 requests | 약 2.80 TB | 약 3.58 TB |
 | Tool/Agent 전체 23,608 requests | 약 23.83 TB | 약 52.63 TB |
 | Conversation 전체 12,031 requests | 약 23.77 TB | 약 37.82 TB |
 
