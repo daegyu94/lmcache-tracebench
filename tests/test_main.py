@@ -11,6 +11,10 @@ def test_mooncake_overrides_are_reflected_in_dry_run(capsys):
                 "conversation",
                 "--mooncake-path",
                 "/tmp/conversation_trace.jsonl",
+                "--mooncake-num-requests",
+                "all",
+                "--base-path",
+                "/tmp/mooncake-{trace}",
                 "--output-dir",
                 "/tmp/mooncake-main-test",
                 "--dry-run",
@@ -20,4 +24,5 @@ def test_mooncake_overrides_are_reflected_in_dry_run(capsys):
     )
     output = capsys.readouterr().out
     assert "storage.lct" in output
-    assert "mooncake-conversation" in output
+    assert "/tmp/mooncake-conversation" in output
+    assert "--num-requests" not in output

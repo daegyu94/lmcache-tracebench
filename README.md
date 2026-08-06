@@ -363,6 +363,10 @@ scaling 설정은 다음과 같습니다.
 있습니다. `time_scale`은 request set과 token 수는 바꾸지 않고 arrival 간격과
 그에 따른 concurrency·I/O timing만 조절합니다.
 
+공통 config를 복제하지 않고 run별 값을 바꾸려면 `--mooncake-num-requests`와
+`--base-path`를 사용합니다. `all`은 YAML의 `null`과 같으며 전체 trace를
+선택합니다.
+
 Tool/Agent trace를 기록하려면 다음 공통 config를 사용합니다.
 
 ```bash
@@ -370,6 +374,8 @@ python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
   --mooncake-trace toolagent \
   --mooncake-path /mnt/std-ssd/traces/mooncake/toolagent_trace.jsonl \
+  --mooncake-num-requests all \
+  --base-path /mnt/hc-ssd/lmcache-trace/mooncake-{trace} \
   --output-dir outputs/qwen3-coder-tp8-mooncake-toolagent
 ```
 

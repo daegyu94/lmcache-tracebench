@@ -11,10 +11,29 @@ from .config import load_config
 from .launcher import build_commands
 
 
+def _mooncake_num_requests(value: str) -> int | None:
+    """Parse a Mooncake request limit, with ``all`` meaning the full trace."""
+    if value == "all":
+        return None
+    try:
+        num_requests = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer or 'all'"
+        ) from exc
+    if num_requests <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
+    return num_requests
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, help="recorder YAML config")
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument(
+        "--base-path",
+        help="override the fs_native L2 base path from the recorder config",
+    )
     parser.add_argument(
         "--mooncake-trace",
         choices=("conversation", "toolagent"),
@@ -23,6 +42,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mooncake-path",
         help="local Mooncake JSONL path; requires --mooncake-trace",
+    )
+    parser.add_argument(
+        "--mooncake-num-requests",
+        type=_mooncake_num_requests,
+        metavar="N|all",
+        default=argparse.SUPPRESS,
+        help="override the Mooncake request prefix; 'all' replays the full trace",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -39,17 +65,32 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config(args.config)
     if bool(args.mooncake_trace) != bool(args.mooncake_path):
         parser.error("--mooncake-trace and --mooncake-path must be used together")
-    if args.mooncake_trace:
+    mooncake_num_requests = getattr(args, "mooncake_num_requests", None)
+    has_mooncake_num_requests = hasattr(args, "mooncake_num_requests")
+    if args.mooncake_trace or has_mooncake_num_requests:
         if config.workload.backend != "mooncake":
             parser.error("Mooncake options require workload.backend: mooncake")
         mooncake = replace(
             config.workload.mooncake,
-            trace=args.mooncake_trace,
-            path=args.mooncake_path,
+            trace=args.mooncake_trace or config.workload.mooncake.trace,
+            path=args.mooncake_path or config.workload.mooncake.path,
+            num_requests=(
+                mooncake_num_requests
+                if has_mooncake_num_requests
+                else config.workload.mooncake.num_requests
+            ),
         )
         config = replace(
             config,
             workload=replace(config.workload, mooncake=mooncake),
+        )
+    if args.base_path:
+        config = replace(
+            config,
+            lmcache=replace(
+                config.lmcache,
+                l2=replace(config.lmcache.l2, base_path=args.base_path),
+            ),
         )
     if config.workload.backend == "mooncake":
         l2 = config.lmcache.l2
