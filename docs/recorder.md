@@ -101,6 +101,30 @@ Mixed workload의 source 비율, session ordering, timing policy와 대표성 �
 
 ## Speed sweep
 
+### Why each speedup needs its own trace
+
+`storage.lct`는 workload가 실제로 실행되는 동안 발생한 storage operation의
+순서와 상대 시간 간격을 기록합니다. GPU compute 시간, serving-side scheduling,
+request 처리 지연은 포함하지 않습니다. 따라서 원본 `storage.lct`를 replay 단계에서
+배속하면 storage operation 간격만 압축되고 GPU compute 시간은 함께 조정되지 않아,
+의도한 workload speedup을 재현하지 못합니다.
+
+배속 비교에서는 recorder 단계에서 각 speedup으로 workload를 실행해
+`storage.lct`를 별도로 생성해야 합니다. 아래 스크립트는 이 과정을 자동화하며,
+배속별 결과 trace는 서로 다른 output 디렉터리에 저장합니다.
+
+```text
+Record phase: workload (GPU compute + serving + storage)
+
+  source workload ──┬─ x1  ──> storage.lct (x1)  ──> replay x1
+                     ├─ x2  ──> storage.lct (x2)  ──> replay x2
+                     ├─ x5  ──> storage.lct (x5)  ──> replay x5
+                     └─ x10 ──> storage.lct (x10) ──> replay x10
+
+  One source trace cannot be replay-time scaled faithfully:
+  GPU compute time is not represented in storage.lct, so only storage gaps shrink.
+```
+
 `record_speed_sweep.sh`는 workload별로 speedup마다 하나의 `storage.lct`를
 순차적으로 기록합니다. config의 L2 `subpath`는 `--mountpoint` 아래에서
 사용하며, 각 실행의 trace 결과만 speedup 디렉터리별로 분리합니다.

@@ -27,6 +27,10 @@ Storage trace에는 실제 KV payload, API 반환값·exception, record 환경�
 시각이 포함되지 않습니다. 따라서 `.lct`는 storage workload 재현 입력으로
 사용하고, L2 성능은 replay 중 adapter·backend에서 새로 측정해야 합니다.
 
+Workload speedup은 replay 단계에서 적용하지 않습니다. GPU compute 시간이
+`storage.lct`에 포함되지 않으므로, speedup 비교에는 [Recorder guide의 speed
+sweep](recorder.md#speed-sweep)처럼 배속별로 별도 기록한 trace를 사용합니다.
+
 ## Replay
 
 Replayer는 저장된 `.lct`를 LMCache `trace replay` 명령으로 한 번 실행합니다.
