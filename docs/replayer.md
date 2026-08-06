@@ -52,6 +52,46 @@ python -m replayer.main \
 `l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
 `--output-dir`는 summary, operation CSV와 로그를 저장할 디렉터리를 덮어씁니다.
 
+## Parallel replicated replay
+
+한 replayer 노드에서 여러 MP instance의 storage 부하를 모사하려면
+`replay_instances.sh`를 사용합니다. 이 기능은 동일한 `.lct`를 N개 독립 replay
+process에서 병렬 실행하는 복제 모드만 제공합니다. 각 instance는 독립적인 L2
+subdirectory와 output directory를 사용하지만, 같은 physical storage를 공유할 수
+있습니다.
+
+```bash
+bash scripts/replay_instances.sh \
+  --instances 8 \
+  --trace outputs/speed-sweep/tensormesh-gaia-x5/storage.lct \
+  --config configs/replayer/fs-native.yaml \
+  --l2-root /MNTPNT/lmcache-trace-replay \
+  --output-root outputs/replay/gaia-x5-n8
+```
+
+실행 전에는 다음과 같이 N개 command만 확인할 수 있습니다.
+
+```bash
+bash scripts/replay_instances.sh \
+  --instances 4 \
+  --trace path/to/storage.lct \
+  --config configs/replayer/fs-native.yaml \
+  --l2-root /MNTPNT/lmcache-trace-replay \
+  --dry-run
+```
+
+결과는 `instance-0/`, `instance-1/` 등의 디렉터리와
+`outputs/replay/gaia-x5-n8/instances-summary.json`에 저장됩니다. 각 instance의
+LMCache 출력은 해당 디렉터리의 `lmcache-replay.log`, launcher 출력은
+`launcher.log`에서 확인합니다. 실행 전 L2 instance 디렉터리가 비어 있는지
+확인하세요.
+
+동일 trace 복제는 storage backend의 aggregate 부하를 높이는 실험에는 적합하지만,
+동일 KV key가 반복될 수 있으므로 N개의 서로 다른 workload를 정확히 재현하는
+기능은 아닙니다. 또한 모든 replay process가 한 노드에서 실행되므로 N개 실제
+replayer 노드의 network locality를 그대로 재현하지는 않습니다. 서로 다른 trace를
+섞거나 여러 replayer 노드에 분산하는 기능은 Future Work입니다.
+
 ## Backend configuration
 
 Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config의 adapter로

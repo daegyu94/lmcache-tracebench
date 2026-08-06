@@ -20,6 +20,8 @@ Record 단계는 workload를 실행하고 로컬 SSD의 `fs_native` L2에 KV obj
 operation sequence의 처리량, latency와 resource 사용량을 비교합니다. Record에
 사용한 L2 backend와 replay 대상 backend는 같을 필요가 없습니다. Storage trace의
 기록 범위와 `.lct` contract는 [Replayer guide](docs/replayer.md#storage-trace-contract)를
+참고하세요. 한 노드에서 동일 trace를 여러 instance로 복제하는 replay는
+[Parallel replicated replay](docs/replayer.md#parallel-replicated-replay)를
 참고하세요.
 
 ## Repository setup
