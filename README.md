@@ -15,7 +15,7 @@ Recorder → vLLM API server → LMCache MP → L2 storage
                                   Replayer
 ```
 
-Record 단계는 H100 TP=8에서 Qwen3-Coder workload를 실행하고 PM1753 SSD의
+Record 단계는 H100 TP=8에서 Qwen3-Coder workload를 실행하고 로컬 SSD의
 `fs_native` L2에 KV object를 저장하며 `storage.lct`를 만듭니다. Replay 단계는
 이 trace를 PoC/B300 cluster의 3FS, pNFS 등 다른 L2 backend에 재생해 동일한
 operation sequence의 처리량, latency와 resource 사용량을 비교합니다. Record에
@@ -230,8 +230,8 @@ bash scripts/record_source_traces.sh \
 실패한 source만 해당 config로 다시 실행하면 됩니다.
 
 `source-traces-20260804-082231` 실행에서 모든 session을 record한 실측 결과는
-다음과 같습니다. KV cache는 PM1753 L2 directory의 `du -sh`, trace는 생성된
-`storage.lct`의 크기입니다.
+다음과 같습니다. KV cache 점유량은 L2 directory의 filesystem 사용량이고, trace는
+생성된 `storage.lct`의 크기입니다.
 
 | Source | L2 KV cache 경로 | KV cache 점유량 | `storage.lct` 크기 |
 | --- | --- | ---: | ---: |
@@ -268,7 +268,118 @@ token당 253,952 byte입니다.
 = 253,952 bytes/token
 ```
 
-### Trace release asset 관리
+### Mooncake real-world workload
+
+`workload.backend: mooncake`는 실제 online request의 timestamp, token 길이와 익명화된
+prefix 구조를 vLLM `timed_trace`로 실행합니다. Mooncake source code는 실행하거나
+vendor하지 않고
+[`kvcache-ai/Mooncake` FAST'25 release](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release/traces)의
+공식 JSONL만 다운로드합니다.
+
+| Trace | 성격 | 요청 수 | 입력 token | 출력 token |
+| --- | --- | ---: | ---: | ---: |
+| `toolagent_trace.jsonl` | Tool/agent serving | 23,608 | 202,940,084 | 4,299,817 |
+| `conversation_trace.jsonl` | 대화형 serving | 12,031 | 144,793,823 | 4,122,048 |
+
+두 trace는 독립된 timeline과 prefix-reuse 분포를 가지므로 각각 record합니다.
+별도의 mixed workload 정책 없이 JSONL을 합치지 않습니다.
+
+각 JSONL line은 request 하나이며 주요 field는 다음과 같습니다.
+
+| Field | 의미 |
+| --- | --- |
+| `timestamp` | Trace 시작 후 request 도착 시각(ms) |
+| `input_length` | vLLM에 전송할 prompt token 수 |
+| `output_length` | EOS와 관계없이 생성할 output token 수 |
+| `hash_ids` | 512-token block 단위의 익명화된 prompt content 식별자 |
+
+실제 prompt text는 포함되지 않습니다. `timed_trace` loader는 `hash_id`를
+deterministic seed로 사용해 synthetic token을 만듭니다. Recorder는
+`chunk_hash_size: 512`와 `PYTHONHASHSEED=0`을 설정해 실행 간 token sequence와
+LMCache key가 일관되게 유지합니다.
+
+모델이나 LMCache를 시작하지 않고 Conversation과 Tool/Agent JSONL을 다운로드하고
+검증하려면 다음 명령을 사용합니다.
+
+```bash
+python -m recorder.mooncake_cli \
+  --path /MNTPNT/mooncake-traces
+```
+
+`--trace toolagent` 또는 `--trace conversation`으로 하나만 선택할 수 있고,
+이미 받은 파일만 검증하려면 `--no-download`를 추가합니다.
+
+공통 config `configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml`의 주요
+scaling 설정은 다음과 같습니다.
+
+| 설정 | 의미 |
+| --- | --- |
+| `num_requests` | JSONL 처음부터 실행할 request 수. `null`은 전체 trace |
+| `time_scale` | Request 간격 배율. `1.0`은 원본 timeline, `0.1`은 10배 압축 |
+| `chunk_hash_size` | `hash_id` 하나를 확장할 token 수. 공식 trace는 512 |
+| `max_concurrent_requests` | 동시에 처리할 client request 상한 |
+
+`num_requests`는 shuffle sample이 아니라 timestamp 순서를 유지한 trace prefix입니다.
+`1,000`, `5,000`, `null` 순서로 늘려 storage 용량과 실행 시간을 확인할 수
+있습니다. `time_scale`은 request set과 token 수는 바꾸지 않고 arrival 간격과
+그에 따른 concurrency·I/O timing만 조절합니다.
+
+공통 config를 복제하지 않고 run별 값을 바꾸려면 `--mooncake-num-requests`와
+`--base-path`를 사용합니다. `all`은 YAML의 `null`과 같으며 전체 trace를
+선택합니다.
+
+Tool/Agent 또는 Conversation trace를 기록하려면 `TRACE`만 바꿔 다음 명령을
+사용합니다. `TRACE`에는 `toolagent` 또는 `conversation`을 지정합니다.
+
+```bash
+TRACE=toolagent  # conversation으로 바꿔 실행할 수 있습니다.
+
+python -m recorder.main \
+  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
+  --mooncake-trace "$TRACE" \
+  --mooncake-path "/MNTPNT/mooncake-traces/${TRACE}_trace.jsonl" \
+  --mooncake-num-requests all \
+  --base-path "/MNTPNT/lmcache-trace/mooncake-${TRACE}" \
+  --output-dir "outputs/qwen3-coder-tp8-mooncake-${TRACE}"
+```
+
+실행할 때마다 `TRACE`를 하나씩 선택하며, 출력과 L2 경로는
+`mooncake-${TRACE}` suffix로 분리됩니다. 두 경로 모두 `reset_on_start: true`이므로
+같은 trace를 다시 시작하면 기존 KV object를 지웁니다. 한 server에서는 GPU와 port
+충돌을 피해 순차 실행하세요.
+
+Mooncake `hash_ids`의 고유 512-token block을 기준으로 계산한 nominal
+unique prefix KV 용량은 다음과 같습니다. 실제 filesystem 사용량은
+LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다.
+
+| Trace 범위 | 고유 prefix KV 추정 | 중복 제거 없는 논리 KV 처리량 |
+| --- | ---: | ---: |
+| Tool/Agent 처음 1,000 requests | 약 1.59 TB | 약 2.54 TB |
+| Conversation 처음 1,000 requests | 약 2.80 TB | 약 3.58 TB |
+| Tool/Agent 전체 23,608 requests | 약 23.83 TB | 약 52.63 TB |
+| Conversation 전체 12,031 requests | 약 23.77 TB | 약 37.82 TB |
+
+실행 중 vLLM benchmark의 progress bar가 완료 request 수, 처리율과 경과 시간을
+표시하며 같은 출력을 `workload.log`에도 저장합니다.
+
+### Recorder output
+
+`--output-dir`에는 다음 파일이 생성됩니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `storage.lct` | LMCache storage operation trace |
+| `manifest.json` | Workload 요약, 오류와 process 종료 상태 |
+| `request_stats.jsonl` | 요청별 latency와 성공 여부 |
+| `session_outcomes.jsonl` | Session별 실행 결과 |
+| `commands.json` | 실행 command와 환경 변수 |
+| `workload.json` | 선택한 workload 정보 |
+| `lmcache.log`, `vllm.log`, `workload.log` | Process별 로그 |
+
+Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면 `manifest.json`을
+확인한 뒤 각 process 로그를 살펴보세요.
+
+## Trace release assets
 
 `scripts/release_asset.sh`는 GitHub Release 생성, trace upload, download를 제공합니다.
 `--help`를 제외한 모든 command는 `gh` CLI 설치와 GitHub 인증이 필요합니다.
@@ -311,134 +422,6 @@ bash scripts/release_asset.sh download \
   --filename swebench_storage.lct \
   --output-dir downloads
 ```
-
-### Mooncake real-world workload
-
-`workload.backend: mooncake`는 실제 online request의 timestamp, token 길이와 익명화된
-prefix 구조를 vLLM `timed_trace`로 실행합니다. Mooncake source code는 실행하거나
-vendor하지 않고
-[`kvcache-ai/Mooncake` FAST'25 release](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release/traces)의
-공식 JSONL만 다운로드합니다.
-
-| Trace | 성격 | 요청 수 | 입력 token | 출력 token |
-| --- | --- | ---: | ---: | ---: |
-| `toolagent_trace.jsonl` | Tool/agent serving | 23,608 | 202,940,084 | 4,299,817 |
-| `conversation_trace.jsonl` | 대화형 serving | 12,031 | 144,793,823 | 4,122,048 |
-
-두 trace는 독립된 timeline과 prefix-reuse 분포를 가지므로 각각 record합니다.
-별도의 mixed workload 정책 없이 JSONL을 합치지 않습니다.
-
-각 JSONL line은 request 하나이며 주요 field는 다음과 같습니다.
-
-| Field | 의미 |
-| --- | --- |
-| `timestamp` | Trace 시작 후 request 도착 시각(ms) |
-| `input_length` | vLLM에 전송할 prompt token 수 |
-| `output_length` | EOS와 관계없이 생성할 output token 수 |
-| `hash_ids` | 512-token block 단위의 익명화된 prompt content 식별자 |
-
-실제 prompt text는 포함되지 않습니다. `timed_trace` loader는 `hash_id`를
-deterministic seed로 사용해 synthetic token을 만듭니다. Recorder는
-`chunk_hash_size: 512`와 `PYTHONHASHSEED=0`을 설정해 실행 간 token sequence와
-LMCache key가 일관되게 유지합니다.
-
-모델이나 LMCache를 시작하지 않고 Conversation과 Tool/Agent JSONL을 다운로드하고
-검증하려면 다음 명령을 사용합니다.
-
-```bash
-python -m recorder.mooncake_cli \
-  --path /MNTPNT/traces/mooncake
-```
-
-`--trace toolagent` 또는 `--trace conversation`으로 하나만 선택할 수 있고,
-이미 받은 파일만 검증하려면 `--no-download`를 추가합니다.
-
-공통 config `configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml`의 주요
-scaling 설정은 다음과 같습니다.
-
-| 설정 | 의미 |
-| --- | --- |
-| `num_requests` | JSONL 처음부터 실행할 request 수. `null`은 전체 trace |
-| `time_scale` | Request 간격 배율. `1.0`은 원본 timeline, `0.1`은 10배 압축 |
-| `chunk_hash_size` | `hash_id` 하나를 확장할 token 수. 공식 trace는 512 |
-| `max_concurrent_requests` | 동시에 처리할 client request 상한 |
-
-`num_requests`는 shuffle sample이 아니라 timestamp 순서를 유지한 trace prefix입니다.
-`1,000`, `5,000`, `null` 순서로 늘려 storage 용량과 실행 시간을 확인할 수
-있습니다. `time_scale`은 request set과 token 수는 바꾸지 않고 arrival 간격과
-그에 따른 concurrency·I/O timing만 조절합니다.
-
-공통 config를 복제하지 않고 run별 값을 바꾸려면 `--mooncake-num-requests`와
-`--base-path`를 사용합니다. `all`은 YAML의 `null`과 같으며 전체 trace를
-선택합니다.
-
-Tool/Agent trace를 기록하려면 다음 공통 config를 사용합니다.
-
-```bash
-python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
-  --mooncake-trace toolagent \
-  --mooncake-path /MNTPNT/traces/mooncake/toolagent_trace.jsonl \
-  --mooncake-num-requests all \
-  --base-path /MNTPNT/lmcache-trace/mooncake-{trace} \
-  --output-dir outputs/qwen3-coder-tp8-mooncake-toolagent
-```
-
-Conversation record:
-
-```bash
-python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
-  --mooncake-trace conversation \
-  --mooncake-path /MNTPNT/traces/mooncake/conversation_trace.jsonl \
-  --mooncake-num-requests all \
-  --base-path /MNTPNT/lmcache-trace/mooncake-{trace} \
-  --output-dir outputs/qwen3-coder-tp8-mooncake-conversation
-```
-
-공통 config는 L2 `base_path`의 `{trace}`를 선택한 trace 이름으로 치환해
-`mooncake-toolagent`와 `mooncake-conversation` 경로를 분리합니다. 두
-경로 모두 `reset_on_start: true`이므로 같은 trace를 다시 시작하면 기존 KV
-object를 지웁니다. 한 server에서는 GPU와 port 충돌을 피해 순차 실행하세요.
-
-Mooncake `hash_ids`의 고유 512-token block을 기준으로 계산한 nominal
-unique prefix KV 용량은 다음과 같습니다. 실제 filesystem 사용량은
-LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다.
-
-| Trace 범위 | 고유 prefix KV 추정 | 중복 제거 없는 논리 KV 처리량 |
-| --- | ---: | ---: |
-| Tool/Agent 처음 1,000 requests | 약 1.59 TB | 약 2.54 TB |
-| Conversation 처음 1,000 requests | 약 2.80 TB | 약 3.58 TB |
-| Tool/Agent 전체 23,608 requests | 약 23.83 TB | 약 52.63 TB |
-| Conversation 전체 12,031 requests | 약 23.77 TB | 약 37.82 TB |
-
-고유 prefix KV는 capacity planning용 working-set 근사치이며, 논리 KV 처리량은
-실제 L2 write byte와 같지 않습니다. Record 후에는 다음 명령으로 실측하세요.
-
-```bash
-du -sb /MNTPNT/lmcache-trace/mooncake-toolagent
-du -sb /MNTPNT/lmcache-trace/mooncake-conversation
-```
-
-실행 중 vLLM benchmark의 progress bar가 완료 request 수, 처리율과 경과 시간을
-표시하며 같은 출력을 `workload.log`에도 저장합니다.
-
-### Recorder output
-
-`--output-dir`에는 다음 파일이 생성됩니다.
-
-| 파일 | 내용 |
-| --- | --- |
-| `storage.lct` | LMCache storage operation trace |
-| `manifest.json` | Workload 요약, 오류와 process 종료 상태 |
-| `request_stats.jsonl` | 요청별 latency와 성공 여부 |
-| `session_outcomes.jsonl` | Session별 실행 결과 |
-| `commands.json` | 실행 command와 환경 변수 |
-| `workload.json` | 선택한 workload 정보 |
-| `lmcache.log`, `vllm.log`, `workload.log` | Process별 로그 |
-
-Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면 `manifest.json`을
-확인한 뒤 각 process 로그를 살펴보세요.
 
 ## Smoke test
 
@@ -514,7 +497,7 @@ python -m replayer.main \
 ### Replay backend
 
 Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config의 adapter로
-새 `StorageManager`를 만듭니다. 따라서 PM1753 `fs_native`로 record한 trace를
+새 `StorageManager`를 만듭니다. 따라서 로컬 SSD의 `fs_native`로 record한 trace를
 pNFS mount나 NIXL/HF3FS에 재생할 수 있습니다.
 
 pNFS가 `/MNTPNT`에 mount되어 있다면 `configs/replayer/fs-native.yaml`의
