@@ -1,7 +1,7 @@
 # LMCache Tracebench
 
 vLLM + LMCache MP 환경에서 Tensormesh-Benchmark V3 또는 Mooncake FAST'25
-workload를 실행하고 LMCache storage trace를 기록·replay하는 실행 도구입니다.
+workload를 실행하고 LMCache storage trace를 기록·재생하는 도구입니다.
 
 ## Overview
 
@@ -17,9 +17,9 @@ Recorder → vLLM API server → LMCache MP → L2 storage
 
 Record 단계는 H100 TP=8에서 Qwen3-Coder workload를 실행하고 PM1753 SSD의
 `fs_native` L2에 KV object를 저장하며 `storage.lct`를 만듭니다. Replay 단계는
-이 trace를 PoC/B300 cluster의 3FS, pNFS 등 다른 L2 backend에 재생해
-동일한 operation sequence의 처리량, latency와 resource 사용량을 비교합니다.
-Record에 사용한 L2 backend와 replay 대상 backend는 같을 필요가 없습니다.
+이 trace를 PoC/B300 cluster의 3FS, pNFS 등 다른 L2 backend에 재생해 동일한
+operation sequence의 처리량, latency와 resource 사용량을 비교합니다. Record에
+사용한 L2 backend와 replay 대상 backend는 같을 필요가 없습니다.
 
 ### Storage trace의 범위
 
@@ -47,13 +47,13 @@ Storage trace에는 실제 KV payload, API 반환값·exception, record 환경�
 
 ## Repository setup
 
-Tensormesh-Benchmark는 `third_party/Tensormesh-Benchmark` git submodule로
-사용합니다. submodule은 `tracebench` branch를 가리키며 parent repository의
-commit으로 고정됩니다.
+Tensormesh-Benchmark는 `third_party/Tensormesh-Benchmark` Git submodule로
+사용합니다. submodule은 `tracebench` branch를 가리키며 상위 저장소의 commit으로
+고정됩니다.
 
 Mooncake backend는 third-party source를 포함하지 않습니다. 프로젝트 내부 adapter가
 [Mooncake FAST'25](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release)의
-익명화된 JSONL trace를 data cache로 내려받고, 설치된 vLLM의 `timed_trace` client로
+익명화된 JSONL trace를 데이터 캐시로 내려받고, 설치된 vLLM의 `timed_trace` client로
 재생합니다.
 
 ```bash
@@ -67,6 +67,8 @@ git submodule update --init --recursive
 Ubuntu 24.04와 Python 3.12가 필요합니다. Recorder는 CUDA가 연결된 NVIDIA GPU가
 필요하지만, storage trace Replayer는 `fs_native` 기준 GPU·vLLM·모델 없이 실행할 수
 있습니다. 모든 profile은 같은 프로젝트 `.venv`를 사용합니다.
+
+이 문서의 `/MNTPNT`는 실제 storage mount 경로로 바꿔 사용합니다.
 
 설치 profile은 실행 역할에 따라 두 개로 나뉩니다.
 
@@ -189,6 +191,7 @@ API request로 전송합니다. `respect-gaps`는 `pre_gap`을 반영하고,
 ```bash
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
+  --base-path /MNTPNT/lmcache-trace/gaia \
   --output-dir outputs/gaia
 ```
 
@@ -214,10 +217,12 @@ SWE-bench, GAIA, WildClaw를 각각 독립 trace로 기록하려면 다음 sourc
   multi-tool agent trajectory
 
 세 source trace를 순서대로 기록하려면 다음 script를 사용합니다.
+실행 전에 source별 config의 `lmcache.l2.base_path`를 실제 mount 아래의 서로 다른
+경로로 설정하세요.
 
 ```bash
 bash scripts/record_source_traces.sh \
-  --output-root /mnt/misc/lmcache-tracebench/outputs
+  --output-root /MNTPNT/lmcache-tracebench/outputs
 ```
 
 각 결과는 timestamped directory 아래 `gaia/`, `wildclaw/`, `swebench/`에 저장됩니다.
@@ -230,9 +235,9 @@ bash scripts/record_source_traces.sh \
 
 | Source | L2 KV cache 경로 | KV cache 점유량 | `storage.lct` 크기 |
 | --- | --- | ---: | ---: |
-| GAIA | `/mnt/std-ssd/lmcache-trace/gaia` | 537G | 135M |
-| SWE-bench | `/mnt/std-ssd/lmcache-trace/swebench` | 4.9T | 5.9G |
-| WildClaw | `/mnt/std-ssd/lmcache-trace/wildclaw` | 56G | 24M |
+| GAIA | `/MNTPNT/lmcache-trace/gaia` | 537G | 135M |
+| SWE-bench | `/MNTPNT/lmcache-trace/swebench` | 4.9T | 5.9G |
+| WildClaw | `/MNTPNT/lmcache-trace/wildclaw` | 56G | 24M |
 
 L2 점유량은 실제 KV object의 filesystem 사용량이고, `storage.lct`는 payload
 대신 API 호출과 인자를 저장하므로 훨씬 작습니다. 이 수치는 해당 실행과 dataset
@@ -286,7 +291,7 @@ bash scripts/release_asset.sh release \
 ```bash
 bash scripts/release_asset.sh upload --tag tensormesh-benchmark-20260805 \
   --filename wildclaw_storage.lct \
-  --filepath /mnt/misc/lmcache-tracebench/outputs/source-traces-20260804-082231/wildclaw/storage.lct
+  --filepath /MNTPNT/lmcache-tracebench/outputs/source-traces-20260804-082231/wildclaw/storage.lct
 ```
 
 위 예시는 `wildclaw_storage.lct`를 해당 release에 업로드합니다. 같은 이름의 asset을
@@ -342,7 +347,7 @@ LMCache key가 일관되게 유지합니다.
 
 ```bash
 python -m recorder.mooncake_cli \
-  --path /mnt/std-ssd/traces/mooncake
+  --path /MNTPNT/traces/mooncake
 ```
 
 `--trace toolagent` 또는 `--trace conversation`으로 하나만 선택할 수 있고,
@@ -373,9 +378,9 @@ Tool/Agent trace를 기록하려면 다음 공통 config를 사용합니다.
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
   --mooncake-trace toolagent \
-  --mooncake-path /mnt/std-ssd/traces/mooncake/toolagent_trace.jsonl \
+  --mooncake-path /MNTPNT/traces/mooncake/toolagent_trace.jsonl \
   --mooncake-num-requests all \
-  --base-path /mnt/hc-ssd/lmcache-trace/mooncake-{trace} \
+  --base-path /MNTPNT/lmcache-trace/mooncake-{trace} \
   --output-dir outputs/qwen3-coder-tp8-mooncake-toolagent
 ```
 
@@ -385,7 +390,9 @@ Conversation record:
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
   --mooncake-trace conversation \
-  --mooncake-path /mnt/std-ssd/traces/mooncake/conversation_trace.jsonl \
+  --mooncake-path /MNTPNT/traces/mooncake/conversation_trace.jsonl \
+  --mooncake-num-requests all \
+  --base-path /MNTPNT/lmcache-trace/mooncake-{trace} \
   --output-dir outputs/qwen3-coder-tp8-mooncake-conversation
 ```
 
@@ -409,8 +416,8 @@ LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다
 실제 L2 write byte와 같지 않습니다. Record 후에는 다음 명령으로 실측하세요.
 
 ```bash
-du -sb /mnt/std-ssd/lmcache-trace/mooncake-toolagent
-du -sb /mnt/std-ssd/lmcache-trace/mooncake-conversation
+du -sb /MNTPNT/lmcache-trace/mooncake-toolagent
+du -sb /MNTPNT/lmcache-trace/mooncake-conversation
 ```
 
 실행 중 vLLM benchmark의 progress bar가 완료 request 수, 처리율과 경과 시간을
@@ -435,18 +442,21 @@ Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면 `ma
 
 ## Smoke test
 
-`configs/recorder/smoke.yaml`은 1 GPU, 작은 Qwen 모델, V3 세션 10개·각 2 turn(최대 20개
-request)으로 실제 storage trace를 만드는 최소 설정입니다. 첫 turn의 write와 두 번째
-turn의 prefix reuse/prefetch 경로를 함께 확인합니다. V3 dataset은 `/mnt/std-ssd/hf-datasets`에
-cache합니다. 최초 실행에는 Hugging Face dataset 접근 권한, 네트워크, 약 2.4 GB의
-cache 공간이 필요하고, 이후 실행은 해당 cache를 재사용합니다.
+`configs/recorder/smoke.yaml`은 1 GPU, 작은 Qwen 모델, V3 세션 10개·각 2 turn(최대
+20개 request)으로 실제 storage trace를 만드는 최소 설정입니다. 첫 turn의 write와
+두 번째 turn의 prefix reuse/prefetch 경로를 함께 확인합니다. V3 dataset은
+`workload.hf_cache_dir`에 지정한 경로에 cache합니다. 실행 전에 이 값을
+`/MNTPNT/hf-datasets`와 같은 실제 경로로 바꾸세요. 최초 실행에는 Hugging
+Face dataset 접근 권한, 네트워크, 약 2.4 GB의 cache 공간이 필요하고, 이후 실행은
+해당 cache를 재사용합니다.
 
 ```bash
 source .venv/bin/activate
-mkdir -p /mnt/std-ssd/lmcache-trace-smoke
+mkdir -p /MNTPNT/lmcache-trace-smoke
 
 python -m recorder.main \
   --config configs/recorder/smoke.yaml \
+  --base-path /MNTPNT/lmcache-trace-smoke \
   --output-dir outputs/smoke
 ```
 
@@ -491,7 +501,7 @@ Replayer는 저장된 `.lct`를 LMCache `trace replay` command로 한 번 실행
 python -m replayer.main \
   --trace path/to/storage.lct \
   --config configs/replayer/fs-native.yaml \
-  --base-path /mnt/std-ssd/lmcache-trace-replay \
+  --base-path /MNTPNT/lmcache-trace-replay \
   --output-dir outputs/replay
 ```
 
@@ -507,9 +517,9 @@ Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config�
 새 `StorageManager`를 만듭니다. 따라서 PM1753 `fs_native`로 record한 trace를
 pNFS mount나 NIXL/HF3FS에 재생할 수 있습니다.
 
-pNFS가 `/mnt/pnfs`에 mount되어 있다면 `configs/replayer/fs-native.yaml`의
-`base_path`를 mount 아래 경로로 지정합니다. LMCache에서는 `fs_native`이지만
-실제 I/O는 pNFS client와 server를 통과합니다.
+pNFS가 `/MNTPNT`에 mount되어 있다면 `configs/replayer/fs-native.yaml`의
+`base_path`를 mount 아래 경로로 지정합니다. LMCache에서는 `fs_native`이지만 실제
+I/O는 pNFS client와 server를 통과합니다.
 
 NIXL과 HF3FS가 설치된 cluster에서는
 `configs/replayer/nixl-hf3fs.yaml`을 사용하고 `file_path`와
@@ -520,7 +530,7 @@ NIXL과 HF3FS가 설치된 cluster에서는
   "type": "nixl_store_dynamic",
   "backend": "HF3FS",
   "backend_params": {
-    "file_path": "/mnt/3fs/lmcache-replay",
+    "file_path": "/MNTPNT/lmcache-replay",
     "use_direct_io": "true",
     "max_capacity_gb": "30720"
   }
@@ -601,5 +611,5 @@ config의 `replay_node`에 host와 interface를 추가합니다.
 
 ```bash
 source .venv/bin/activate
-pytest
+python -m pytest
 ```
