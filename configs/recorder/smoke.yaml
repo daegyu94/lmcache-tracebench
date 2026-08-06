@@ -28,7 +28,7 @@ lmcache:
     store_policy: skip_l1
   l2:
     type: fs_native
-    base_path: /mnt/std-ssd/lmcache-trace-smoke
+    subpath: lmcache-trace/smoke
     num_workers: 1
     use_odirect: true
     reset_on_start: true
@@ -45,7 +45,7 @@ workload:
   mixed_session_order: original
   flatten_tools: true
   hf_streaming: false
-  hf_cache_dir: /mnt/std-ssd/hf-datasets
+  hf_cache_dir: hf-datasets
 
 output:
   root: outputs/smoke

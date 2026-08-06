@@ -26,7 +26,7 @@ lmcache:
     store_policy: skip_l1
   l2:
     type: fs_native
-    base_path: /mnt/std-ssd/lmcache-trace/mixed-all
+    subpath: lmcache-trace/tensormesh-all
     num_workers: 16
     # Bypass the Linux page cache and issue O_DIRECT filesystem I/O.
     use_odirect: true

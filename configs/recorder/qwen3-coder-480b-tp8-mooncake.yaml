@@ -26,8 +26,8 @@ lmcache:
     store_policy: skip_l1
   l2:
     type: fs_native
-    # recorder.main resolves {trace} to toolagent or conversation.
-    base_path: /mnt/std-ssd/lmcache-trace/mooncake-{trace}
+    # recorder.main joins this relative path to --mountpoint and resolves {trace}.
+    subpath: lmcache-trace/mooncake-{trace}
     num_workers: 16
     use_odirect: true
     reset_on_start: true
@@ -38,7 +38,7 @@ workload:
   mooncake:
     # Defaults make this config runnable for Tool/Agent without overrides.
     trace: toolagent
-    path: /mnt/std-ssd/traces/mooncake/toolagent_trace.jsonl
+    path: mooncake-traces/{trace}_trace.jsonl
     download_if_missing: true
     num_requests: 1000
     # 1.0 preserves the original one-hour arrival timeline; 0.1 is 10x faster.

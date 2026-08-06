@@ -1,3 +1,7 @@
+from dataclasses import replace
+
+import pytest
+
 from recorder.config import RecorderConfig, gb_to_bytes, load_config
 
 
@@ -23,11 +27,11 @@ def test_qwen_tp8_smoke_config_uses_100_mixed_sessions():
     assert config.workload.source == "all"
     assert config.workload.num_sessions == 100
     assert config.workload.mixed_session_order == "round_robin"
-    assert config.lmcache.l2.base_path.endswith("/mixed-smoke")
+    assert config.lmcache.l2.subpath == "lmcache-trace/tensormesh-smoke"
 
 
-def test_qwen_tp8_config_has_no_session_cap():
-    config = load_config("configs/recorder/qwen3-coder-480b-tp8-realistic.yaml")
+def test_qwen_tp8_base_config_has_no_session_cap():
+    config = load_config("configs/recorder/qwen3-coder-480b-tp8-base.yaml")
     assert config.workload.source == "all"
     assert config.workload.num_sessions is None
     assert config.workload.timing_mode == "respect-gaps"
@@ -36,19 +40,36 @@ def test_qwen_tp8_config_has_no_session_cap():
     assert config.lmcache.l1.size_gb == 20
 
 
-def test_qwen_tp8_max_pressure_config_uses_80_sessions():
-    config = load_config("configs/recorder/qwen3-coder-480b-tp8-max-pressure.yaml")
-    assert config.workload.timing_mode == "max-pressure"
-    assert config.workload.max_concurrent_sessions == 80
-
-
 def test_source_specific_configs_disable_mixed_interleaving():
     for source in ("swebench", "gaia", "wildclaw"):
         config = load_config(f"configs/recorder/qwen3-coder-480b-tp8-{source}.yaml")
         assert config.workload.source == source
         assert config.workload.num_sessions is None
         assert config.workload.mixed_session_order == "original"
-        assert config.lmcache.l2.base_path.endswith(f"/{source}")
+        assert config.lmcache.l2.subpath == f"lmcache-trace/tensormesh-{source}"
+
+
+def test_rejects_absolute_l2_subpath():
+    defaults = RecorderConfig()
+    config = replace(
+        defaults,
+        lmcache=replace(
+            defaults.lmcache,
+            l2=replace(defaults.lmcache.l2, subpath="/tmp/lmcache"),
+        ),
+    )
+    with pytest.raises(ValueError, match="subpath"):
+        config.validate()
+
+
+def test_rejects_legacy_l2_base_path(tmp_path):
+    config_path = tmp_path / "legacy.yaml"
+    config_path.write_text(
+        "lmcache:\n  l2:\n    base_path: /tmp/lmcache\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="replaced.*subpath"):
+        load_config(config_path)
 
 
 def test_rejects_tp_gpu_mismatch():

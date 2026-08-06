@@ -11,13 +11,13 @@ def test_format_duration():
 
 
 def test_reset_l2_storage_removes_existing_contents(tmp_path: Path):
-    base_path = tmp_path / "storage" / "run"
-    base_path.mkdir(parents=True)
-    (base_path / "old-cache-entry").write_text("old", encoding="utf-8")
+    l2_path = tmp_path / "storage" / "run"
+    l2_path.mkdir(parents=True)
+    (l2_path / "old-cache-entry").write_text("old", encoding="utf-8")
 
-    result = reset_l2_storage(base_path)
+    result = reset_l2_storage(l2_path)
 
-    assert result == base_path.resolve()
+    assert result == l2_path.resolve()
     assert result.is_dir()
     assert list(result.iterdir()) == []
 

@@ -3,7 +3,7 @@ extends: qwen3-coder-480b-tp8-base.yaml
 
 lmcache:
   l2:
-    base_path: /mnt/std-ssd/lmcache-trace/swebench
+    subpath: lmcache-trace/tensormesh-swebench
 
 workload:
   source: swebench

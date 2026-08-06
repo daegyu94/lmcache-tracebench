@@ -13,8 +13,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--trace", required=True, help="path to a .lct trace")
     parser.add_argument("--config", required=True, help="replayer YAML config")
     parser.add_argument(
-        "--base-path",
-        help="override fs_native base_path or NIXL backend_params.file_path",
+        "--l2-path",
+        help="override the configured fs_native or NIXL L2 path",
     )
     parser.add_argument(
         "--output-dir",
@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     config = load_config(args.config)
     config = apply_overrides(
-        config, base_path=args.base_path, output_dir=args.output_dir
+        config, l2_path=args.l2_path, output_dir=args.output_dir
     )
     profiler_config = None
     if args.profile_config:

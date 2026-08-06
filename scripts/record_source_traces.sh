@@ -5,9 +5,10 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/.." && pwd)"
 output_root="outputs"
+mountpoint=""
 
 usage() {
-  echo "Usage: bash scripts/record_source_traces.sh [--output-root PATH]"
+  echo "Usage: bash scripts/record_source_traces.sh --mountpoint PATH [--output-root PATH]"
 }
 
 while (($#)); do
@@ -18,6 +19,14 @@ while (($#)); do
         exit 2
       fi
       output_root="$2"
+      shift 2
+      ;;
+    --mountpoint)
+      if (($# < 2)); then
+        usage >&2
+        exit 2
+      fi
+      mountpoint="$2"
       shift 2
       ;;
     -h|--help)
@@ -31,6 +40,12 @@ while (($#)); do
       ;;
   esac
 done
+
+if [[ -z "$mountpoint" || "$mountpoint" != /* ]]; then
+  echo "--mountpoint must be an absolute path" >&2
+  usage >&2
+  exit 2
+fi
 
 cd "$project_dir"
 if [[ ! -f .venv/bin/activate ]]; then
@@ -52,6 +67,7 @@ for source in gaia wildclaw swebench; do
   echo "[INFO] Starting $source trace"
   python -m recorder.main \
     --config "$config" \
+    --mountpoint "$mountpoint" \
     --output-dir "$run_root/$source"
   echo "[INFO] Finished $source trace"
 done

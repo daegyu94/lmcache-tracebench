@@ -36,7 +36,7 @@ def test_path_overrides_are_reflected_in_dry_run(capsys, tmp_path):
                 str(trace),
                 "--config",
                 "configs/replayer/smoke.yaml",
-                "--base-path",
+                "--l2-path",
                 str(base_path),
                 "--output-dir",
                 str(output_dir),

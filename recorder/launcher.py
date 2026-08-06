@@ -19,7 +19,7 @@ def _adapter_payload(config: RecorderConfig) -> dict[str, object]:
     l2 = config.lmcache.l2
     payload: dict[str, object] = {
         "type": l2.type,
-        "base_path": l2.base_path,
+        "base_path": l2.effective_path,
     }
     if l2.num_workers is not None:
         payload["num_workers"] = l2.num_workers

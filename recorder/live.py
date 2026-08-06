@@ -42,14 +42,14 @@ def _status(level: str, message: str) -> None:
 
 
 def reset_l2_storage(
-    base_path: str | Path,
+    path: str | Path,
     *,
     protected_paths: tuple[Path, ...] = (),
 ) -> Path:
     """Remove and recreate an explicitly configured L2 storage directory."""
-    requested = Path(base_path).expanduser()
+    requested = Path(path).expanduser()
     if not requested.is_absolute():
-        raise ValueError("LMCache L2 reset requires an absolute base_path")
+        raise ValueError("LMCache L2 reset requires an absolute path")
 
     for candidate in (requested, *requested.parents):
         if candidate.exists() and candidate.is_symlink():
@@ -70,7 +70,7 @@ def reset_l2_storage(
 
     if target.exists():
         if not target.is_dir():
-            raise ValueError(f"LMCache L2 base_path is not a directory: {target}")
+            raise ValueError(f"LMCache L2 path is not a directory: {target}")
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=False)
     return target
@@ -273,10 +273,11 @@ def run_live(
             if verbose:
                 _status(
                     "INFO",
-                    f"Resetting LMCache L2 storage: {config.lmcache.l2.base_path}",
+                    "Resetting LMCache L2 storage: "
+                    f"{config.lmcache.l2.effective_path}",
                 )
             reset_path = reset_l2_storage(
-                config.lmcache.l2.base_path,
+                config.lmcache.l2.effective_path,
                 protected_paths=(run_dir,),
             )
             if verbose:
@@ -437,6 +438,8 @@ def run_live(
                 "backend": "tensormesh",
                 "num_sessions": len(workload.sessions),
                 "source_counts": workload.source_counts,
+                "timing_mode": config.workload.timing_mode,
+                "pre_gap_scale": config.workload.pre_gap_scale,
             }
         elif mooncake_plan is not None:
             workload_manifest = {
@@ -445,6 +448,7 @@ def run_live(
                 "trace_path": str(mooncake_plan.path),
                 "num_requests": mooncake_plan.selected_requests,
                 "source_counts": mooncake_plan.source_counts,
+                "time_scale": config.workload.mooncake.time_scale,
             }
         else:
             workload_manifest = {

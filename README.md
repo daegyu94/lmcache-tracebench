@@ -46,7 +46,9 @@ git submodule update --init --recursive
 GPU·vLLM·모델 없이 실행할 수 있습니다. 모든 profile은 같은 프로젝트 `.venv`를
 사용합니다.
 
-이 문서와 상세 가이드의 `/MNTPNT`는 실제 storage mount 경로로 바꿔 사용합니다.
+Recorder config의 `lmcache.l2.subpath`와 workload의 상대 경로는 실행 시
+`--mountpoint /MNTPNT` 아래에 배치됩니다. `/MNTPNT`는 실제 storage mount
+경로로 바꿔 사용합니다.
 
 설치 profile은 실행 역할에 따라 두 개로 나뉩니다.
 
@@ -148,11 +150,10 @@ Face dataset 접근 권한, 네트워크, 약 2.4 GB의 cache 공간이 필요�
 
 ```bash
 source .venv/bin/activate
-mkdir -p /MNTPNT/lmcache-trace-smoke
 
 python -m recorder.main \
   --config configs/recorder/smoke.yaml \
-  --base-path /MNTPNT/lmcache-trace-smoke \
+  --mountpoint /MNTPNT \
   --output-dir outputs/smoke
 ```
 

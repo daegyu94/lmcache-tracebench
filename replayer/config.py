@@ -94,27 +94,27 @@ def load_config(path: str | Path | None = None) -> ReplayerConfig:
 def apply_overrides(
     config: ReplayerConfig,
     *,
-    base_path: str | None = None,
+    l2_path: str | None = None,
     output_dir: str | None = None,
 ) -> ReplayerConfig:
     """Return config with CLI path overrides applied."""
-    if base_path is not None:
-        if not base_path:
-            raise ValueError("base_path must not be empty")
+    if l2_path is not None:
+        if not l2_path:
+            raise ValueError("l2_path must not be empty")
         adapter = dict(config.l2_adapter)
         adapter_type = adapter.get("type")
         if adapter_type == "fs_native":
-            adapter["base_path"] = base_path
+            adapter["base_path"] = l2_path
         elif adapter_type == "nixl_store_dynamic":
             backend_params = adapter.get("backend_params")
             if not isinstance(backend_params, dict):
                 raise ValueError(
                     "nixl_store_dynamic adapter requires backend_params mapping"
                 )
-            adapter["backend_params"] = {**backend_params, "file_path": base_path}
+            adapter["backend_params"] = {**backend_params, "file_path": l2_path}
         else:
             raise ValueError(
-                "--base-path is supported for fs_native and nixl_store_dynamic adapters"
+                "--l2-path is supported for fs_native and nixl_store_dynamic adapters"
             )
         config = replace(config, l2_adapter=adapter)
     if output_dir is not None:

@@ -56,10 +56,16 @@ class L1Config:
 @dataclass(frozen=True)
 class L2Config:
     type: str = "fs_native"
-    base_path: str = "/mnt/ssd/lmcache-trace"
+    subpath: str = "lmcache-trace/tensormesh-all"
     num_workers: int | None = 8
     reset_on_start: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
+    resolved_path: str | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def effective_path(self) -> str:
+        """Return the final path passed to the LMCache adapter."""
+        return self.resolved_path or self.subpath
 
 
 @dataclass(frozen=True)
@@ -77,7 +83,7 @@ class LMCacheConfig:
 @dataclass(frozen=True)
 class MooncakeWorkloadConfig:
     trace: str = "toolagent"
-    path: str = "/mnt/std-ssd/traces/mooncake/toolagent_trace.jsonl"
+    path: str = "mooncake-traces/{trace}_trace.jsonl"
     url: str | None = None
     download_if_missing: bool = True
     num_requests: int | None = 1000
@@ -169,8 +175,23 @@ class RecorderConfig:
             raise ValueError("LMCache chunk_size must be positive")
         if self.lmcache.l2.type != "fs_native":
             raise ValueError("the recorder requires LMCache L2 type fs_native")
-        if not self.lmcache.l2.base_path:
-            raise ValueError("LMCache fs_native base_path must not be empty")
+        if not self.lmcache.l2.subpath:
+            raise ValueError("lmcache.l2.subpath must not be empty")
+        subpath = Path(self.lmcache.l2.subpath)
+        starts_with_home = bool(subpath.parts) and subpath.parts[0].startswith("~")
+        if (
+            not subpath.parts
+            or subpath.is_absolute()
+            or starts_with_home
+            or ".." in subpath.parts
+        ):
+            raise ValueError(
+                "lmcache.l2.subpath must stay within the recorder mountpoint"
+            )
+        if self.lmcache.l2.resolved_path is not None and not Path(
+            self.lmcache.l2.resolved_path
+        ).is_absolute():
+            raise ValueError("LMCache L2 resolved_path must be absolute")
         if self.workload.backend not in {"tensormesh", "mooncake"}:
             raise ValueError("workload.backend must be 'tensormesh' or 'mooncake'")
         if self.workload.progress_interval_seconds <= 0:
@@ -289,9 +310,15 @@ def load_config(path: str | Path | None = None) -> RecorderConfig:
     model = ModelConfig(**model_values)
     runtime = RuntimeConfig(**{**defaults.runtime.__dict__, **runtime_raw})
     l1 = L1Config(**{**defaults.lmcache.l1.__dict__, **l1_raw})
-    known_l2 = {"type", "base_path", "num_workers", "reset_on_start"}
+    if "base_path" in l2_raw:
+        raise ValueError(
+            "lmcache.l2.base_path was replaced by the relative "
+            "lmcache.l2.subpath setting"
+        )
+    known_l2 = {"type", "subpath", "num_workers", "reset_on_start"}
+    l2_values = {**defaults.lmcache.l2.__dict__, **l2_raw}
     l2 = L2Config(
-        **{key: value for key, value in {**defaults.lmcache.l2.__dict__, **l2_raw}.items() if key in known_l2},
+        **{key: value for key, value in l2_values.items() if key in known_l2},
         extra={key: value for key, value in l2_raw.items() if key not in known_l2},
     )
     lm_values = {**defaults.lmcache.__dict__, **lm_raw}

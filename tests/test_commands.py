@@ -10,6 +10,9 @@ def test_recorder_commands_enable_mp_fs_native_trace():
     assert "--trace-level" in commands.lmcache
     assert commands.lmcache[commands.lmcache.index("--trace-level") + 1] == "storage"
     assert "fs_native" in commands.lmcache[commands.lmcache.index("--l2-adapter") + 1]
+    assert '"base_path":"lmcache-trace/tensormesh-all"' in commands.lmcache[
+        commands.lmcache.index("--l2-adapter") + 1
+    ]
     assert '"use_odirect":true' in commands.lmcache[
         commands.lmcache.index("--l2-adapter") + 1
     ]

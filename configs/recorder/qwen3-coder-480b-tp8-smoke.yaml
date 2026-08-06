@@ -26,7 +26,7 @@ lmcache:
     store_policy: skip_l1
   l2:
     type: fs_native
-    base_path: /mnt/std-ssd/lmcache-trace/mixed-smoke
+    subpath: lmcache-trace/tensormesh-smoke
     num_workers: 16
     use_odirect: true
     reset_on_start: true

@@ -4,9 +4,10 @@
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
 Recorder는 LMCache MP와 vLLM을 시작하고 OpenAI-compatible endpoint로 workload를
-전송합니다. 예제 config의 `lmcache.l2.reset_on_start: true`는 실행 전에 기존
-`base_path`를 비우므로, 필요한 데이터는 백업하거나 이 값을 `false`로 바꾸세요.
-`--dry-run`은 L2 디렉터리를 변경하지 않습니다.
+전송합니다. 예제 config의 `lmcache.l2.reset_on_start: true`는 실행 전에
+`--mountpoint`와 `lmcache.l2.subpath`로 정해진 L2 경로를 비웁니다. 필요한
+데이터는 백업하거나 이 값을 `false`로 바꾸세요. `--dry-run`은 L2 디렉터리를
+변경하지 않습니다.
 
 ## Tensormesh V3 workload
 
@@ -40,7 +41,7 @@ API request로 전송합니다. `respect-gaps`는 `pre_gap`을 반영하고,
 ```bash
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
-  --base-path /MNTPNT/lmcache-trace/gaia \
+  --mountpoint /MNTPNT \
   --output-dir outputs/gaia
 ```
 
@@ -66,11 +67,13 @@ SWE-bench, GAIA, WildClaw를 각각 독립 trace로 기록하려면 다음 sourc
   multi-tool agent trajectory
 
 세 source trace를 순서대로 기록하려면 다음 script를 사용합니다.
-실행 전에 source별 config의 `lmcache.l2.base_path`를 실제 mount 아래의 서로 다른
-경로로 설정하세요.
+각 source config의 `lmcache.l2.subpath`는
+`lmcache-trace/tensormesh-<source>`이며, `--mountpoint`가 실제 storage mount
+경로를 결정합니다.
 
 ```bash
 bash scripts/record_source_traces.sh \
+  --mountpoint /MNTPNT \
   --output-root /MNTPNT/lmcache-tracebench/outputs
 ```
 
@@ -95,6 +98,45 @@ revision의 관측값이며 model, session 수, chunk size, cache policy가 바�
 
 Mixed workload의 source 비율, session ordering, timing policy와 대표성 검증은
 현재 **TBD**입니다.
+
+## Speed sweep
+
+`record_speed_sweep.sh`는 workload별로 speedup마다 하나의 `storage.lct`를
+순차적으로 기록합니다. config의 L2 `subpath`는 `--mountpoint` 아래에서
+사용하며, 각 실행의 trace 결과만 speedup 디렉터리별로 분리합니다.
+
+Mooncake 기록(기본 Tool/Agent·Conversation, 요청 1,000개):
+
+```bash
+bash scripts/record_speed_sweep.sh \
+  --backend mooncake \
+  --mountpoint /MNTPNT \
+  --speedups 1,2,5,10 \
+  --num-requests 1000
+```
+
+Tensormesh 기록(기본 GAIA·WildClaw·SWE-bench):
+
+```bash
+bash scripts/record_speed_sweep.sh \
+  --backend tensormesh \
+  --mountpoint /MNTPNT \
+  --speedups 1,2,5,10
+```
+
+결과는 다음과 같이 저장됩니다.
+
+```text
+outputs/speed-sweep/mooncake-toolagent-x1/storage.lct
+outputs/speed-sweep/mooncake-toolagent-x5/storage.lct
+outputs/speed-sweep/tensormesh-gaia-x1/storage.lct
+outputs/speed-sweep/tensormesh-swebench-x10/storage.lct
+```
+
+Mooncake의 `speedup`은 `time_scale=1/speedup`으로, Tensormesh의 `speedup`은
+`respect-gaps` 모드에서 `pre_gap_scale=1/speedup`으로 변환됩니다. Tensormesh의
+`max-pressure`는 gap을 제거한 별도 baseline이므로 speedup sweep에 포함하지
+않습니다. 실행 전 계획만 확인하려면 `--dry-run`을 추가합니다.
 
 ## GPU memory quota
 
@@ -173,9 +215,10 @@ scaling 설정은 다음과 같습니다.
 있습니다. `time_scale`은 request 수와 token 수는 바꾸지 않고 arrival 간격과
 그에 따른 concurrency·I/O timing만 조절합니다.
 
-공통 config를 복제하지 않고 run별 값을 바꾸려면 `--mooncake-num-requests`와
-`--base-path`를 사용합니다. `all`은 YAML의 `null`과 같으며 전체 trace를
-선택합니다.
+공통 config를 복제하지 않고 run별 request 수를 바꾸려면
+`--mooncake-num-requests`를 사용합니다. `all`은 YAML의 `null`과 같으며 전체
+trace를 선택합니다. 특정 L2 위치를 일회성으로 지정해야 할 때만 `--l2-path`를
+추가하고, 일반 실행에서는 `--mountpoint`만 사용합니다.
 
 Tool/Agent 또는 Conversation trace를 기록하려면 `TRACE`만 바꿔 다음 명령을
 사용합니다. `TRACE`에는 `toolagent` 또는 `conversation`을 지정합니다.
@@ -185,10 +228,9 @@ TRACE=toolagent  # conversation으로 바꿔 실행할 수 있습니다.
 
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
+  --mountpoint /MNTPNT \
   --mooncake-trace "$TRACE" \
-  --mooncake-path "/MNTPNT/mooncake-traces/${TRACE}_trace.jsonl" \
   --mooncake-num-requests all \
-  --base-path "/MNTPNT/lmcache-trace/mooncake-${TRACE}" \
   --output-dir "outputs/qwen3-coder-tp8-mooncake-${TRACE}"
 ```
 
