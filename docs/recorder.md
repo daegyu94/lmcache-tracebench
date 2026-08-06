@@ -125,6 +125,23 @@ Record phase: workload (GPU compute + serving + storage)
   GPU compute time is not represented in storage.lct, so only storage gaps shrink.
 ```
 
+The timing limitation can also be viewed directly at the operation level:
+
+```text
+Record: full workload timeline
+
+  GPU compute ── storage S1 ───── GPU compute ── storage S2
+                    │                              │
+                    └──────── storage.lct ────────┘
+
+Replay: storage operations only
+
+  storage S1 ─── storage S2
+       └─ GPU compute time is not present in storage.lct
+
+  Replay-time x5 compresses the storage gap, but does not scale GPU compute.
+```
+
 `record_speed_sweep.sh`는 workload별로 speedup마다 하나의 `storage.lct`를
 순차적으로 기록합니다. config의 L2 `subpath`는 `--mountpoint` 아래에서
 사용하며, 각 실행의 trace 결과만 speedup 디렉터리별로 분리합니다.
