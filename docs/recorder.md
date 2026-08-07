@@ -144,7 +144,10 @@ Replay: storage operations only
 
 `record_speed_sweep.sh`는 workload별로 speedup마다 하나의 `storage.lct`를
 순차적으로 기록합니다. config의 L2 `subpath`는 `--mountpoint` 아래에서
-사용하며, 각 실행의 trace 결과만 speedup 디렉터리별로 분리합니다.
+사용합니다. 각 case는 시작할 때 L2 경로를 초기화하고, 실행이 끝나면 중간 L2
+directory도 기본적으로 비웁니다. `storage.lct`와 로그가 있는 output directory는
+그대로 보존하며, Hugging Face dataset cache와 Mooncake 입력 trace도 삭제하지
+않습니다. 실행 후 L2 object를 남겨야 할 때만 `--keep-l2`를 추가하세요.
 
 Mooncake 기록(기본 Tool/Agent·Conversation, 요청 1,000개):
 

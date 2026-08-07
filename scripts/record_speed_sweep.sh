@@ -13,6 +13,7 @@ mooncake_trace_root=""
 mooncake_trace_root_set=false
 num_requests="1000"
 num_requests_set=false
+keep_l2=false
 dry_run=false
 
 usage() {
@@ -34,6 +35,8 @@ Options:
                           Directory containing <trace>_trace.jsonl
                           (default: MOUNTPOINT/mooncake-traces)
   --num-requests N|all    Mooncake request prefix (default: 1000)
+  --keep-l2               Keep the per-case LMCache L2 directory after recording
+                          (default: clean it after each case)
   --dry-run               Print every recorder plan without starting services
   -h, --help              Show this help
 
@@ -102,6 +105,10 @@ while (($#)); do
       num_requests_set=true
       shift 2
       ;;
+    --keep-l2)
+      keep_l2=true
+      shift
+      ;;
     --dry-run)
       dry_run=true
       shift
@@ -149,6 +156,67 @@ if [[ ! -f .venv/bin/activate ]]; then
   die "Project virtual environment is missing. Run: bash scripts/setup_runtime.sh"
 fi
 source .venv/bin/activate
+
+clean_case_l2() {
+  local workload="$1"
+  local l2_prefix
+  case "$backend" in
+    mooncake)
+      l2_prefix="mooncake"
+      ;;
+    tensormesh)
+      l2_prefix="tensormesh"
+      ;;
+    *)
+      die "cannot resolve L2 path for backend: $backend"
+      ;;
+  esac
+
+  local mount_root="${mountpoint%/}"
+  local l2_parent="${mount_root}/lmcache-trace"
+  local target="${l2_parent}/${l2_prefix}-${workload}"
+
+  # The target is derived only from validated backend/workload values. Keep
+  # an explicit path-boundary check before the destructive operation.
+  case "$target" in
+    "$l2_parent/mooncake-"*|"$l2_parent/tensormesh-"*)
+      ;;
+    *)
+      die "refusing to clean unexpected L2 path: $target"
+      ;;
+  esac
+
+  local cursor="$target"
+  while [[ "$cursor" != "$mount_root" ]]; do
+    if [[ "$cursor" == "/" ]]; then
+      die "refusing to clean L2 path outside mountpoint: $target"
+    fi
+    if [[ -L "$cursor" ]]; then
+      die "refusing to clean a path containing a symlink: $cursor"
+    fi
+    cursor="$(dirname -- "$cursor")"
+  done
+
+  if [[ -L "$mount_root" ]]; then
+    die "refusing to clean a path with a symlink mountpoint: $mount_root"
+  fi
+  if [[ -e "$target" && ! -d "$target" ]]; then
+    die "LMCache L2 path is not a directory: $target"
+  fi
+  if [[ -d "$target" ]]; then
+    local nested_symlink
+    nested_symlink="$(find -P "$target" -type l -print -quit)"
+    if [[ -n "$nested_symlink" ]]; then
+      die "refusing to recursively clean a directory containing a symlink: $nested_symlink"
+    fi
+  fi
+
+  echo "[INFO] Cleaning LMCache L2 storage: $target"
+  if [[ -e "$target" ]]; then
+    rm -rf -- "$target"
+  fi
+  mkdir -p -- "$target"
+}
 
 IFS=',' read -r -a workload_list <<< "$workloads"
 IFS=',' read -r -a speedup_list <<< "$speedups"
@@ -209,7 +277,19 @@ for raw_workload in "${workload_list[@]}"; do
     fi
 
     echo "[INFO] Recording ${run_name}"
-    "${command[@]}"
+    if "${command[@]}"; then
+      command_status=0
+    else
+      command_status=$?
+    fi
+
+    if [[ "$keep_l2" == false && "$dry_run" == false ]]; then
+      clean_case_l2 "$workload"
+    fi
+
+    if ((command_status != 0)); then
+      exit "$command_status"
+    fi
   done
 done
 
