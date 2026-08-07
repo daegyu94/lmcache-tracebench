@@ -11,8 +11,8 @@ mountpoint=""
 output_root="outputs/speed-sweep"
 mooncake_trace_root=""
 mooncake_trace_root_set=false
-num_requests="1000"
-num_requests_set=false
+dataset_percent=""
+dataset_percent_set=false
 keep_l2=false
 dry_run=false
 
@@ -34,7 +34,10 @@ Options:
   --mooncake-trace-root PATH
                           Directory containing <trace>_trace.jsonl
                           (default: MOUNTPOINT/mooncake-traces)
-  --num-requests N|all    Mooncake request prefix (default: 1000)
+  --dataset-percent PERCENT
+                          Select the first PERCENT of the dataset. Mooncake
+                          uses requests; Tensormesh applies it to SWE-bench
+                          sessions and ignores it for GAIA/WildClaw.
   --keep-l2               Keep the per-case LMCache L2 directory after recording
                           (default: clean it after each case)
   --dry-run               Print every recorder plan without starting services
@@ -45,7 +48,7 @@ Examples:
     --backend mooncake \
     --mountpoint /MNTPNT \
     --speedups 1,2,5,10 \
-    --num-requests 1000
+    --dataset-percent 10
 
   bash scripts/record_speed_sweep.sh \
     --backend tensormesh \
@@ -99,10 +102,10 @@ while (($#)); do
       mooncake_trace_root_set=true
       shift 2
       ;;
-    --num-requests)
+    --dataset-percent)
       require_value "$@"
-      num_requests="$2"
-      num_requests_set=true
+      dataset_percent="$2"
+      dataset_percent_set=true
       shift 2
       ;;
     --keep-l2)
@@ -134,9 +137,6 @@ case "$backend" in
     ;;
   tensormesh)
     default_workloads="gaia,wildclaw,swebench"
-    if [[ "$num_requests_set" == true ]]; then
-      die "--num-requests is only valid with --backend mooncake"
-    fi
     ;;
   *)
     die "--backend must be mooncake or tensormesh: $backend"
@@ -224,6 +224,24 @@ if ((${#workload_list[@]} == 0 || ${#speedup_list[@]} == 0)); then
   die "--workloads and --speedups must not be empty"
 fi
 
+if [[ "$dataset_percent_set" == true ]]; then
+  if ! python -c 'import math, sys; value = float(sys.argv[1]); raise SystemExit(0 if math.isfinite(value) and 0 < value <= 100 else 1)' "$dataset_percent"; then
+    die "dataset-percent must be greater than 0 and at most 100: $dataset_percent"
+  fi
+  if [[ "$backend" == tensormesh ]]; then
+    for raw_workload in "${workload_list[@]}"; do
+      workload="${raw_workload//[[:space:]]/}"
+      case "$workload" in
+        swebench|gaia|wildclaw)
+          ;;
+        *)
+          die "--dataset-percent requires a Tensormesh workload: swebench, gaia, or wildclaw"
+          ;;
+      esac
+    done
+  fi
+fi
+
 output_root="${output_root%/}"
 mooncake_trace_root="${mooncake_trace_root%/}"
 
@@ -264,13 +282,18 @@ for raw_workload in "${workload_list[@]}"; do
     if [[ "$backend" == mooncake ]]; then
       command+=(
         --mooncake-trace "$workload"
-        --mooncake-num-requests "$num_requests"
       )
+      if [[ "$dataset_percent_set" == true ]]; then
+        command+=(--dataset-percent "$dataset_percent")
+      fi
       if [[ "$mooncake_trace_root_set" == true ]]; then
         command+=(
           --mooncake-path "${mooncake_trace_root}/${workload}_trace.jsonl"
         )
       fi
+    fi
+    if [[ "$backend" == tensormesh && "$dataset_percent_set" == true ]]; then
+      command+=(--dataset-percent "$dataset_percent")
     fi
     if [[ "$dry_run" == true ]]; then
       command+=(--dry-run)

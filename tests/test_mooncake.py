@@ -87,6 +87,25 @@ def test_prepare_and_build_mooncake_timed_trace(tmp_path: Path):
     assert "--disable-tqdm" not in command
 
 
+def test_prepare_mooncake_selects_percentage_prefix(tmp_path: Path):
+    trace_path = tmp_path / "toolagent.jsonl"
+    _write_trace(trace_path)
+    config = MooncakeWorkloadConfig(
+        trace="toolagent",
+        path=str(trace_path),
+        download_if_missing=False,
+        num_requests=None,
+    )
+
+    plan = prepare_mooncake_workload(config, dataset_percent=50)
+
+    assert plan.total_requests == 3
+    assert plan.selected_requests == 2
+    assert plan.dataset_percent == 50
+    assert plan.first_timestamp_ms == 1000
+    assert plan.last_timestamp_ms == 2500
+
+
 def test_mooncake_download_cli_validates_without_recorder_config(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ):

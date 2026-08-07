@@ -71,6 +71,24 @@ SWE-bench, GAIA, WildClaw를 각각 독립 trace로 기록하려면 다음 sourc
 `lmcache-trace/tensormesh-<source>`이며, `--mountpoint`가 실제 storage mount
 경로를 결정합니다.
 
+SWE-bench의 전체 dataset 중 일부만 기록할 때는 `--dataset-percent`를 사용합니다.
+비율은 source와 dataset-model filter를 적용한 전체 session 수에 대해 계산하고,
+session 순서를 유지한 prefix를 선택합니다. GAIA와 WildClaw는 이 비율을 무시하고
+전체 source dataset을 사용합니다. 실제 선택 session과 request(turn) 수는
+`workload.json`과 `manifest.json`의 `total_sessions`, `selected_sessions`,
+`total_turns`, `selected_turns`에서 확인할 수 있습니다.
+
+```bash
+python -m recorder.main \
+  --config configs/recorder/qwen3-coder-480b-tp8-swebench.yaml \
+  --mountpoint /MNTPNT \
+  --dataset-percent 10 \
+  --output-dir outputs/swebench-10pct
+```
+
+`--dataset-percent`는 Tensormesh의 SWE-bench에 적용되며, GAIA와 WildClaw에서는
+무시됩니다. 결과의 `dataset_percent_applied`가 실제 적용 여부를 나타냅니다.
+
 ```bash
 bash scripts/record_source_traces.sh \
   --mountpoint /MNTPNT \
@@ -149,14 +167,27 @@ directory도 기본적으로 비웁니다. `storage.lct`와 로그가 있는 out
 그대로 보존하며, Hugging Face dataset cache와 Mooncake 입력 trace도 삭제하지
 않습니다. 실행 후 L2 object를 남겨야 할 때만 `--keep-l2`를 추가하세요.
 
-Mooncake 기록(기본 Tool/Agent·Conversation, 요청 1,000개):
+Mooncake 기록(기본 Tool/Agent·Conversation, 전체 trace의 10%):
 
 ```bash
 bash scripts/record_speed_sweep.sh \
   --backend mooncake \
   --mountpoint /MNTPNT \
   --speedups 1,2,5,10 \
-  --num-requests 1000
+  --dataset-percent 10
+```
+
+SWE-bench는 전체 session의 비율을 선택하고, GAIA와 WildClaw는 비율을 무시하고
+각 source의 전체 dataset을 사용합니다. 세 workload를 함께 실행하려면 다음과
+같이 지정합니다.
+
+```bash
+bash scripts/record_speed_sweep.sh \
+  --backend tensormesh \
+  --workloads swebench,gaia,wildclaw \
+  --mountpoint /MNTPNT \
+  --speedups 1,2,5,10 \
+  --dataset-percent 10
 ```
 
 Tensormesh 기록(기본 GAIA·WildClaw·SWE-bench):
@@ -249,20 +280,22 @@ scaling 설정은 다음과 같습니다.
 
 | 설정 | 의미 |
 | --- | --- |
-| `num_requests` | JSONL 처음부터 실행할 request 수. `null`은 전체 trace |
+| `--dataset-percent` | JSONL 처음부터 선택할 request 비율. `10`은 전체 trace의 10% |
 | `time_scale` | request 간격 배율. `1.0`은 원본 timeline, `0.1`은 10배 압축 |
 | `chunk_hash_size` | `hash_id` 하나를 확장할 token 수. 공식 trace는 512 |
 | `max_concurrent_requests` | 동시에 처리할 client request 상한 |
 
-`num_requests`는 shuffle sample이 아니라 timestamp 순서를 유지한 trace prefix입니다.
-`1,000`, `5,000`, `null` 순서로 늘려 storage 용량과 실행 시간을 확인할 수
-있습니다. `time_scale`은 request 수와 token 수는 바꾸지 않고 arrival 간격과
-그에 따른 concurrency·I/O timing만 조절합니다.
+`--dataset-percent`는 shuffle sample이 아니라 timestamp 순서를 유지한 trace
+prefix입니다. 선택 request 수는 `ceil(전체 request 수 × 비율 / 100)`으로 계산하며,
+실제 전체·선택 request 수는 `workload.json`과 `manifest.json`의
+`total_requests`, `selected_requests`에서 확인할 수 있습니다. `time_scale`은
+request 수와 token 수는 바꾸지 않고 arrival 간격과 그에 따른 concurrency·I/O
+timing만 조절합니다.
 
-공통 config를 복제하지 않고 run별 request 수를 바꾸려면
-`--mooncake-num-requests`를 사용합니다. `all`은 YAML의 `null`과 같으며 전체
-trace를 선택합니다. 특정 L2 위치를 일회성으로 지정해야 할 때만 `--l2-path`를
-추가하고, 일반 실행에서는 `--mountpoint`만 사용합니다.
+공통 config를 복제하지 않고 run별 dataset 비율을 바꾸려면
+`--dataset-percent`를 사용합니다. 생략하면 config의 기본 동작을 따릅니다. 특정
+L2 위치를 일회성으로 지정해야 할 때만 `--l2-path`를 추가하고, 일반 실행에서는
+`--mountpoint`만 사용합니다.
 
 Tool/Agent 또는 Conversation trace를 기록하려면 `TRACE`만 바꿔 다음 명령을
 사용합니다. `TRACE`에는 `toolagent` 또는 `conversation`을 지정합니다.
@@ -274,7 +307,7 @@ python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
   --mountpoint /MNTPNT \
   --mooncake-trace "$TRACE" \
-  --mooncake-num-requests all \
+  --dataset-percent 10 \
   --output-dir "outputs/qwen3-coder-tp8-mooncake-${TRACE}"
 ```
 

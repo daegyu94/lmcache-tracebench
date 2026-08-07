@@ -134,6 +134,35 @@ python -c "import lmcache, lmcache.c_ops, vllm, openai, datasets; print('runtime
 `No module named 'lmcache'` 또는 `vllm` 오류는 다른 virtual environment를
 활성화했거나 package 설치가 빠진 경우입니다.
 
+## Dataset percentage recording
+
+SWE-bench의 전체 dataset 중 일부만 기록하려면 `--dataset-percent`를 사용합니다.
+전체 session을 기준으로 timestamp 순서를 유지한 prefix를 선택하며, GAIA와
+WildClaw는 이 옵션을 무시하고 전체 dataset을 사용합니다. 실제 전체·선택 session과
+request(turn) 수는 결과의 `workload.json`과 `manifest.json`에서 확인할 수 있습니다.
+
+```bash
+python -m recorder.main \
+  --config configs/recorder/qwen3-coder-480b-tp8-swebench.yaml \
+  --mountpoint /MNTPNT \
+  --dataset-percent 10 \
+  --output-dir outputs/swebench-10pct
+```
+
+Mooncake은 같은 옵션으로 전체 timed trace의 request 비율을 선택합니다.
+
+```bash
+bash scripts/record_speed_sweep.sh \
+  --backend mooncake \
+  --mountpoint /MNTPNT \
+  --speedups 1,5,10 \
+  --dataset-percent 10
+```
+
+`--dataset-percent`는 Tensormesh SWE-bench와 Mooncake에 적용되며, GAIA와
+WildClaw에서는 무시됩니다. 자세한 recorder output과 speed sweep은
+[Recorder guide](docs/recorder.md)를 참고하세요.
+
 ## Guides
 
 - [Recorder guide](docs/recorder.md): Tensormesh V3, Mooncake workload, GPU quota와 Recorder output

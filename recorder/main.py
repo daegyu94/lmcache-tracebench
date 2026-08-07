@@ -12,21 +12,6 @@ from .config import RecorderConfig, load_config
 from .launcher import build_commands
 
 
-def _mooncake_num_requests(value: str) -> int | None:
-    """Parse a Mooncake request limit, with ``all`` meaning the full trace."""
-    if value == "all":
-        return None
-    try:
-        num_requests = int(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(
-            "must be a positive integer or 'all'"
-        ) from exc
-    if num_requests <= 0:
-        raise argparse.ArgumentTypeError("must be a positive integer or 'all'")
-    return num_requests
-
-
 def _positive_float(value: str) -> float:
     """Parse a finite positive floating-point CLI value."""
     try:
@@ -35,6 +20,21 @@ def _positive_float(value: str) -> float:
         raise argparse.ArgumentTypeError("must be a positive number") from exc
     if not math.isfinite(parsed) or parsed <= 0:
         raise argparse.ArgumentTypeError("must be a positive number")
+    return parsed
+
+
+def _dataset_percent(value: str) -> float:
+    """Parse a dataset prefix percentage in the inclusive range (0, 100]."""
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a number greater than 0 and at most 100"
+        ) from exc
+    if not math.isfinite(parsed) or parsed <= 0 or parsed > 100:
+        raise argparse.ArgumentTypeError(
+            "must be a number greater than 0 and at most 100"
+        )
     return parsed
 
 
@@ -136,11 +136,13 @@ def _parser() -> argparse.ArgumentParser:
         help="local Mooncake JSONL path; requires --mooncake-trace",
     )
     parser.add_argument(
-        "--mooncake-num-requests",
-        type=_mooncake_num_requests,
-        metavar="N|all",
-        default=argparse.SUPPRESS,
-        help="override the Mooncake request prefix; 'all' replays the full trace",
+        "--dataset-percent",
+        type=_dataset_percent,
+        metavar="PERCENT",
+        help=(
+            "record the first PERCENT of the dataset; Mooncake selects requests "
+            "and Tensormesh SWE-bench selects sessions (GAIA/WildClaw ignore it)"
+        ),
     )
     parser.add_argument(
         "--speedup",
@@ -165,25 +167,39 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config(args.config)
     if args.mooncake_path and not args.mooncake_trace:
         parser.error("--mooncake-path requires --mooncake-trace")
-    mooncake_num_requests = getattr(args, "mooncake_num_requests", None)
-    has_mooncake_num_requests = hasattr(args, "mooncake_num_requests")
-    if args.mooncake_trace or has_mooncake_num_requests:
+    if args.mooncake_trace:
         if config.workload.backend != "mooncake":
             parser.error("Mooncake options require workload.backend: mooncake")
         mooncake = replace(
             config.workload.mooncake,
             trace=args.mooncake_trace or config.workload.mooncake.trace,
             path=args.mooncake_path or config.workload.mooncake.path,
-            num_requests=(
-                mooncake_num_requests
-                if has_mooncake_num_requests
-                else config.workload.mooncake.num_requests
-            ),
         )
         config = replace(
             config,
             workload=replace(config.workload, mooncake=mooncake),
         )
+    if args.dataset_percent is not None:
+        if config.workload.backend == "mooncake":
+            # A percentage is mutually exclusive with the legacy fixed request
+            # prefix.  Clear the config default so the live planner computes the
+            # prefix from the downloaded trace length.
+            mooncake = replace(config.workload.mooncake, num_requests=None)
+            config = replace(
+                config,
+                workload=replace(config.workload, mooncake=mooncake),
+            )
+        elif config.workload.backend == "tensormesh":
+            if config.workload.source not in {"swebench", "gaia", "wildclaw"}:
+                parser.error(
+                    "--dataset-percent requires a Tensormesh SWE-bench, "
+                    "GAIA, or WildClaw source"
+                )
+        else:  # pragma: no cover - config.validate handles unknown backends
+            parser.error(
+                "--dataset-percent is supported for Mooncake and "
+                "Tensormesh SWE-bench, GAIA, or WildClaw"
+            )
     if args.speedup is not None:
         try:
             config = apply_speedup(config, args.speedup)
@@ -216,13 +232,14 @@ def main(argv: list[str] | None = None) -> int:
             "backend": "mooncake",
             "trace": config.workload.mooncake.trace,
             "path": config.workload.mooncake.path,
-            "num_requests": config.workload.mooncake.num_requests,
+            "dataset_percent": args.dataset_percent,
             "time_scale": config.workload.mooncake.time_scale,
         }
     else:
         workload_summary = {
             "backend": "tensormesh",
             "source": config.workload.source,
+            "dataset_percent": args.dataset_percent,
             "timing_mode": config.workload.timing_mode,
             "pre_gap_scale": config.workload.pre_gap_scale,
         }
@@ -237,11 +254,20 @@ def main(argv: list[str] | None = None) -> int:
             )
         from .workload import load_workload
 
-        plan = load_workload(config.workload)
+        plan = load_workload(
+            config.workload,
+            dataset_percent=args.dataset_percent,
+        )
         workload_plan = {
             "backend": "tensormesh",
             "source_counts": plan.source_counts,
             "session_ids": plan.session_ids,
+            "dataset_percent": plan.dataset_percent,
+            "dataset_percent_applied": plan.dataset_percent_applied,
+            "total_sessions": plan.total_sessions,
+            "selected_sessions": len(plan.sessions),
+            "total_turns": plan.total_turns,
+            "selected_turns": plan.selected_turns,
         }
         print("Workload plan:")
         print(json.dumps(workload_plan, indent=2, default=str))
@@ -249,7 +275,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args.dry_run:
         from .live import run_live
 
-        run_live(config, output_dir=output_dir)
+        run_live(
+            config,
+            output_dir=output_dir,
+            dataset_percent=args.dataset_percent,
+        )
     return 0
 
 

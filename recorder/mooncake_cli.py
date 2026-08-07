@@ -4,11 +4,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from dataclasses import asdict
 from pathlib import Path
 
 from .config import MooncakeWorkloadConfig
 from .mooncake import prepare_mooncake_workload
+
+
+def _dataset_percent(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a number greater than 0 and at most 100"
+        ) from exc
+    if not math.isfinite(parsed) or parsed <= 0 or parsed > 100:
+        raise argparse.ArgumentTypeError(
+            "must be a number greater than 0 and at most 100"
+        )
+    return parsed
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -30,10 +45,11 @@ def _parser() -> argparse.ArgumentParser:
         help="override the official source URL (requires one trace)",
     )
     parser.add_argument(
-        "--num-requests",
-        type=int,
+        "--dataset-percent",
+        type=_dataset_percent,
+        metavar="PERCENT",
         default=None,
-        help="select this many requests while validating (default: all)",
+        help="validate the first PERCENT of each trace (default: all)",
     )
     parser.add_argument(
         "--no-download",
@@ -60,9 +76,12 @@ def main(argv: list[str] | None = None) -> int:
             path=str(output_dir / f"{trace}_trace.jsonl"),
             url=args.url,
             download_if_missing=not args.no_download,
-            num_requests=args.num_requests,
+            num_requests=None,
         )
-        plan = prepare_mooncake_workload(config)
+        plan = prepare_mooncake_workload(
+            config,
+            dataset_percent=args.dataset_percent,
+        )
         summary = asdict(plan)
         summary["path"] = str(Path(plan.path))
         summaries.append(summary)

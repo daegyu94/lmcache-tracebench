@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import tempfile
@@ -39,6 +40,7 @@ class MooncakePlan:
     max_total_tokens: int
     first_timestamp_ms: float
     last_timestamp_ms: float
+    dataset_percent: float | None = None
 
     @property
     def source_counts(self) -> dict[str, int]:
@@ -90,18 +92,9 @@ def _number(entry: dict[str, Any], field: str, line_number: int) -> float:
     return float(value)
 
 
-def prepare_mooncake_workload(config: MooncakeWorkloadConfig) -> MooncakePlan:
-    """Download if needed, validate JSONL, and summarize the selected prefix."""
-    path, source_url = ensure_mooncake_trace(config)
-    total_requests = 0
-    selected_requests = 0
-    total_input_tokens = 0
-    total_output_tokens = 0
-    max_input_tokens = 0
-    max_total_tokens = 0
-    first_timestamp_ms: float | None = None
-    last_timestamp_ms: float | None = None
-
+def _validated_entries(path: Path):
+    """Yield validated Mooncake entries while checking timestamp ordering."""
+    previous_timestamp_ms: float | None = None
     with path.open(encoding="utf-8") as stream:
         for line_number, line in enumerate(stream, start=1):
             if not line.strip():
@@ -128,37 +121,82 @@ def prepare_mooncake_workload(config: MooncakeWorkloadConfig) -> MooncakePlan:
                 raise ValueError(
                     f"Mooncake trace line {line_number} has invalid hash_ids"
                 )
-
-            total_requests += 1
             if (
-                config.num_requests is not None
-                and selected_requests >= config.num_requests
+                previous_timestamp_ms is not None
+                and timestamp < previous_timestamp_ms
             ):
-                continue
-            if last_timestamp_ms is not None and timestamp < last_timestamp_ms:
                 raise ValueError(
                     "Mooncake trace timestamps must be nondecreasing; "
-                    f"line {line_number} has {timestamp} after {last_timestamp_ms}"
+                    f"line {line_number} has {timestamp} after "
+                    f"{previous_timestamp_ms}"
                 )
-            selected_requests += 1
-            total_input_tokens += input_length
-            total_output_tokens += output_length
-            max_input_tokens = max(max_input_tokens, input_length)
-            max_total_tokens = max(
-                max_total_tokens,
-                input_length + output_length,
-            )
-            if first_timestamp_ms is None:
-                first_timestamp_ms = timestamp
-            last_timestamp_ms = timestamp
+            previous_timestamp_ms = timestamp
+            yield timestamp, input_length, output_length
 
+
+def _validate_dataset_percent(dataset_percent: float) -> float:
+    if (
+        not math.isfinite(dataset_percent)
+        or dataset_percent <= 0
+        or dataset_percent > 100
+    ):
+        raise ValueError("dataset_percent must be greater than 0 and at most 100")
+    return float(dataset_percent)
+
+
+def prepare_mooncake_workload(
+    config: MooncakeWorkloadConfig,
+    *,
+    dataset_percent: float | None = None,
+) -> MooncakePlan:
+    """Download, validate, and summarize a Mooncake dataset prefix."""
+    if dataset_percent is not None:
+        dataset_percent = _validate_dataset_percent(dataset_percent)
+        if config.num_requests is not None:
+            raise ValueError(
+                "dataset_percent cannot be combined with num_requests; "
+                "leave num_requests unset when selecting by percentage"
+            )
+    path, source_url = ensure_mooncake_trace(config)
+    total_requests = sum(1 for _ in _validated_entries(path))
     if total_requests == 0:
         raise ValueError(f"Mooncake trace is empty: {path}")
-    if config.num_requests is not None and total_requests < config.num_requests:
+
+    if dataset_percent is not None:
+        selected_limit = math.ceil(total_requests * dataset_percent / 100.0)
+    elif config.num_requests is None:
+        selected_limit = total_requests
+    else:
+        selected_limit = config.num_requests
+    if total_requests < selected_limit:
         raise ValueError(
             f"Mooncake trace has {total_requests} requests, fewer than configured "
-            f"num_requests={config.num_requests}"
+            f"num_requests={selected_limit}"
         )
+
+    selected_requests = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
+    max_input_tokens = 0
+    max_total_tokens = 0
+    first_timestamp_ms: float | None = None
+    last_timestamp_ms: float | None = None
+
+    for timestamp, input_length, output_length in _validated_entries(path):
+        if selected_requests >= selected_limit:
+            break
+        selected_requests += 1
+        total_input_tokens += input_length
+        total_output_tokens += output_length
+        max_input_tokens = max(max_input_tokens, input_length)
+        max_total_tokens = max(
+            max_total_tokens,
+            input_length + output_length,
+        )
+        if first_timestamp_ms is None:
+            first_timestamp_ms = timestamp
+        last_timestamp_ms = timestamp
+
     assert first_timestamp_ms is not None
     assert last_timestamp_ms is not None
     return MooncakePlan(
@@ -173,6 +211,7 @@ def prepare_mooncake_workload(config: MooncakeWorkloadConfig) -> MooncakePlan:
         max_total_tokens=max_total_tokens,
         first_timestamp_ms=first_timestamp_ms,
         last_timestamp_ms=last_timestamp_ms,
+        dataset_percent=dataset_percent,
     )
 
 

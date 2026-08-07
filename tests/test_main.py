@@ -16,8 +16,8 @@ def test_mooncake_overrides_are_reflected_in_dry_run(capsys):
                 "/tmp/mount",
                 "--mooncake-trace",
                 "conversation",
-                "--mooncake-num-requests",
-                "all",
+                "--dataset-percent",
+                "100",
                 "--l2-path",
                 "/tmp/mooncake-{trace}",
                 "--output-dir",
@@ -31,7 +31,7 @@ def test_mooncake_overrides_are_reflected_in_dry_run(capsys):
     assert "storage.lct" in output
     assert "/tmp/mooncake-conversation" in output
     assert "/tmp/mount/mooncake-traces/conversation_trace.jsonl" in output
-    assert "--num-requests" not in output
+    assert '"dataset_percent": 100.0' in output
 
 
 def test_mountpoint_resolves_relative_recorder_paths(capsys):

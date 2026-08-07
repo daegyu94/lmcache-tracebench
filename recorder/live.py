@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import shutil
 import time
@@ -208,6 +209,7 @@ def run_live(
     config: RecorderConfig,
     *,
     output_dir: str | Path | None = None,
+    dataset_percent: float | None = None,
     verbose: bool = True,
 ) -> dict[str, Any]:
     """Run V3 against vLLM while LMCache records an MP storage trace.
@@ -217,6 +219,24 @@ def run_live(
     after cleanup so a non-zero CLI exit still signals an incomplete run.
     """
     config.validate()
+    if dataset_percent is not None:
+        if (
+            not math.isfinite(dataset_percent)
+            or dataset_percent <= 0
+            or dataset_percent > 100
+        ):
+            raise ValueError("dataset_percent must be greater than 0 and at most 100")
+        if config.workload.backend == "tensormesh":
+            if config.workload.source not in {"swebench", "gaia", "wildclaw"}:
+                raise ValueError(
+                    "dataset_percent requires a Tensormesh SWE-bench, "
+                    "GAIA, or WildClaw source"
+                )
+        elif config.workload.backend != "mooncake":
+            raise ValueError(
+                "dataset_percent is supported for Mooncake and "
+                "Tensormesh SWE-bench, GAIA, or WildClaw"
+            )
     configured_output = Path(config.output.root)
     if config.output.run_id:
         configured_output /= config.output.run_id
@@ -229,7 +249,10 @@ def run_live(
     if config.workload.backend == "mooncake":
         if verbose:
             _status("INFO", "Preparing Mooncake FAST'25 workload")
-        mooncake_plan = prepare_mooncake_workload(config.workload.mooncake)
+        mooncake_plan = prepare_mooncake_workload(
+            config.workload.mooncake,
+            dataset_percent=dataset_percent,
+        )
         if (
             config.model.max_model_len is not None
             and mooncake_plan.max_total_tokens > config.model.max_model_len
@@ -325,7 +348,11 @@ def run_live(
         if config.workload.backend == "tensormesh":
             if verbose:
                 _status("INFO", "Loading Tensormesh V3 workload")
-            workload = load_workload(config.workload, verbose=verbose)
+            workload = load_workload(
+                config.workload,
+                dataset_percent=dataset_percent,
+                verbose=verbose,
+            )
             _write_json(
                 run_dir / "workload.json",
                 {
@@ -333,6 +360,12 @@ def run_live(
                     "source_counts": workload.source_counts,
                     "session_ids": workload.session_ids,
                     "num_sessions": len(workload.sessions),
+                    "total_sessions": workload.total_sessions,
+                    "selected_sessions": len(workload.sessions),
+                    "total_turns": workload.total_turns,
+                    "selected_turns": workload.selected_turns,
+                    "dataset_percent": workload.dataset_percent,
+                    "dataset_percent_applied": workload.dataset_percent_applied,
                 },
             )
             if verbose:
@@ -437,6 +470,12 @@ def run_live(
             workload_manifest = {
                 "backend": "tensormesh",
                 "num_sessions": len(workload.sessions),
+                "total_sessions": workload.total_sessions,
+                "selected_sessions": len(workload.sessions),
+                "total_turns": workload.total_turns,
+                "selected_turns": workload.selected_turns,
+                "dataset_percent": workload.dataset_percent,
+                "dataset_percent_applied": workload.dataset_percent_applied,
                 "source_counts": workload.source_counts,
                 "timing_mode": config.workload.timing_mode,
                 "pre_gap_scale": config.workload.pre_gap_scale,
@@ -447,6 +486,9 @@ def run_live(
                 "trace": mooncake_plan.trace,
                 "trace_path": str(mooncake_plan.path),
                 "num_requests": mooncake_plan.selected_requests,
+                "total_requests": mooncake_plan.total_requests,
+                "selected_requests": mooncake_plan.selected_requests,
+                "dataset_percent": mooncake_plan.dataset_percent,
                 "source_counts": mooncake_plan.source_counts,
                 "time_scale": config.workload.mooncake.time_scale,
             }
