@@ -218,6 +218,59 @@ clean_case_l2() {
   mkdir -p -- "$target"
 }
 
+record_case_l2_usage() {
+  local workload="$1"
+  local output_dir="$2"
+  local command_status="$3"
+  local mount_root="${mountpoint%/}"
+  local l2_path="${mount_root}/lmcache-trace/${backend}-${workload}"
+  local usage_status="ok"
+  local bytes=""
+
+  if [[ -d "$l2_path" ]]; then
+    if ! bytes="$(du -sb -- "$l2_path" | awk 'NR == 1 {print $1}')"; then
+      usage_status="measurement_failed"
+      bytes=""
+    fi
+  else
+    usage_status="missing"
+  fi
+
+  mkdir -p -- "$output_dir"
+  python - "$output_dir/l2_usage.json" "${output_root}/l2_usage.jsonl" \
+    "$backend" "$workload" "$l2_path" "$bytes" "$usage_status" \
+    "$command_status" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+usage_path = Path(sys.argv[1])
+summary_path = Path(sys.argv[2])
+backend, workload, l2_path = sys.argv[3:6]
+raw_bytes, usage_status, raw_exit_code = sys.argv[6:9]
+bytes_used = int(raw_bytes) if raw_bytes else None
+record = {
+    "backend": backend,
+    "workload": workload,
+    "l2_path": l2_path,
+    "bytes": bytes_used,
+    "gb": round(bytes_used / 1_000_000_000, 3) if bytes_used is not None else None,
+    "gib": round(bytes_used / (1024**3), 3) if bytes_used is not None else None,
+    "measurement_status": usage_status,
+    "record_exit_code": int(raw_exit_code),
+    "measured_at_utc": datetime.now(timezone.utc).isoformat(),
+}
+usage_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+with summary_path.open("a", encoding="utf-8") as stream:
+    stream.write(json.dumps({"output_dir": str(usage_path.parent), **record}, sort_keys=True) + "\n")
+print(
+    f"[INFO] L2 storage usage: {record['gb']} GB "
+    f"({record['bytes']} bytes) at {l2_path}"
+)
+PY
+}
+
 IFS=',' read -r -a workload_list <<< "$workloads"
 IFS=',' read -r -a speedup_list <<< "$speedups"
 if ((${#workload_list[@]} == 0 || ${#speedup_list[@]} == 0)); then
@@ -244,6 +297,7 @@ fi
 
 output_root="${output_root%/}"
 mooncake_trace_root="${mooncake_trace_root%/}"
+mkdir -p -- "$output_root"
 
 for raw_speedup in "${speedup_list[@]}"; do
   speedup="${raw_speedup//[[:space:]]/}"
@@ -307,7 +361,10 @@ for raw_workload in "${workload_list[@]}"; do
     fi
 
     if [[ "$keep_l2" == false && "$dry_run" == false ]]; then
+      record_case_l2_usage "$workload" "$output_dir" "$command_status"
       clean_case_l2 "$workload"
+    elif [[ "$dry_run" == false ]]; then
+      record_case_l2_usage "$workload" "$output_dir" "$command_status"
     fi
 
     if ((command_status != 0)); then

@@ -165,7 +165,9 @@ Replay: storage operations only
 사용합니다. 각 case는 시작할 때 L2 경로를 초기화하고, 실행이 끝나면 중간 L2
 directory도 기본적으로 비웁니다. `storage.lct`와 로그가 있는 output directory는
 그대로 보존하며, Hugging Face dataset cache와 Mooncake 입력 trace도 삭제하지
-않습니다. 실행 후 L2 object를 남겨야 할 때만 `--keep-l2`를 추가하세요.
+않습니다. 정리 직전에 L2 사용량을 측정해 각 case의 `l2_usage.json`과
+전체 sweep의 `l2_usage.jsonl`에 bytes, decimal GB와 GiB를 기록합니다. 실행 후
+L2 object를 남겨야 할 때만 `--keep-l2`를 추가하세요.
 
 Mooncake 기록(기본 Tool/Agent·Conversation, 전체 trace의 10%):
 
@@ -340,6 +342,7 @@ LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다
 | `session_outcomes.jsonl` | Session별 실행 결과 |
 | `commands.json` | 실행 command와 환경 변수 |
 | `workload.json` | 선택한 workload 정보 |
+| `l2_usage.json` | speed sweep case 종료 직전 측정한 L2 사용량 |
 | `lmcache.log`, `vllm.log`, `workload.log` | Process별 로그 |
 
 Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면 `manifest.json`을
