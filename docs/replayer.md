@@ -57,6 +57,29 @@ python -m replayer.main \
 `l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
 `--output-dir`는 summary, operation CSV와 로그를 저장할 디렉터리를 덮어씁니다.
 
+## Replay speedup sweep
+
+이미 기록된 하나의 `.lct`에 여러 `--speedup` 값을 적용해 storage arrival-rate를
+비교하려면 `benchmarks/storage_trace/replay_speed_sweep.sh`를 사용합니다. 이 스크립트는
+speedup별로 replay를 순차 실행하고, 각 case에 독립적인 L2 경로와 output 디렉터리를
+사용합니다. 따라서 한 case의 warm cache가 다음 speedup에 영향을 주지 않습니다.
+
+```bash
+bash benchmarks/storage_trace/replay_speed_sweep.sh \
+  --trace outputs/speed-sweep/tensormesh-gaia-x1/storage.lct \
+  --config configs/replayer/fs-native.yaml \
+  --l2-root /MNTPNT/lmcache-trace-replay/speed-sweep \
+  --output-root outputs/replay/speed-sweep/gaia \
+  --speedups 1,2,5,10
+```
+
+각 case의 결과와 LMCache 로그는 `output-root/x<SPEEDUP>/`에 저장되며, 전체 실행
+결과는 `sweep-summary.json`과 `sweep-results.jsonl`에 기록됩니다. `--profile`을
+추가하면 speedup별 storage node profiling도 함께 실행합니다. 기존 case 경로가
+비어 있지 않으면 warm-cache 결과를 방지하기 위해 실행을 중단하므로, 비교 실험에는
+새 L2 root와 output root를 사용하세요. 실행 전 command만 확인하려면 `--dry-run`을
+추가합니다.
+
 ## Parallel replicated replay
 
 한 replayer 노드에서 여러 MP instance의 storage 부하를 모사하려면
