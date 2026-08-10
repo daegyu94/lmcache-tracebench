@@ -28,6 +28,7 @@
 | `storage_trace/record_speed_sweep.sh` | workload speedup별 `.lct` record |
 | `storage_trace/replay_speed_sweep.sh` | 하나의 `.lct`를 여러 storage arrival-rate로 replay |
 | `storage_trace/replay_l1_size_sweep.sh` | 하나의 `.lct`를 여러 L1 capacity로 replay |
+| `storage_trace/replay_backend_sweep.sh` | backend별 speedup/L1 sweep 실행 |
 | `storage_trace/replay_workload_sweep.sh` | 여러 workload에 동일한 replay speedup sweep 적용 |
 | `storage_trace/replay_instances.sh` | 하나의 trace를 여러 replay process로 복제 실행 |
 
@@ -97,7 +98,33 @@ bash benchmarks/storage_trace/replay_workload_sweep.sh \
 이 script는 workload를 순차 실행합니다. 한 workload가 실패해도 다음 workload를
 계속 실행하고, 마지막 exit code와 summary에 실패를 반영합니다.
 
-### 4. Inspect artifacts
+### 4. Sweep storage backends
+
+backend별 adapter/config와 L2 경로를 바꿔가며 speedup 또는 L1 size sweep을 하려면
+`replay_backend_sweep.sh`를 사용합니다. `NAME`은 결과 label이고, 실제 adapter는
+`CONFIG`, storage target은 `L2_PATH`가 결정합니다. 따라서 `xfs`와 `pnfs`는 같은
+`fs-native.yaml`을 사용하되 mount path를 다르게 지정하고, `3fs`는
+`nixl-hf3fs.yaml`을 사용합니다.
+
+```bash
+bash benchmarks/storage_trace/replay_backend_sweep.sh \
+  --trace /mnt/nvme/lmcache-traces/tensormesh-20260809/tensormesh-wildclaw/storage.lct \
+  --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
+  --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \
+  --backend-spec '3fs=configs/replayer/nixl-hf3fs.yaml@/mnt/3fs/lmcache-replay' \
+  --experiment speedup \
+  --speedups 1,2,4,8 \
+  --output-root outputs/replay-backend-sweep/tensormesh-wildclaw
+```
+
+L1 capacity를 비교하려면 `--experiment l1-size --l1-sizes 20,40,80,160
+--speedup 1`로 변경합니다. scaled-open과 함께 실험하려면 `--speedup 8`을
+지정합니다. 결과는 `output-root/<BACKEND>/` 아래에 저장되고, 상위
+`backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log`와
+backend별 기존 sweep summary/log가 생성됩니다. 각 backend에는 새로운 L2 path를
+사용하고, mount가 실제로 해당 backend인지 확인하세요.
+
+### 5. Inspect artifacts
 
 일반적인 replay case의 output은 다음과 같습니다.
 
@@ -119,7 +146,8 @@ x8/
 speedup sweep은 `sweep-summary.json`, `sweep-results.jsonl`, `sweep.log`를
 추가로 생성합니다. workload sweep은 상위 output root에
 `workload-summary.json`, `workload-results.jsonl`, `workload-sweep.log`를
-생성합니다.
+생성합니다. backend sweep은 상위 output root에 backend별 결과와
+`backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log`를 생성합니다.
 
 ## Interpretation
 
