@@ -34,6 +34,19 @@
 
 실행 가능한 옵션은 각 script의 `--help`를 사용합니다.
 
+### Sweep script overview
+
+| Script | Sweep unit | Case execution order |
+| --- | --- | --- |
+| `replay_speed_sweep.sh` | 하나의 trace × speedup | `x1 → x2 → x4 → x8` |
+| `replay_l1_size_sweep.sh` | 하나의 trace × L1 size | `l1-20gb → l1-40gb → ...` |
+| `replay_workload_sweep.sh` | workload × speedup | workload 순서 안에서 speedup 순서 |
+| `replay_backend_sweep.sh` | backend × speedup 또는 L1 size | backend 순서 안에서 선택한 sweep 순서 |
+
+각 case는 별도의 `python -m replayer.main` 실행이며, sweep script들은 이 단일
+replay를 반복 호출하는 launcher입니다. 실제 LMCache storage replay는
+`replayer/runner.py`가 실행하는 `lmcache trace replay` subprocess가 담당합니다.
+
 ## Recommended workflow
 
 ### 1. Record or obtain traces
@@ -116,6 +129,37 @@ bash benchmarks/storage_trace/replay_backend_sweep.sh \
   --speedups 1,2,4,8 \
   --output-root outputs/replay-backend-sweep/tensormesh-wildclaw
 ```
+
+`--backend-spec`가 입력된 순서대로 backend가 실행되고, 각 backend 안에서는
+`--speedups`에 입력한 순서대로 case가 실행됩니다. 위 명령의 전체 순서는 다음과
+같습니다.
+
+```text
+xfs:x1 → xfs:x2 → xfs:x4 → xfs:x8
+  → pnfs:x1 → pnfs:x2 → pnfs:x4 → pnfs:x8
+  → 3fs:x1 → 3fs:x2 → 3fs:x4 → 3fs:x8
+```
+
+실행 흐름을 한 단계 확장하면 다음과 같습니다.
+
+```text
+replay_backend_sweep.sh
+├── replay_speed_sweep.sh --config fs-native.yaml --l2-root /mnt/xfs/...
+│   ├── python -m replayer.main --speedup 1 --l2-path /mnt/xfs/.../x1
+│   ├── python -m replayer.main --speedup 2 --l2-path /mnt/xfs/.../x2
+│   ├── python -m replayer.main --speedup 4 --l2-path /mnt/xfs/.../x4
+│   └── python -m replayer.main --speedup 8 --l2-path /mnt/xfs/.../x8
+├── replay_speed_sweep.sh --config fs-native.yaml --l2-root /mnt/pnfs/...
+│   └── ... pnfs의 x1, x2, x4, x8
+└── replay_speed_sweep.sh --config nixl-hf3fs.yaml --l2-root /mnt/3fs/...
+    └── ... 3fs의 x1, x2, x4, x8
+```
+
+backend sweep은 병렬 실행하지 않습니다. 한 backend의 speedup sweep이 끝난 뒤
+다음 backend로 넘어갑니다. 개별 replay가 실패해도 다음 case를 계속 시도하고,
+최종 summary와 exit code에 실패를 기록합니다. 단, L2 case directory가 이미
+존재하거나 비어 있지 않으면 warm-cache 결과 방지를 위해 해당 sweep이 중단될 수
+있습니다.
 
 L1 capacity를 비교하려면 `--experiment l1-size --l1-sizes 20,40,80,160
 --speedup 1`로 변경합니다. scaled-open과 함께 실험하려면 `--speedup 8`을
