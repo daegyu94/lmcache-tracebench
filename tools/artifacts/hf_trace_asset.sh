@@ -3,7 +3,7 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-project_root="$(cd -- "$script_dir/.." && pwd -P)"
+project_root="$(cd -- "$script_dir/../.." && pwd -P)"
 python_command="${PYTHON:-python}"
 if [[ -z "${PYTHON:-}" && -x "$project_root/.venv/bin/python" ]]; then
   python_command="$project_root/.venv/bin/python"
@@ -12,11 +12,11 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/hf_trace_asset.sh upload --repo-id REPO --filepath PATH \
+  bash tools/artifacts/hf_trace_asset.sh upload --repo-id REPO --filepath PATH \
     [--path-in-repo PATH] [--revision REVISION] [--clobber] [--dry-run]
-  bash scripts/hf_trace_asset.sh download --repo-id REPO --path-in-repo PATH \
+  bash tools/artifacts/hf_trace_asset.sh download --repo-id REPO --path-in-repo PATH \
     --output-dir PATH [--revision REVISION] [--clobber] [--dry-run]
-  bash scripts/hf_trace_asset.sh list --repo-id REPO [--revision REVISION]
+  bash tools/artifacts/hf_trace_asset.sh list --repo-id REPO [--revision REVISION]
 
 Commands:
   upload    Upload a local file to a Hugging Face Dataset repository.
@@ -38,11 +38,11 @@ Authentication:
   repositories do not require authentication.
 
 Examples:
-  bash scripts/hf_trace_asset.sh upload \
+  bash tools/artifacts/hf_trace_asset.sh upload \
     --repo-id daegyu94/lmcache-storage-traces \
     --filepath outputs/mooncake/storage.lct \
     --path-in-repo mooncake-20260807/storage.lct
-  bash scripts/hf_trace_asset.sh download \
+  bash tools/artifacts/hf_trace_asset.sh download \
     --repo-id daegyu94/lmcache-storage-traces \
     --path-in-repo tensormesh-20260809/tensormesh-gaia.tar.gz \
     --output-dir downloads

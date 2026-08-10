@@ -90,7 +90,7 @@ python -m recorder.main \
 무시됩니다. 결과의 `dataset_percent_applied`가 실제 적용 여부를 나타냅니다.
 
 ```bash
-bash scripts/record_source_traces.sh \
+bash benchmarks/storage_trace/record_source_traces.sh \
   --mountpoint /MNTPNT \
   --output-root /MNTPNT/lmcache-tracebench/outputs
 ```
@@ -160,7 +160,7 @@ Replay: storage operations only
   Replay-time x5 compresses the storage gap, but does not scale GPU compute.
 ```
 
-`record_speed_sweep.sh`는 workload별로 speedup마다 하나의 `storage.lct`를
+`benchmarks/storage_trace/record_speed_sweep.sh`는 workload별로 speedup마다 하나의 `storage.lct`를
 순차적으로 기록합니다. config의 L2 `subpath`는 `--mountpoint` 아래에서
 사용합니다. 각 case는 시작할 때 L2 경로를 초기화하고, 실행이 끝나면 중간 L2
 directory도 기본적으로 비웁니다. `storage.lct`와 로그가 있는 output directory는
@@ -172,7 +172,7 @@ L2 object를 남겨야 할 때만 `--keep-l2`를 추가하세요.
 Mooncake 기록(기본 Tool/Agent·Conversation, 전체 trace의 10%):
 
 ```bash
-bash scripts/record_speed_sweep.sh \
+bash benchmarks/storage_trace/record_speed_sweep.sh \
   --backend mooncake \
   --mountpoint /MNTPNT \
   --speedups 1,2,5,10 \
@@ -184,7 +184,7 @@ SWE-bench는 전체 session의 비율을 선택하고, GAIA와 WildClaw는 비�
 같이 지정합니다.
 
 ```bash
-bash scripts/record_speed_sweep.sh \
+bash benchmarks/storage_trace/record_speed_sweep.sh \
   --backend tensormesh \
   --workloads swebench,gaia,wildclaw \
   --mountpoint /MNTPNT \
@@ -195,7 +195,7 @@ bash scripts/record_speed_sweep.sh \
 Tensormesh 기록(기본 GAIA·WildClaw·SWE-bench):
 
 ```bash
-bash scripts/record_speed_sweep.sh \
+bash benchmarks/storage_trace/record_speed_sweep.sh \
   --backend tensormesh \
   --mountpoint /MNTPNT \
   --speedups 1,2,5,10

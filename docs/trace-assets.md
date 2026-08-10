@@ -1,7 +1,7 @@
 # Trace release assets
 
 기록한 storage trace를 GitHub Release asset 또는 Hugging Face Dataset으로 공유하거나 내려받는 방법입니다.
-`scripts/release_asset.sh`는 GitHub Release 생성, trace upload, download를 제공합니다.
+`tools/artifacts/release_asset.sh`는 GitHub Release 생성, trace upload, download를 제공합니다.
 `--help`를 제외한 모든 command는 `gh` CLI 설치와 GitHub 인증이 필요합니다.
 
 ```bash
@@ -11,7 +11,7 @@ gh auth login
 ## Create a release
 
 ```bash
-bash scripts/release_asset.sh release \
+bash tools/artifacts/release_asset.sh release \
   --tag tensormesh-benchmark-20260805 \
   --title "Tensormesh benchmark traces (2026-08-05)"
 ```
@@ -22,7 +22,7 @@ bash scripts/release_asset.sh release \
 `--filename`은 Release에 표시할 asset 이름이고, `--filepath`은 로컬 파일 경로입니다.
 
 ```bash
-bash scripts/release_asset.sh upload --tag tensormesh-benchmark-20260805 \
+bash tools/artifacts/release_asset.sh upload --tag tensormesh-benchmark-20260805 \
   --filename wildclaw_storage.lct \
   --filepath /MNTPNT/lmcache-tracebench/outputs/source-traces-20260804-082231/wildclaw/storage.lct
 ```
@@ -41,7 +41,7 @@ Release에서 trace를 내려받으려면 다음을 실행합니다. split asset
 정리합니다.
 
 ```bash
-bash scripts/release_asset.sh download \
+bash tools/artifacts/release_asset.sh download \
   --tag tensormesh-benchmark-20260805 \
   --filename swebench_storage.lct \
   --output-dir downloads
@@ -75,7 +75,7 @@ HF script는 기존 파일을 덮어쓰지 않습니다. 의도적으로 교체�
 추가합니다.
 
 ```bash
-bash scripts/hf_trace_asset.sh upload \
+bash tools/artifacts/hf_trace_asset.sh upload \
   --repo-id daegyu94/lmcache-storage-traces \
   --filepath /path/to/tensormesh-gaia.tar.gz \
   --path-in-repo tensormesh-20260809/tensormesh-gaia.tar.gz
@@ -90,7 +90,7 @@ bash scripts/hf_trace_asset.sh upload \
 재현 가능한 실험에서는 변경하지 않을 tag 또는 commit을 지정하는 것을 권장합니다.
 
 ```bash
-bash scripts/hf_trace_asset.sh download \
+bash tools/artifacts/hf_trace_asset.sh download \
   --repo-id daegyu94/lmcache-storage-traces \
   --path-in-repo mooncake-20260807/mooncake-toolagent.tar.gz \
   --output-dir downloads
@@ -99,6 +99,6 @@ bash scripts/hf_trace_asset.sh download \
 파일 목록은 다음처럼 확인합니다.
 
 ```bash
-bash scripts/hf_trace_asset.sh list \
+bash tools/artifacts/hf_trace_asset.sh list \
   --repo-id daegyu94/lmcache-storage-traces
 ```

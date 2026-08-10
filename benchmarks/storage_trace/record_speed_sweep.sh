@@ -3,7 +3,7 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-project_dir="$(cd -- "$script_dir/.." && pwd)"
+project_dir="$(cd -- "$script_dir/../.." && pwd)"
 backend=""
 workloads=""
 speedups="1,2,5,10"
@@ -19,7 +19,7 @@ dry_run=false
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/record_speed_sweep.sh --backend BACKEND --mountpoint PATH [OPTIONS]
+  bash benchmarks/storage_trace/record_speed_sweep.sh --backend BACKEND --mountpoint PATH [OPTIONS]
 
 Required:
   --backend BACKEND       mooncake or tensormesh
@@ -44,13 +44,13 @@ Options:
   -h, --help              Show this help
 
 Examples:
-  bash scripts/record_speed_sweep.sh \
+  bash benchmarks/storage_trace/record_speed_sweep.sh \
     --backend mooncake \
     --mountpoint /MNTPNT \
     --speedups 1,2,5,10 \
     --dataset-percent 10
 
-  bash scripts/record_speed_sweep.sh \
+  bash benchmarks/storage_trace/record_speed_sweep.sh \
     --backend tensormesh \
     --mountpoint /MNTPNT \
     --speedups 1,2,5,10

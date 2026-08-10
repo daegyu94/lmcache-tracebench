@@ -8,9 +8,9 @@ split_chunk_bytes=$((1900 * 1024 * 1024))
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/release_asset.sh release --tag TAG [--title TITLE] [--notes TEXT] [--target COMMITISH] [--dry-run]
-  bash scripts/release_asset.sh upload --tag TAG --filename NAME --filepath PATH [--clobber] [--dry-run]
-  bash scripts/release_asset.sh download --tag TAG --filename NAME --output-dir PATH [--clobber] [--keep-parts] [--dry-run]
+  bash tools/artifacts/release_asset.sh release --tag TAG [--title TITLE] [--notes TEXT] [--target COMMITISH] [--dry-run]
+  bash tools/artifacts/release_asset.sh upload --tag TAG --filename NAME --filepath PATH [--clobber] [--dry-run]
+  bash tools/artifacts/release_asset.sh download --tag TAG --filename NAME --output-dir PATH [--clobber] [--keep-parts] [--dry-run]
 
 Commands:
   release   Create a GitHub Release. TAG is created at the current HEAD unless
@@ -25,12 +25,12 @@ Authentication:
   authenticated for github.com. Run: gh auth login
 
 Examples:
-  bash scripts/release_asset.sh release --tag tensormesh-benchmark-20260805 \
+  bash tools/artifacts/release_asset.sh release --tag tensormesh-benchmark-20260805 \
     --title "Tensormesh benchmark traces (2026-08-05)"
-  bash scripts/release_asset.sh upload --tag tensormesh-benchmark-20260805 \
+  bash tools/artifacts/release_asset.sh upload --tag tensormesh-benchmark-20260805 \
     --filename wildclaw_storage.lct \
     --filepath /mnt/misc/lmcache-tracebench/outputs/source-traces-20260804-082231/wildclaw/storage.lct
-  bash scripts/release_asset.sh download --tag tensormesh-benchmark-20260805 \
+  bash tools/artifacts/release_asset.sh download --tag tensormesh-benchmark-20260805 \
     --filename swebench_storage.lct --output-dir downloads
 EOF
 }

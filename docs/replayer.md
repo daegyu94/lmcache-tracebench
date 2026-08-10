@@ -60,13 +60,13 @@ python -m replayer.main \
 ## Parallel replicated replay
 
 한 replayer 노드에서 여러 MP instance의 storage 부하를 모사하려면
-`replay_instances.sh`를 사용합니다. 이 기능은 동일한 `.lct`를 N개 독립 replay
+`benchmarks/storage_trace/replay_instances.sh`를 사용합니다. 이 기능은 동일한 `.lct`를 N개 독립 replay
 process에서 병렬 실행하는 복제 모드만 제공합니다. 각 instance는 독립적인 L2
 subdirectory와 output directory를 사용하지만, 같은 physical storage를 공유할 수
 있습니다.
 
 ```bash
-bash scripts/replay_instances.sh \
+bash benchmarks/storage_trace/replay_instances.sh \
   --instances 8 \
   --trace outputs/speed-sweep/tensormesh-gaia-x5/storage.lct \
   --config configs/replayer/fs-native.yaml \
@@ -77,7 +77,7 @@ bash scripts/replay_instances.sh \
 실행 전에는 다음과 같이 N개 command만 확인할 수 있습니다.
 
 ```bash
-bash scripts/replay_instances.sh \
+bash benchmarks/storage_trace/replay_instances.sh \
   --instances 4 \
   --trace path/to/storage.lct \
   --config configs/replayer/fs-native.yaml \

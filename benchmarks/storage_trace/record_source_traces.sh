@@ -3,12 +3,12 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-project_dir="$(cd -- "$script_dir/.." && pwd)"
+project_dir="$(cd -- "$script_dir/../.." && pwd)"
 output_root="outputs"
 mountpoint=""
 
 usage() {
-  echo "Usage: bash scripts/record_source_traces.sh --mountpoint PATH [--output-root PATH]"
+  echo "Usage: bash benchmarks/storage_trace/record_source_traces.sh --mountpoint PATH [--output-root PATH]"
 }
 
 while (($#)); do

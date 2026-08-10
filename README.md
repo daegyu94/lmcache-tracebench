@@ -152,7 +152,7 @@ python -m recorder.main \
 Mooncake은 같은 옵션으로 전체 timed trace의 request 비율을 선택합니다.
 
 ```bash
-bash scripts/record_speed_sweep.sh \
+bash benchmarks/storage_trace/record_speed_sweep.sh \
   --backend mooncake \
   --mountpoint /MNTPNT \
   --speedups 1,5,10 \
