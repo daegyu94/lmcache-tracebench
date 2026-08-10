@@ -8,3 +8,4 @@ fastapi[standard]>=0.133.0,<0.137.0
 numba==0.65.0
 numpy==2.2.6
 setuptools>=77.0.3,<81.0.0
+huggingface_hub>=1.0,<2.0

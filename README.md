@@ -167,7 +167,7 @@ WildClaw에서는 무시됩니다. 자세한 recorder output과 speed sweep은
 
 - [Recorder guide](docs/recorder.md): Tensormesh V3, Mooncake workload, GPU quota와 Recorder output
 - [Replayer guide](docs/replayer.md): `.lct` contract, replay backend와 profiling
-- [Trace release assets](docs/trace-assets.md): GitHub Release upload/download
+- [Trace assets](docs/trace-assets.md): GitHub Release and Hugging Face Dataset upload/download
 
 ## Smoke test
 
