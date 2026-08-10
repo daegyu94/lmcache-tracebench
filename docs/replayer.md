@@ -34,6 +34,39 @@ record의 monotonic timestamp offset만 나누는 scaled-open replay 옵션입�
 관찰하게 합니다. 실제 workload compute까지 바꾼 비교는 recorder speed sweep을
 사용하고, 동일 trace의 storage arrival-rate 실험은 이 옵션을 사용합니다.
 
+### How timestamp scaling works
+
+각 record의 `t_mono`는 trace 시작 후 해당 API가 호출된 시각을 초 단위 offset으로
+저장합니다. Replay는 `.lct` 안의 `t_mono`나 wall-clock `t_wall` 값을 다시 쓰지
+않고, 실행 중 각 record의 목표 제출 시각을 다음처럼 계산합니다.
+
+```text
+target_i = replay_start_monotonic + record_i.t_mono / speedup
+sleep_i  = max(0, target_i - current_monotonic)
+```
+
+예를 들어 원본 trace에 다음 timestamp가 기록되어 있다고 가정합니다.
+
+| Record | 원본 `t_mono` | 원본 호출 간격 | `--speedup 5` 목표 offset | 배속 후 호출 간격 |
+| --- | ---: | ---: | ---: | ---: |
+| A | 0.0 s | - | 0.0 s | - |
+| B | 2.0 s | 2.0 s | 0.4 s | 0.4 s |
+| C | 5.0 s | 3.0 s | 1.0 s | 0.6 s |
+| D | 11.0 s | 6.0 s | 2.2 s | 1.2 s |
+
+즉 trace 시작 후 11초에 제출됐던 D는 replay 시작 후 2.2초가 목표가 되고,
+모든 record 사이의 간격도 5분의 1로 줄어듭니다. 이는 timestamp 필드를
+`0.0, 0.4, 1.0, 2.2`로 수정한 새 trace를 만드는 것이 아니라, 원본 offset을
+나눈 값으로 현재 replay process의 `time.monotonic()` 기준 sleep 시간을 정하는
+방식입니다.
+
+목표 시각은 직전 record 기준이 아니라 replay 시작 시각 기준으로 매번 계산합니다.
+따라서 C dispatch가 느려져 다음 record의 목표 시각을 이미 지난 경우에는 추가로
+sleep하지 않고 D를 바로 dispatch합니다. 이때 뒤처진 시간을 되돌리기 위해 API를
+병렬 호출하거나 record를 건너뛰지는 않으며, 원래 순서를 유지한 채 가능한 한
+scaled schedule을 따라갑니다. 마지막 record dispatch 뒤에는 speedup과 별개로
+비동기 Store/Prefetch 작업이 idle 상태가 될 때까지 drain을 기다립니다.
+
 ## Replay
 
 Replayer는 저장된 `.lct`를 LMCache `trace replay` 명령으로 한 번 실행합니다.
@@ -79,6 +112,30 @@ bash benchmarks/storage_trace/replay_speed_sweep.sh \
 비어 있지 않으면 warm-cache 결과를 방지하기 위해 실행을 중단하므로, 비교 실험에는
 새 L2 root와 output root를 사용하세요. 실행 전 command만 확인하려면 `--dry-run`을
 추가합니다.
+
+## Replay workload sweep
+
+여러 workload trace에 동일한 speedup sweep을 적용하려면
+`benchmarks/storage_trace/replay_workload_sweep.sh`를 사용합니다. trace root 아래에
+`<WORKLOAD>/storage.lct` 구조가 있어야 하며, workload별로 L2와 output 경로를
+분리합니다.
+
+```bash
+bash benchmarks/storage_trace/replay_workload_sweep.sh \
+  --trace-root /mnt/nvme/lmcache-traces/tensormesh-20260809 \
+  --config configs/replayer/fs-native.yaml \
+  --workloads tensormesh-wildclaw,tensormesh-other \
+  --l2-root /mnt/nvme/lmcache-trace-replay \
+  --output-root outputs/replay-workload-sweep \
+  --speedups 1,2,4,8
+```
+
+각 workload의 결과는 `output-root/<WORKLOAD>/x<SPEEDUP>/`에 저장됩니다.
+상위 launcher 로그와 workload별 결과는 각각 `workload-sweep.log`,
+`workload-summary.json`, `workload-results.jsonl`에 기록됩니다. 한 workload가
+실패해도 나머지 workload를 계속 실행하며, 마지막에 전체 exit code로 실패를 알립니다.
+비교 실험에서는 이전 실행의 warm cache가 섞이지 않도록 새 L2 root와 output root를
+사용하세요.
 
 ## Parallel replicated replay
 
