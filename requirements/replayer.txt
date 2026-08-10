@@ -1,3 +1,5 @@
 # Replayer runtime for fs_native and NIXL/HF3FS backends.
 -r common.txt
+# LMCache CLI eagerly imports the engine-benchmark command during startup.
+openai>=1.0
 nixl

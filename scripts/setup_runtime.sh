@@ -106,6 +106,12 @@ if [[ "${check_only}" == false ]]; then
     fi
 
     "${venv_python}" -m pip install --upgrade pip
+    # LMCache is installed from a VCS source with --no-build-isolation below.
+    # Bootstrap its build backend before pip resolves that source distribution.
+    "${venv_python}" -m pip install --upgrade "setuptools>=77.0.3,<81.0.0"
+    # LMCache's metadata build imports torch before pip installs the full
+    # requirements file, so bootstrap the pinned torch build dependency too.
+    "${venv_python}" -m pip install --upgrade "torch==2.11.0"
     # Reinstall the selected runtime so a previously installed LMCache build or
     # version cannot leak across recorder/replayer profile changes.
     "${venv_python}" -m pip install --upgrade --force-reinstall --no-build-isolation \
@@ -125,12 +131,12 @@ if [[ "${profile}" == "recorder" ]]; then
     "${venv_python}" -m vllm.entrypoints.openai.api_server --help >/dev/null
 else
     "${venv_python}" -c \
-        "import importlib.util, lmcache, lmcache.c_ops; assert importlib.util.find_spec('nixl'); print('replayer imports: OK')"
+        "import importlib.util, lmcache, lmcache.c_ops, openai; assert importlib.util.find_spec('nixl'); print('replayer imports: OK')"
 fi
 "${venv_python}" -c \
     "from importlib.metadata import version; print('runtime versions:', ', '.join(f'{name}={version(name)}' for name in ('lmcache', 'torch', 'fsspec')))"
 "${venv_python}" -m pip check
 "${venv_python}" -m lmcache.v1.multiprocess.server --help >/dev/null
-"${venv_python}" -m lmcache.cli.main trace replay --help >/dev/null
+"${project_root}/.venv/bin/lmcache" trace replay --help >/dev/null
 
 echo "LMCache Tracebench ${profile} runtime is ready: ${venv_python}"
