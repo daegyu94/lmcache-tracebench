@@ -131,6 +131,26 @@ fi
 if [[ ! -f "$config" ]]; then
   die "Replayer config not found: $config"
 fi
+
+mkdir -p -- "$output_root"
+sweep_log="$output_root/sweep.log"
+: > "$sweep_log"
+exec > >(tee -a "$sweep_log") 2>&1
+echo "[INFO] Replay speed sweep started"
+echo "[INFO] Trace: $trace"
+echo "[INFO] Config: $config"
+echo "[INFO] Speedups: $speedups"
+echo "[INFO] Sweep log: $sweep_log"
+
+case_count=0
+on_interrupt() {
+  local signal="$1"
+  echo "[ERROR] Replay speed sweep interrupted by SIG$signal after $case_count completed case(s)." >&2
+  echo "[ERROR] See sweep log: $sweep_log" >&2
+  exit $((128 + signal))
+}
+trap 'on_interrupt 2' INT
+trap 'on_interrupt 15' TERM
 if [[ -n "$profile_config" ]]; then
   profile_config="$(resolve_project_path "$profile_config")"
   if [[ ! -f "$profile_config" ]]; then
@@ -162,16 +182,15 @@ while IFS= read -r raw_speedup; do
   if ! python -c 'import math, sys; value = float(sys.argv[1]); raise SystemExit(0 if math.isfinite(value) and value > 0 else 1)' "$speedup"; then
     die "speedup must be a finite positive number: $speedup"
   fi
-done < <(printf '%s' "$speedups" | tr ',' '\n')
+done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
 while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
   case_name="x$speedup"
   ensure_case_path_available "$l2_root/$case_name" "L2 case path"
   ensure_case_path_available "$output_root/$case_name" "output case path"
-done < <(printf '%s' "$speedups" | tr ',' '\n')
+done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
-mkdir -p -- "$output_root"
 if [[ "$dry_run" == false ]]; then
   mkdir -p -- "$l2_root"
 fi
@@ -220,7 +239,8 @@ while IFS= read -r raw_speedup; do
   ended_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   python - "$results_jsonl" "$speedup" "$l2_path" "$output_dir" \
-    "$command_status" "$dry_run" "$started_at" "$ended_at" "$elapsed_seconds" <<'PY'
+    "$command_status" "$dry_run" "$started_at" "$ended_at" "$elapsed_seconds" \
+    "$output_dir/lmcache-replay.log" <<'PY'
 import json
 import sys
 
@@ -234,12 +254,14 @@ import sys
     started_at,
     ended_at,
     raw_elapsed_seconds,
+    lmcache_log,
 ) = sys.argv[1:]
 returncode = int(raw_returncode)
 record = {
     "speedup": float(raw_speedup),
     "l2_path": l2_path,
     "output_dir": output_dir,
+    "lmcache_log": lmcache_log,
     "returncode": returncode,
     "status": "dry_run" if dry_run == "true" else (
         "ok" if returncode == 0 else "failed"
@@ -254,15 +276,21 @@ PY
 
   if ((command_status != 0)); then
     echo "[ERROR] Replay speedup $speedup failed with exit code $command_status" >&2
+    echo "[ERROR] Inspect LMCache log: $output_dir/lmcache-replay.log" >&2
   fi
-done < <(printf '%s' "$speedups" | tr ',' '\n')
+  case_count=$((case_count + 1))
+done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
-python - "$results_jsonl" "$summary_path" "$trace" "$config" "$l2_root" "$output_root" <<'PY'
+if [[ ! -s "$results_jsonl" ]]; then
+  die "No speedup cases were executed. Check --speedups and $sweep_log"
+fi
+
+python - "$results_jsonl" "$summary_path" "$trace" "$config" "$l2_root" "$output_root" "$sweep_log" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-results_path, summary_path, trace, config, l2_root, output_root = sys.argv[1:]
+results_path, summary_path, trace, config, l2_root, output_root, sweep_log = sys.argv[1:]
 results = [
     json.loads(line)
     for line in Path(results_path).read_text(encoding="utf-8").splitlines()
@@ -273,6 +301,7 @@ summary = {
     "config": config,
     "l2_root": l2_root,
     "output_root": output_root,
+    "sweep_log": sweep_log,
     "speedups": [item["speedup"] for item in results],
     "results": results,
     "completed": len(results),
@@ -286,7 +315,8 @@ print(f"[INFO] Replay speed sweep summary: {summary_path}")
 PY
 
 if ((overall_status != 0)); then
-  echo "[ERROR] Replay speed sweep completed with failures." >&2
+  echo "[ERROR] Replay speed sweep completed with failures. See: $sweep_log" >&2
   exit "$overall_status"
 fi
+echo "[INFO] Launcher log: $sweep_log"
 echo "[INFO] Completed replay speed sweep under: $output_root"
