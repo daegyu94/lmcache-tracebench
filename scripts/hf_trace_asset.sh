@@ -329,3 +329,31 @@ if (($# == 0)); then
   usage >&2
   exit 2
 fi
+
+if (($# == 0)); then
+  usage >&2
+  exit 2
+fi
+
+case "$1" in
+  upload)
+    shift
+    run_upload "$@"
+    ;;
+  download)
+    shift
+    run_download "$@"
+    ;;
+  list)
+    shift
+    run_list "$@"
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    echo "Unknown command: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
