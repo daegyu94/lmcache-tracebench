@@ -27,9 +27,12 @@ Storage trace에는 실제 KV payload, API 반환값·exception, record 환경�
 시각이 포함되지 않습니다. 따라서 `.lct`는 storage workload 재현 입력으로
 사용하고, L2 성능은 replay 중 adapter·backend에서 새로 측정해야 합니다.
 
-Workload speedup은 replay 단계에서 적용하지 않습니다. GPU compute 시간이
-`storage.lct`에 포함되지 않으므로, speedup 비교에는 [Recorder guide의 speed
-sweep](recorder.md#speed-sweep)처럼 배속별로 별도 기록한 trace를 사용합니다.
+`--speedup`은 workload나 GPU compute를 배속하지 않고, 이미 기록된 storage
+record의 monotonic timestamp offset만 나누는 scaled-open replay 옵션입니다.
+예를 들어 `--speedup 5`는 API 제출 schedule을 5배 압축하고, LMCache의
+비동기 L2 I/O가 그 제출률을 따라가지 못할 때 발생하는 contention과 miss를
+관찰하게 합니다. 실제 workload compute까지 바꾼 비교는 recorder speed sweep을
+사용하고, 동일 trace의 storage arrival-rate 실험은 이 옵션을 사용합니다.
 
 ## Replay
 
@@ -37,6 +40,8 @@ Replayer는 저장된 `.lct`를 LMCache `trace replay` 명령으로 한 번 실�
 공용 `base.yaml`을 상속하는 `fs-native.yaml` 또는 `nixl-hf3fs.yaml`을 선택합니다.
 각 storage record는 trace의 monotonic timestamp 간격에 맞춰 재생되며, replay host가
 더 느리면 원래 schedule보다 뒤처진 상태로 계속 진행합니다.
+`--speedup`이 1보다 크면 이 timestamp 간격만 축소되며, replay 자체는 여전히
+single-threaded API dispatch와 비동기 StorageManager/L2 controller를 사용합니다.
 
 ```bash
 python -m replayer.main \

@@ -10,16 +10,22 @@ def test_recorder_commands_enable_mp_fs_native_trace():
     assert "--trace-level" in commands.lmcache
     assert commands.lmcache[commands.lmcache.index("--trace-level") + 1] == "storage"
     assert "fs_native" in commands.lmcache[commands.lmcache.index("--l2-adapter") + 1]
-    assert '"base_path":"lmcache-trace/tensormesh-all"' in commands.lmcache[
-        commands.lmcache.index("--l2-adapter") + 1
-    ]
-    assert '"use_odirect":true' in commands.lmcache[
-        commands.lmcache.index("--l2-adapter") + 1
-    ]
-    assert "LMCacheMPConnector" in commands.vllm[commands.vllm.index("--kv-transfer-config") + 1]
-    assert "lmcache.integration.vllm.lmcache_mp_connector" in commands.vllm[
-        commands.vllm.index("--kv-transfer-config") + 1
-    ]
+    assert (
+        '"base_path":"lmcache-trace/tensormesh-all"'
+        in commands.lmcache[commands.lmcache.index("--l2-adapter") + 1]
+    )
+    assert (
+        '"use_odirect":true'
+        in commands.lmcache[commands.lmcache.index("--l2-adapter") + 1]
+    )
+    assert (
+        "LMCacheMPConnector"
+        in commands.vllm[commands.vllm.index("--kv-transfer-config") + 1]
+    )
+    assert (
+        "lmcache.integration.vllm.lmcache_mp_connector"
+        in commands.vllm[commands.vllm.index("--kv-transfer-config") + 1]
+    )
     assert commands.vllm[commands.vllm.index("--port") + 1] == "8000"
     assert commands.vllm[commands.vllm.index("--gpu-memory-utilization") + 1] == "0.9"
     assert "--kv-cache-memory-bytes" not in commands.vllm
@@ -34,3 +40,4 @@ def test_replayer_is_one_shot_and_uses_skip_l1():
     assert command[command.index("--l2-store-policy") + 1] == "skip_l1"
     adapter = command[command.index("--l2-adapter") + 1]
     assert '"type":"fs_native"' in adapter
+    assert command[command.index("--speedup") + 1] == "1.0"

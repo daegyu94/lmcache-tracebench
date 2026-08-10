@@ -1,7 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Configuration for one-shot LMCache trace replay."""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -26,6 +29,7 @@ class ReplayerConfig:
             "use_odirect": True,
         }
     )
+    speedup: float = 1.0
     verbose: bool = False
 
     def validate(self) -> None:
@@ -43,6 +47,8 @@ class ReplayerConfig:
             raise ValueError("l2_adapter must be a mapping with a non-empty type")
         if self.l1_align_bytes <= 0:
             raise ValueError("l1_align_bytes must be positive")
+        if not math.isfinite(self.speedup) or self.speedup <= 0:
+            raise ValueError("speedup must be finite and positive")
 
 
 def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -96,6 +102,7 @@ def apply_overrides(
     *,
     l2_path: str | None = None,
     output_dir: str | None = None,
+    speedup: float | None = None,
 ) -> ReplayerConfig:
     """Return config with CLI path overrides applied."""
     if l2_path is not None:
@@ -121,5 +128,7 @@ def apply_overrides(
         if not output_dir:
             raise ValueError("output_dir must not be empty")
         config = replace(config, output_dir=output_dir)
+    if speedup is not None:
+        config = replace(config, speedup=speedup)
     config.validate()
     return config

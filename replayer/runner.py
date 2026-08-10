@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """Build the one-shot ``lmcache trace replay`` command."""
 
 from __future__ import annotations
@@ -32,6 +34,8 @@ def build_command(config: ReplayerConfig, trace_path: str) -> list[str]:
         "trace",
         "replay",
         trace_path,
+        "--speedup",
+        str(config.speedup),
         "--l1-size-gb",
         str(config.l1_size_gb),
         "--l1-init-size-gb",

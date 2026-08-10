@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 """CLI for one-shot LMCache storage trace replay."""
 
 from __future__ import annotations
@@ -21,6 +23,11 @@ def _parser() -> argparse.ArgumentParser:
         help="override the directory for replay output and logs",
     )
     parser.add_argument(
+        "--speedup",
+        type=float,
+        help="scale recorded storage timestamp offsets for scaled-open replay",
+    )
+    parser.add_argument(
         "--profile",
         "--profile-config",
         dest="profile_config",
@@ -34,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     config = load_config(args.config)
     config = apply_overrides(
-        config, l2_path=args.l2_path, output_dir=args.output_dir
+        config, l2_path=args.l2_path, output_dir=args.output_dir, speedup=args.speedup
     )
     profiler_config = None
     if args.profile_config:

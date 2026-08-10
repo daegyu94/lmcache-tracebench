@@ -215,6 +215,9 @@ python -m replayer.main \
 참고하세요. 결과는 `outputs/smoke-replay/trace_replay_summary.json`과
 `outputs/smoke-replay/trace_replay_ops.csv`에 저장됩니다. 먼저 실행 명령만 보려면
 끝에 `--dry-run`을 추가합니다.
+L1 retrieve 및 L2 lookup/load key-level outcome은
+`outputs/smoke-replay/cache_replay_stats.json`에서 확인할 수 있으며,
+동일 trace의 storage arrival-rate 실험은 `--speedup 5`처럼 실행합니다.
 
 ## Tests
 
