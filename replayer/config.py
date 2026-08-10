@@ -103,8 +103,10 @@ def apply_overrides(
     l2_path: str | None = None,
     output_dir: str | None = None,
     speedup: float | None = None,
+    l1_size_gb: float | None = None,
+    l1_init_size_gb: int | None = None,
 ) -> ReplayerConfig:
-    """Return config with CLI path overrides applied."""
+    """Return config with CLI overrides applied."""
     if l2_path is not None:
         if not l2_path:
             raise ValueError("l2_path must not be empty")
@@ -130,5 +132,9 @@ def apply_overrides(
         config = replace(config, output_dir=output_dir)
     if speedup is not None:
         config = replace(config, speedup=speedup)
+    if l1_size_gb is not None:
+        config = replace(config, l1_size_gb=l1_size_gb)
+    if l1_init_size_gb is not None:
+        config = replace(config, l1_init_size_gb=l1_init_size_gb)
     config.validate()
     return config

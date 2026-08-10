@@ -28,6 +28,16 @@ def _parser() -> argparse.ArgumentParser:
         help="scale recorded storage timestamp offsets for scaled-open replay",
     )
     parser.add_argument(
+        "--l1-size-gb",
+        type=float,
+        help="override the L1 capacity in GiB",
+    )
+    parser.add_argument(
+        "--l1-init-size-gb",
+        type=int,
+        help="override the initial L1 capacity in GiB",
+    )
+    parser.add_argument(
         "--profile",
         "--profile-config",
         dest="profile_config",
@@ -41,7 +51,12 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     config = load_config(args.config)
     config = apply_overrides(
-        config, l2_path=args.l2_path, output_dir=args.output_dir, speedup=args.speedup
+        config,
+        l2_path=args.l2_path,
+        output_dir=args.output_dir,
+        speedup=args.speedup,
+        l1_size_gb=args.l1_size_gb,
+        l1_init_size_gb=args.l1_init_size_gb,
     )
     profiler_config = None
     if args.profile_config:

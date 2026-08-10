@@ -72,6 +72,31 @@ def test_speedup_override_is_reflected_in_dry_run(capsys, tmp_path):
 
     assert "--speedup 5.0" in capsys.readouterr().out
 
+def test_l1_size_overrides_are_reflected_in_dry_run(capsys, tmp_path):
+    trace = tmp_path / "storage.lct"
+    trace.touch()
+
+    assert (
+        main(
+            [
+                "--trace",
+                str(trace),
+                "--config",
+                "configs/replayer/smoke.yaml",
+                "--l1-size-gb",
+                "40",
+                "--l1-init-size-gb",
+                "40",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "--l1-size-gb 40.0" in output
+    assert "--l1-init-size-gb 40" in output
+
 
 def test_backend_configs_extend_common_base():
     fs_native = load_config("configs/replayer/fs-native.yaml")
