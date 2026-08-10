@@ -54,8 +54,8 @@ HF Dataset은 대형 storage trace를 workload별 경로로 보관하고 공유�
 dataset 경로에 포함하면 기록 시점을 구분할 수 있습니다.
 
 ```text
-releases/tensormesh-benchmark-20260809/tensormesh-gaia.tar.gz
-releases/mooncake-storage-20260807/mooncake-toolagent.tar.gz
+tensormesh-20260809/tensormesh-gaia.tar.gz
+mooncake-20260807/mooncake-toolagent.tar.gz
 ```
 
 ### Authentication
@@ -78,7 +78,7 @@ HF script는 기존 파일을 덮어쓰지 않습니다. 의도적으로 교체�
 bash scripts/hf_trace_asset.sh upload \
   --repo-id daegyu94/lmcache-storage-traces \
   --filepath /path/to/tensormesh-gaia.tar.gz \
-  --path-in-repo releases/tensormesh-benchmark-20260809/tensormesh-gaia.tar.gz
+  --path-in-repo tensormesh-20260809/tensormesh-gaia.tar.gz
 ```
 
 기존 GitHub Release asset을 이전할 때는 먼저 `gh release download`로 로컬에 받은 뒤
@@ -92,7 +92,7 @@ bash scripts/hf_trace_asset.sh upload \
 ```bash
 bash scripts/hf_trace_asset.sh download \
   --repo-id daegyu94/lmcache-storage-traces \
-  --path-in-repo releases/mooncake-storage-20260807/mooncake-toolagent.tar.gz \
+  --path-in-repo mooncake-20260807/mooncake-toolagent.tar.gz \
   --output-dir downloads
 ```
 

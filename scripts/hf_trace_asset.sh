@@ -41,10 +41,10 @@ Examples:
   bash scripts/hf_trace_asset.sh upload \
     --repo-id daegyu94/lmcache-storage-traces \
     --filepath outputs/mooncake/storage.lct \
-    --path-in-repo releases/mooncake-storage-20260807/storage.lct
+    --path-in-repo mooncake-20260807/storage.lct
   bash scripts/hf_trace_asset.sh download \
     --repo-id daegyu94/lmcache-storage-traces \
-    --path-in-repo releases/tensormesh-benchmark-20260809/tensormesh-gaia.tar.gz \
+    --path-in-repo tensormesh-20260809/tensormesh-gaia.tar.gz \
     --output-dir downloads
 EOF
 }
