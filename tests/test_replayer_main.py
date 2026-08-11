@@ -72,6 +72,28 @@ def test_speedup_override_is_reflected_in_dry_run(capsys, tmp_path):
 
     assert "--speedup 5.0" in capsys.readouterr().out
 
+
+def test_trace_percent_override_is_reflected_in_dry_run(capsys, tmp_path):
+    trace = tmp_path / "l2.lct"
+    trace.touch()
+
+    assert (
+        main(
+            [
+                "--trace",
+                str(trace),
+                "--config",
+                "configs/replayer/smoke.yaml",
+                "--trace-percent",
+                "10",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    assert "--trace-percent 10.0" in capsys.readouterr().out
+
 def test_l1_size_overrides_are_reflected_in_dry_run(capsys, tmp_path):
     trace = tmp_path / "storage.lct"
     trace.touch()

@@ -30,6 +30,7 @@ class ReplayerConfig:
         }
     )
     speedup: float = 1.0
+    trace_percent: float = 100.0
     verbose: bool = False
 
     def validate(self) -> None:
@@ -49,6 +50,12 @@ class ReplayerConfig:
             raise ValueError("l1_align_bytes must be positive")
         if not math.isfinite(self.speedup) or self.speedup <= 0:
             raise ValueError("speedup must be finite and positive")
+        if (
+            not math.isfinite(self.trace_percent)
+            or self.trace_percent <= 0
+            or self.trace_percent > 100
+        ):
+            raise ValueError("trace_percent must be finite and in (0, 100]")
 
 
 def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -103,6 +110,7 @@ def apply_overrides(
     l2_path: str | None = None,
     output_dir: str | None = None,
     speedup: float | None = None,
+    trace_percent: float | None = None,
     l1_size_gb: float | None = None,
     l1_init_size_gb: int | None = None,
 ) -> ReplayerConfig:
@@ -132,6 +140,8 @@ def apply_overrides(
         config = replace(config, output_dir=output_dir)
     if speedup is not None:
         config = replace(config, speedup=speedup)
+    if trace_percent is not None:
+        config = replace(config, trace_percent=trace_percent)
     if l1_size_gb is not None:
         config = replace(config, l1_size_gb=l1_size_gb)
     if l1_init_size_gb is not None:

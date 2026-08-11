@@ -28,6 +28,11 @@ def _parser() -> argparse.ArgumentParser:
         help="scale recorded storage timestamp offsets for scaled-open replay",
     )
     parser.add_argument(
+        "--trace-percent",
+        type=float,
+        help="replay the first N percent of L2 task submissions",
+    )
+    parser.add_argument(
         "--l1-size-gb",
         type=float,
         help="override the L1 capacity in GiB",
@@ -55,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
         l2_path=args.l2_path,
         output_dir=args.output_dir,
         speedup=args.speedup,
+        trace_percent=args.trace_percent,
         l1_size_gb=args.l1_size_gb,
         l1_init_size_gb=args.l1_init_size_gb,
     )

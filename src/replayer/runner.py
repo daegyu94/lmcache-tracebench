@@ -36,6 +36,8 @@ def build_command(config: ReplayerConfig, trace_path: str) -> list[str]:
         trace_path,
         "--speedup",
         str(config.speedup),
+        "--trace-percent",
+        str(config.trace_percent),
         "--l1-size-gb",
         str(config.l1_size_gb),
         "--l1-init-size-gb",

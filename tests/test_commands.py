@@ -1,3 +1,5 @@
+import pytest
+
 from recorder.config import load_config
 from recorder.launcher import build_commands
 from replayer.config import ReplayerConfig
@@ -51,9 +53,16 @@ def test_replayer_is_one_shot_and_uses_skip_l1():
     adapter = command[command.index("--l2-adapter") + 1]
     assert '"type":"fs_native"' in adapter
     assert command[command.index("--speedup") + 1] == "1.0"
+    assert command[command.index("--trace-percent") + 1] == "100.0"
 
 
 def test_l2_prepare_command_uses_same_replay_configuration():
     command = build_prepare_command(ReplayerConfig(), "l2.lct")
     assert command[:4] == ["lmcache", "trace", "replay", "l2.lct"]
     assert command[-2:] == ["--prepare-l2", "--prepare-only"]
+
+
+@pytest.mark.parametrize("trace_percent", [0.0, -1.0, 100.1, float("nan")])
+def test_replayer_rejects_invalid_trace_percent(trace_percent):
+    with pytest.raises(ValueError, match="trace_percent"):
+        ReplayerConfig(trace_percent=trace_percent).validate()
