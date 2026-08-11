@@ -4,5 +4,5 @@ extends: base.yaml
 l2_adapter:
   type: fs_native
   base_path: /mnt/std-ssd/lmcache-trace-replay
-  num_workers: 16
+  num_workers: 32
   use_odirect: true
