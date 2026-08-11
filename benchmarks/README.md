@@ -75,6 +75,7 @@ bash benchmarks/storage_trace/replay_speed_sweep.sh \
 
 각 speedup은 독립적인 `x<SPEEDUP>/` L2와 output directory를 사용합니다.
 단일 speedup만 확인할 때도 `--speedups 8`처럼 실행할 수 있습니다.
+float speedup도 지원하므로 `--speedups 1.0,1.5,2.0`처럼 지정할 수 있습니다.
 
 ### Replay one trace across L1 sizes
 
