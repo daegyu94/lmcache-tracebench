@@ -1,13 +1,26 @@
 # Benchmark guide
 
 이 디렉터리의 script는 storage trace를 record하고 replay하는 반복 실험을 위한
-실행 진입점입니다. `.lct` contract와 replay semantics의 상세 설명은
+실행 진입점입니다. recorder와 replayer를 디렉터리로 분리해 각 workflow의 옵션과
+출력 구조를 독립적으로 관리합니다. `.lct` contract와 replay semantics의 상세 설명은
 [Replayer guide](../docs/replayer.md), recorder 설정은
 [Recorder guide](../docs/recorder.md)를 기준으로 합니다.
 
+```text
+benchmarks/
+├── recorder/   # workload를 실행해 storage.lct 또는 l2.lct 생성
+└── replayer/   # trace를 backend/L1/speedup별로 replay
+```
+
 ## Before running
 
-- 프로젝트 환경을 먼저 설치합니다.
+- recorder를 실행하려면 프로젝트 환경을 설치합니다.
+
+  ```bash
+  bash scripts/setup_runtime.sh --profile recorder
+  ```
+
+- replayer만 실행하려면 replayer profile을 설치합니다.
 
   ```bash
   bash scripts/setup_runtime.sh --profile replayer
@@ -20,17 +33,37 @@
 - `--l2-root`는 실제 storage mount를 가리키는 absolute path를 사용합니다.
   `--output-root`에는 JSON summary와 launcher log가 저장됩니다.
 
-## Script index
+## Recorder scripts
 
 | Script | 용도 |
 | --- | --- |
-| `storage_trace/record_source_traces.sh` | 외부 recorder source에서 baseline trace 생성 |
-| `storage_trace/record_speed_sweep.sh` | workload speedup별 `.lct` record |
-| `storage_trace/replay_speed_sweep.sh` | 하나의 `.lct`를 여러 storage arrival-rate로 replay |
-| `storage_trace/replay_l1_size_sweep.sh` | 하나의 `.lct`를 여러 L1 capacity로 replay |
-| `storage_trace/replay_backend_sweep.sh` | backend별 speedup/L1 sweep 실행 |
-| `storage_trace/replay_workload_sweep.sh` | 여러 workload에 동일한 replay speedup sweep 적용 |
-| `storage_trace/replay_instances.sh` | 하나의 trace를 여러 replay process로 복제 실행 |
+| `recorder/record_source_traces.sh` | source별 baseline trace 생성 |
+| `recorder/record_speed_sweep.sh` | workload speedup별 `.lct` 생성 |
+
+`record_source_traces.sh`는 기본적으로 GAIA, WildClaw, SWE-bench의
+`storage.lct`를 생성합니다. L2 adapter trace가 필요하면 다음처럼 source와
+trace 종류를 지정합니다.
+
+```bash
+bash benchmarks/recorder/record_source_traces.sh \
+  --mountpoint /MNTPNT \
+  --output-root outputs/source-traces \
+  --trace-kind l2 \
+  --sources gaia,wildclaw
+```
+
+`record_speed_sweep.sh`는 workload별 speedup마다 독립 trace를 생성합니다.
+`--trace-kind l2`를 추가하면 각 speedup 디렉터리에 `l2.lct`를 생성합니다.
+
+## Replayer scripts
+
+| Script | 용도 |
+| --- | --- |
+| `replayer/replay_speed_sweep.sh` | 하나의 `.lct`를 여러 storage arrival-rate로 replay |
+| `replayer/replay_l1_size_sweep.sh` | 하나의 `.lct`를 여러 L1 capacity로 replay |
+| `replayer/replay_backend_sweep.sh` | backend별 speedup/L1 sweep 실행 |
+| `replayer/replay_workload_sweep.sh` | 여러 workload에 동일한 replay speedup sweep 적용 |
+| `replayer/replay_instances.sh` | 하나의 trace를 여러 replay process로 복제 실행 |
 
 실행 가능한 옵션은 각 script의 `--help`를 사용합니다.
 
@@ -38,10 +71,10 @@
 
 | Script | Sweep unit | Case execution order |
 | --- | --- | --- |
-| `replay_speed_sweep.sh` | 하나의 trace × speedup | `x1 → x2 → x4 → x8` |
-| `replay_l1_size_sweep.sh` | 하나의 trace × L1 size | `l1-20gb → l1-40gb → ...` |
-| `replay_workload_sweep.sh` | workload × speedup | workload 순서 안에서 speedup 순서 |
-| `replay_backend_sweep.sh` | backend × speedup 또는 L1 size | backend 순서 안에서 선택한 sweep 순서 |
+| `replayer/replay_speed_sweep.sh` | 하나의 trace × speedup | `x1 → x2 → x4 → x8` |
+| `replayer/replay_l1_size_sweep.sh` | 하나의 trace × L1 size | `l1-20gb → l1-40gb → ...` |
+| `replayer/replay_workload_sweep.sh` | workload × speedup | workload 순서 안에서 speedup 순서 |
+| `replayer/replay_backend_sweep.sh` | backend × speedup 또는 L1 size | backend 순서 안에서 선택한 sweep 순서 |
 
 각 case는 별도의 `python -m replayer.main` 실행이며, sweep script들은 이 단일
 replay를 반복 호출하는 launcher입니다. 실제 LMCache storage replay는
@@ -58,8 +91,10 @@ trace asset을 준비한 뒤 workload별로 다음 구조를 유지합니다.
 ```text
 trace-root/
 └── <workload>/
-    └── storage.lct
+    └── <trace-kind>.lct  # storage.lct 또는 l2.lct
 ```
+
+같은 workload에 두 trace가 모두 있으면 목적에 맞는 하나를 선택해 replay합니다.
 
 외부 trace asset의 다운로드와 directory layout은
 [Trace assets guide](../docs/trace-assets.md)를 참고합니다.
@@ -67,7 +102,7 @@ trace-root/
 ### 2. Replay one trace across speedups
 
 ```bash
-bash benchmarks/storage_trace/replay_speed_sweep.sh \
+bash benchmarks/replayer/replay_speed_sweep.sh \
   --trace /path/to/workload/storage.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /mnt/lmcache-replay/workload \
@@ -86,7 +121,7 @@ L1 capacity에 따른 L1/L2 lookup 변화를 비교하려면 다음 script를 �
 `l1-size-gb`와 `l1-init-size-gb`를 같은 값으로 설정합니다.
 
 ```bash
-bash benchmarks/storage_trace/replay_l1_size_sweep.sh \
+bash benchmarks/replayer/replay_l1_size_sweep.sh \
   --trace /path/to/workload/storage.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /mnt/lmcache-replay/workload \
@@ -102,7 +137,7 @@ bash benchmarks/storage_trace/replay_l1_size_sweep.sh \
 ### 3. Replay multiple workloads
 
 ```bash
-bash benchmarks/storage_trace/replay_workload_sweep.sh \
+bash benchmarks/replayer/replay_workload_sweep.sh \
   --trace-root /mnt/lmcache-traces/tensormesh-20260809 \
   --config configs/replayer/fs-native.yaml \
   --workloads tensormesh-wildclaw,tensormesh-other \
@@ -117,13 +152,13 @@ bash benchmarks/storage_trace/replay_workload_sweep.sh \
 ### 4. Sweep storage backends
 
 backend별 adapter/config와 L2 경로를 바꿔가며 speedup 또는 L1 size sweep을 하려면
-`replay_backend_sweep.sh`를 사용합니다. `NAME`은 결과 label이고, 실제 adapter는
+`replayer/replay_backend_sweep.sh`를 사용합니다. `NAME`은 결과 label이고, 실제 adapter는
 `CONFIG`, storage target은 `L2_PATH`가 결정합니다. 따라서 `xfs`와 `pnfs`는 같은
 `fs-native.yaml`을 사용하되 mount path를 다르게 지정하고, `3fs`는
 `nixl-hf3fs.yaml`을 사용합니다.
 
 ```bash
-bash benchmarks/storage_trace/replay_backend_sweep.sh \
+bash benchmarks/replayer/replay_backend_sweep.sh \
   --trace /mnt/nvme/lmcache-traces/tensormesh-20260809/tensormesh-wildclaw/storage.lct \
   --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
   --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \

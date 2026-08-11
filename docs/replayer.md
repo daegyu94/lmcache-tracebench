@@ -132,12 +132,12 @@ python -m replayer.main \
 ## Replay speedup sweep
 
 이미 기록된 하나의 `.lct`에 여러 `--speedup` 값을 적용해 storage arrival-rate를
-비교하려면 `benchmarks/storage_trace/replay_speed_sweep.sh`를 사용합니다. 이 스크립트는
+비교하려면 `benchmarks/replayer/replay_speed_sweep.sh`를 사용합니다. 이 스크립트는
 speedup별로 replay를 순차 실행하고, 각 case에 독립적인 L2 경로와 output 디렉터리를
 사용합니다. 따라서 한 case의 warm cache가 다음 speedup에 영향을 주지 않습니다.
 
 ```bash
-bash benchmarks/storage_trace/replay_speed_sweep.sh \
+bash benchmarks/replayer/replay_speed_sweep.sh \
   --trace outputs/speed-sweep/tensormesh-gaia-x1/storage.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /MNTPNT/lmcache-trace-replay/speed-sweep \
@@ -155,12 +155,12 @@ bash benchmarks/storage_trace/replay_speed_sweep.sh \
 ## Replay workload sweep
 
 여러 workload trace에 동일한 speedup sweep을 적용하려면
-`benchmarks/storage_trace/replay_workload_sweep.sh`를 사용합니다. trace root 아래에
+`benchmarks/replayer/replay_workload_sweep.sh`를 사용합니다. trace root 아래에
 `<WORKLOAD>/storage.lct` 구조가 있어야 하며, workload별로 L2와 output 경로를
 분리합니다.
 
 ```bash
-bash benchmarks/storage_trace/replay_workload_sweep.sh \
+bash benchmarks/replayer/replay_workload_sweep.sh \
   --trace-root /mnt/nvme/lmcache-traces/tensormesh-20260809 \
   --config configs/replayer/fs-native.yaml \
   --workloads tensormesh-wildclaw,tensormesh-other \
@@ -179,13 +179,13 @@ bash benchmarks/storage_trace/replay_workload_sweep.sh \
 ## Parallel replicated replay
 
 한 replayer 노드에서 여러 MP instance의 storage 부하를 모사하려면
-`benchmarks/storage_trace/replay_instances.sh`를 사용합니다. 이 기능은 동일한 `.lct`를 N개 독립 replay
+`benchmarks/replayer/replay_instances.sh`를 사용합니다. 이 기능은 동일한 `.lct`를 N개 독립 replay
 process에서 병렬 실행하는 복제 모드만 제공합니다. 각 instance는 독립적인 L2
 subdirectory와 output directory를 사용하지만, 같은 physical storage를 공유할 수
 있습니다.
 
 ```bash
-bash benchmarks/storage_trace/replay_instances.sh \
+bash benchmarks/replayer/replay_instances.sh \
   --instances 8 \
   --trace outputs/speed-sweep/tensormesh-gaia-x5/storage.lct \
   --config configs/replayer/fs-native.yaml \
@@ -196,7 +196,7 @@ bash benchmarks/storage_trace/replay_instances.sh \
 실행 전에는 다음과 같이 N개 command만 확인할 수 있습니다.
 
 ```bash
-bash benchmarks/storage_trace/replay_instances.sh \
+bash benchmarks/replayer/replay_instances.sh \
   --instances 4 \
   --trace path/to/storage.lct \
   --config configs/replayer/fs-native.yaml \
