@@ -29,6 +29,10 @@ Storage trace에는 실제 KV payload, API 반환값·exception, record 환경�
 
 ## L2 adapter trace
 
+기존 storage trace의 한계와 L2 replay의 dependency·prepare 설계는
+[L2-level tracing](l2-tracing.md)에서 설명합니다. 이 문서는 실행 옵션과 결과
+해석을 중심으로 다룹니다.
+
 Backend I/O 비교에는 recorder의 `--trace-kind l2`로 생성한 `l2.lct`를 사용할 수
 있습니다. 이 trace는 StorageManager lifecycle 대신 실제 adapter의
 `store`, `lookup_and_lock`, `load`, `unlock`, `delete` task와 source completion
@@ -37,11 +41,12 @@ lookup/load bitmap만 저장합니다.
 Replay는 trace 종료 marker가 없거나 recorder/EventBus drop count가 0이 아니면
 불완전한 입력으로 판단해 실행하지 않습니다.
 
-L2 replay는 source에서 이미 존재했던 read object를 dummy data로 먼저 저장한 뒤
-측정을 시작합니다. Tracebench replayer가 이 prepare 단계를 자동으로 실행하며,
-prepare I/O는 storage-node profiling 구간에서 제외됩니다. 이후 L2 adapter를 직접
-구동하므로 record/replay 환경의 L1 상태 차이로 인한 `finish_write` 또는
-`finish_read` warning은 발생하지 않습니다.
+L2 replay는 source lookup hit 중 선행 successful store가 없는 object만 dummy
+data로 먼저 저장한 뒤 측정을 시작합니다. Trace 안의 `store → read` object와 lookup
+miss는 prepare하지 않습니다. Tracebench replayer가 이 prepare 단계를 자동으로
+실행하며, prepare I/O는 storage-node profiling 구간에서 제외됩니다. 이후 L2
+adapter를 직접 구동하므로 record/replay 환경의 L1 상태 차이로 인한
+`finish_write` 또는 `finish_read` warning은 발생하지 않습니다.
 
 Replay는 source의 실제 I/O mix를 유지하는 `causal exact` 방식입니다.
 `store → lookup → load → unlock` dependency만 target backend의 completion으로
