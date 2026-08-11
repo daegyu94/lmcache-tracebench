@@ -17,7 +17,7 @@ backend_specs=()
 usage() {
   cat <<'EOF'
 Usage:
-  bash benchmarks/storage_trace/replay_backend_sweep.sh \
+  bash benchmarks/replayer/replay_backend_sweep.sh \
     --trace PATH \
     --backend-spec NAME=CONFIG@L2_PATH \
     [OPTIONS]
@@ -42,7 +42,7 @@ Options:
   -h, --help               Show this help
 
 Examples:
-  bash benchmarks/storage_trace/replay_backend_sweep.sh \
+  bash benchmarks/replayer/replay_backend_sweep.sh \
     --trace /path/to/storage.lct \
     --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
     --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \
@@ -50,7 +50,7 @@ Examples:
     --experiment speedup \
     --speedups 1,2,4,8
 
-  bash benchmarks/storage_trace/replay_backend_sweep.sh \
+  bash benchmarks/replayer/replay_backend_sweep.sh \
     --trace /path/to/storage.lct \
     --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
     --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \

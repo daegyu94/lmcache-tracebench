@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Record one storage trace per workload and requested workload speedup.
+# Record one trace per workload and requested workload speedup.
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=record_common.sh
+source "$script_dir/record_common.sh"
 backend=""
 workloads=""
 speedups="1,2,5,10"
@@ -13,13 +15,14 @@ mooncake_trace_root=""
 mooncake_trace_root_set=false
 dataset_percent=""
 dataset_percent_set=false
+trace_kind="storage"
 keep_l2=false
 dry_run=false
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash benchmarks/storage_trace/record_speed_sweep.sh --backend BACKEND --mountpoint PATH [OPTIONS]
+  bash benchmarks/recorder/record_speed_sweep.sh --backend BACKEND --mountpoint PATH [OPTIONS]
 
 Required:
   --backend BACKEND       mooncake or tensormesh
@@ -38,19 +41,20 @@ Options:
                           Select the first PERCENT of the dataset. Mooncake
                           uses requests; Tensormesh applies it to SWE-bench
                           sessions and ignores it for GAIA/WildClaw.
+  --trace-kind KIND       storage or l2 (default: storage)
   --keep-l2               Keep the per-case LMCache L2 directory after recording
                           (default: clean it after each case)
   --dry-run               Print every recorder plan without starting services
   -h, --help              Show this help
 
 Examples:
-  bash benchmarks/storage_trace/record_speed_sweep.sh \
+  bash benchmarks/recorder/record_speed_sweep.sh \
     --backend mooncake \
     --mountpoint /MNTPNT \
     --speedups 1,2,5,10 \
     --dataset-percent 10
 
-  bash benchmarks/storage_trace/record_speed_sweep.sh \
+  bash benchmarks/recorder/record_speed_sweep.sh \
     --backend tensormesh \
     --mountpoint /MNTPNT \
     --speedups 1,2,5,10
@@ -108,6 +112,11 @@ while (($#)); do
       dataset_percent_set=true
       shift 2
       ;;
+    --trace-kind)
+      require_value "$@"
+      trace_kind="$2"
+      shift 2
+      ;;
     --keep-l2)
       keep_l2=true
       shift
@@ -129,48 +138,33 @@ while (($#)); do
 done
 
 [[ -n "$backend" ]] || { usage >&2; exit 2; }
-[[ -n "$mountpoint" ]] || { echo "--mountpoint is required" >&2; usage >&2; exit 2; }
-[[ "$mountpoint" == /* ]] || die "--mountpoint must be an absolute path: $mountpoint"
-case "$backend" in
-  mooncake)
-    default_workloads="toolagent,conversation"
-    ;;
-  tensormesh)
-    default_workloads="gaia,wildclaw,swebench"
-    ;;
-  *)
-    die "--backend must be mooncake or tensormesh: $backend"
-    ;;
-esac
+if ! record_validate_mountpoint "$mountpoint"; then
+  usage >&2
+  exit 2
+fi
+if ! default_workloads="$(record_default_workloads "$backend")"; then
+  die "--backend must be mooncake or tensormesh: $backend"
+fi
 
 if [[ -z "$workloads" ]]; then
   workloads="$default_workloads"
+fi
+
+if ! record_validate_trace_kind "$trace_kind"; then
+  usage >&2
+  exit 2
 fi
 
 if [[ "$mooncake_trace_root_set" == false ]]; then
   mooncake_trace_root=""
 fi
 
-cd "$project_dir"
-if [[ ! -f .venv/bin/activate ]]; then
-  die "Project virtual environment is missing. Run: bash scripts/setup_runtime.sh"
-fi
-source .venv/bin/activate
+record_activate_project_venv "$project_dir" || exit 1
+echo "[INFO] Trace kind: $trace_kind"
 
 clean_case_l2() {
   local workload="$1"
-  local l2_prefix
-  case "$backend" in
-    mooncake)
-      l2_prefix="mooncake"
-      ;;
-    tensormesh)
-      l2_prefix="tensormesh"
-      ;;
-    *)
-      die "cannot resolve L2 path for backend: $backend"
-      ;;
-  esac
+  local l2_prefix="$backend"
 
   local mount_root="${mountpoint%/}"
   local l2_parent="${mount_root}/lmcache-trace"
@@ -309,17 +303,9 @@ done
 
 for raw_workload in "${workload_list[@]}"; do
   workload="${raw_workload//[[:space:]]/}"
-  case "$backend:$workload" in
-    mooncake:toolagent|mooncake:conversation)
-      config="configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml"
-      ;;
-    tensormesh:gaia|tensormesh:wildclaw|tensormesh:swebench)
-      config="configs/recorder/qwen3-coder-480b-tp8-${workload}.yaml"
-      ;;
-    *)
-      die "unsupported workload '$workload' for backend '$backend'"
-      ;;
-  esac
+  if ! config="$(record_config_for_workload "$backend" "$workload")"; then
+    die "unsupported workload '$workload' for backend '$backend'"
+  fi
 
   for raw_speedup in "${speedup_list[@]}"; do
     speedup="${raw_speedup//[[:space:]]/}"
@@ -329,6 +315,7 @@ for raw_workload in "${workload_list[@]}"; do
       python -m recorder.main
       --config "$config"
       --mountpoint "$mountpoint"
+      --trace-kind "$trace_kind"
       --speedup "$speedup"
       --output-dir "$output_dir"
     )

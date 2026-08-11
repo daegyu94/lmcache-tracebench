@@ -17,7 +17,7 @@ dry_run=false
 usage() {
   cat <<'EOF'
 Usage:
-  bash benchmarks/storage_trace/replay_workload_sweep.sh \
+  bash benchmarks/replayer/replay_workload_sweep.sh \
     --trace-root PATH \
     --config PATH \
     --workloads LIST \
@@ -40,7 +40,7 @@ Options:
   -h, --help               Show this help
 
 Example:
-  bash benchmarks/storage_trace/replay_workload_sweep.sh \
+  bash benchmarks/replayer/replay_workload_sweep.sh \
     --trace-root /mnt/nvme/lmcache-traces/tensormesh-20260809 \
     --trace-name storage.lct \
     --config configs/replayer/fs-native.yaml \
