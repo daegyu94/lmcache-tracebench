@@ -2,6 +2,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import traceprof
+
 from traceprof.aggregate import aggregate_profiles
 from traceprof.config import load_config
 from traceprof.controller import RemoteProfiler
@@ -38,7 +40,8 @@ replay_node:
 
 
 def test_remote_agent_is_shell_only():
-    script = Path("traceprof/storage_agent.sh")
+    assert traceprof.__file__ is not None
+    script = Path(traceprof.__file__).with_name("storage_agent.sh")
 
     assert script.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash")
     assert subprocess.run(

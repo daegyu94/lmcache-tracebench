@@ -26,7 +26,11 @@ lmcache-trace-recorder = "recorder.main:main"
 lmcache-trace-replayer = "replayer.main:main"
 lmcache-trace-mooncake = "recorder.mooncake_cli:main"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["recorder*", "replayer*", "traceprof*"]
 
 [tool.setuptools.package-data]

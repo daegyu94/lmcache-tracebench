@@ -45,7 +45,7 @@
 
 각 case는 별도의 `python -m replayer.main` 실행이며, sweep script들은 이 단일
 replay를 반복 호출하는 launcher입니다. 실제 LMCache storage replay는
-`replayer/runner.py`가 실행하는 `lmcache trace replay` subprocess가 담당합니다.
+`src/replayer/runner.py`가 실행하는 `lmcache trace replay` subprocess가 담당합니다.
 
 ## Recommended workflow
 

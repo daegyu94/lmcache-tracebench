@@ -26,6 +26,10 @@ operation sequence의 처리량, latency와 resource 사용량을 비교합니�
 
 ## Repository setup
 
+Python runtime source는 `src/` 아래의 `recorder`, `replayer`, `traceprof` package로
+구성되며, project 설치 후 기존 `python -m recorder.main`과
+`python -m replayer.main` module 경로를 그대로 사용합니다.
+
 Tensormesh-Benchmark는 `third_party/Tensormesh-Benchmark` Git submodule로
 사용합니다. submodule은 `tracebench` branch를 가리키며 상위 저장소의 commit으로
 고정됩니다.
