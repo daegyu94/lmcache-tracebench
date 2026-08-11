@@ -55,6 +55,31 @@ def build_command(config: ReplayerConfig, trace_path: str) -> list[str]:
     ]
 
 
+def build_prepare_command(config: ReplayerConfig, trace_path: str) -> list[str]:
+    """Build the L2 target preparation command for one replay case."""
+    return [*build_command(config, trace_path), "--prepare-l2", "--prepare-only"]
+
+
+def _read_trace_level(trace_path: Path) -> str:
+    """Read the trace header level through the installed LMCache runtime."""
+    from lmcache.v1.mp_observability.trace.reader import TraceReader
+
+    with TraceReader(str(trace_path)) as reader:
+        return reader.header.level
+
+
+def _run_prepare(config: ReplayerConfig, trace: Path, output_dir: Path) -> int:
+    log_path = output_dir / "lmcache-prepare.log"
+    with log_path.open("w", encoding="utf-8") as log_file:
+        return subprocess.run(
+            build_prepare_command(config, str(trace)),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        ).returncode
+
+
 def run_command(
     config: ReplayerConfig,
     trace_path: str,
@@ -68,6 +93,20 @@ def run_command(
     output_dir = Path(config.output_dir).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / "lmcache-replay.log"
+    trace_level = _read_trace_level(trace)
+    if trace_level == "l2":
+        print("[INFO] Preparing L2 replay target", flush=True)
+        prepare_code = _run_prepare(config, trace, output_dir)
+        if prepare_code != 0:
+            print(
+                "[ERROR] L2 prepare failed with exit code "
+                f"{prepare_code}. Log: {output_dir / 'lmcache-prepare.log'}"
+            )
+            return prepare_code
+        print(
+            f"[INFO] L2 prepare complete. Log: {output_dir / 'lmcache-prepare.log'}",
+            flush=True,
+        )
     started_at = time.monotonic()
     last_update_at = 0.0
     progress_seen = False

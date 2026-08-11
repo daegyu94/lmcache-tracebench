@@ -27,7 +27,14 @@ def _adapter_payload(config: RecorderConfig) -> dict[str, object]:
     return payload
 
 
-def build_commands(config: RecorderConfig, *, trace_path: str) -> CommandPlan:
+def build_commands(
+    config: RecorderConfig,
+    *,
+    trace_path: str,
+    trace_level: str = "storage",
+) -> CommandPlan:
+    if trace_level not in {"storage", "l2"}:
+        raise ValueError("trace_level must be 'storage' or 'l2'")
     config.validate()
     l1 = config.lmcache.l1
     lmcache = [
@@ -51,7 +58,7 @@ def build_commands(config: RecorderConfig, *, trace_path: str) -> CommandPlan:
         "--l2-adapter",
         json.dumps(_adapter_payload(config), sort_keys=True, separators=(",", ":")),
         "--trace-level",
-        "storage",
+        trace_level,
         "--trace-output",
         trace_path,
     ]

@@ -1,6 +1,6 @@
 # Dependencies shared by recorder and storage-trace replayer environments.
 # The tracebench fork provides L2 stats, cache outcomes, and scaled-open replay.
-lmcache @ git+https://github.com/daegyu94/LMCache.git@tracebench-v0.5.1
+lmcache @ git+https://github.com/daegyu94/LMCache.git@tracebench-v0.5.2
 torch==2.11.0
 fsspec[http]==2026.6.0
 # Keep a profile switch compatible with the vLLM runtime left by recorder.

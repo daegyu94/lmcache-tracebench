@@ -152,6 +152,12 @@ def _parser() -> argparse.ArgumentParser:
             "time_scale=1/speedup and Tensormesh scales respect-gaps"
         ),
     )
+    parser.add_argument(
+        "--trace-kind",
+        choices=("storage", "l2"),
+        default="storage",
+        help="record StorageManager calls or actual L2 adapter tasks",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--load-workload",
@@ -218,8 +224,12 @@ def main(argv: list[str] | None = None) -> int:
     if config.output.run_id:
         configured_output /= config.output.run_id
     output_dir = Path(args.output_dir or configured_output).expanduser()
-    trace_path = output_dir / "storage.lct"
-    command_plan = build_commands(config, trace_path=str(trace_path))
+    trace_path = output_dir / f"{args.trace_kind}.lct"
+    command_plan = build_commands(
+        config,
+        trace_path=str(trace_path),
+        trace_level=args.trace_kind,
+    )
 
     print("LMCache command:")
     print(" ".join(command_plan.lmcache))
@@ -279,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
             config,
             output_dir=output_dir,
             dataset_percent=args.dataset_percent,
+            trace_level=args.trace_kind,
         )
     return 0
 

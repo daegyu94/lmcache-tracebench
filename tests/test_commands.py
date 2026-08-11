@@ -1,7 +1,7 @@
 from recorder.config import load_config
 from recorder.launcher import build_commands
 from replayer.config import ReplayerConfig
-from replayer.runner import build_command
+from replayer.runner import build_command, build_prepare_command
 
 
 def test_recorder_commands_enable_mp_fs_native_trace():
@@ -33,6 +33,16 @@ def test_recorder_commands_enable_mp_fs_native_trace():
     assert commands.env["PYTHONHASHSEED"] == "0"
 
 
+def test_recorder_commands_support_l2_adapter_trace():
+    config = load_config("configs/recorder/example.yaml")
+    commands = build_commands(
+        config,
+        trace_path="outputs/run/l2.lct",
+        trace_level="l2",
+    )
+    assert commands.lmcache[commands.lmcache.index("--trace-level") + 1] == "l2"
+
+
 def test_replayer_is_one_shot_and_uses_skip_l1():
     command = build_command(ReplayerConfig(), "trace.lct")
     assert command[:4] == ["lmcache", "trace", "replay", "trace.lct"]
@@ -41,3 +51,9 @@ def test_replayer_is_one_shot_and_uses_skip_l1():
     adapter = command[command.index("--l2-adapter") + 1]
     assert '"type":"fs_native"' in adapter
     assert command[command.index("--speedup") + 1] == "1.0"
+
+
+def test_l2_prepare_command_uses_same_replay_configuration():
+    command = build_prepare_command(ReplayerConfig(), "l2.lct")
+    assert command[:4] == ["lmcache", "trace", "replay", "l2.lct"]
+    assert command[-2:] == ["--prepare-l2", "--prepare-only"]

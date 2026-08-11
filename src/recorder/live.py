@@ -210,6 +210,7 @@ def run_live(
     *,
     output_dir: str | Path | None = None,
     dataset_percent: float | None = None,
+    trace_level: str = "storage",
     verbose: bool = True,
 ) -> dict[str, Any]:
     """Run V3 against vLLM while LMCache records an MP storage trace.
@@ -218,6 +219,8 @@ def run_live(
     including when the workload or server fails. It raises the original error
     after cleanup so a non-zero CLI exit still signals an incomplete run.
     """
+    if trace_level not in {"storage", "l2"}:
+        raise ValueError("trace_level must be 'storage' or 'l2'")
     config.validate()
     if dataset_percent is not None:
         if (
@@ -242,8 +245,12 @@ def run_live(
         configured_output /= config.output.run_id
     run_dir = Path(output_dir or configured_output).expanduser().resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = run_dir / "storage.lct"
-    commands = build_commands(config, trace_path=str(trace_path))
+    trace_path = run_dir / f"{trace_level}.lct"
+    commands = build_commands(
+        config,
+        trace_path=str(trace_path),
+        trace_level=trace_level,
+    )
     mooncake_plan: MooncakePlan | None = None
     workload_command: list[str] | None = None
     if config.workload.backend == "mooncake":
