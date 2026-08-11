@@ -27,12 +27,44 @@ Storage trace에는 실제 KV payload, API 반환값·exception, record 환경�
 시각이 포함되지 않습니다. 따라서 `.lct`는 storage workload 재현 입력으로
 사용하고, L2 성능은 replay 중 adapter·backend에서 새로 측정해야 합니다.
 
+## L2 adapter trace
+
+Backend I/O 비교에는 recorder의 `--trace-kind l2`로 생성한 `l2.lct`를 사용할 수
+있습니다. 이 trace는 StorageManager lifecycle 대신 실제 adapter의
+`store`, `lookup_and_lock`, `load`, `unlock`, `delete` task와 source completion
+결과를 기록합니다. KV payload는 포함하지 않고 object key, batch, byte size와
+lookup/load bitmap만 저장합니다.
+Replay는 trace 종료 marker가 없거나 recorder/EventBus drop count가 0이 아니면
+불완전한 입력으로 판단해 실행하지 않습니다.
+
+L2 replay는 source에서 이미 존재했던 read object를 dummy data로 먼저 저장한 뒤
+측정을 시작합니다. Tracebench replayer가 이 prepare 단계를 자동으로 실행하며,
+prepare I/O는 storage-node profiling 구간에서 제외됩니다. 이후 L2 adapter를 직접
+구동하므로 record/replay 환경의 L1 상태 차이로 인한 `finish_write` 또는
+`finish_read` warning은 발생하지 않습니다.
+
+Replay는 source의 실제 I/O mix를 유지하는 `causal exact` 방식입니다.
+`store → lookup → load → unlock` dependency만 target backend의 completion으로
+보장하고, 관계없는 task는 원본 제출 시각에 따라 계속 제출합니다. 현재는 source와
+target이 각각 하나의 L2 adapter인 trace만 지원합니다.
+
+긴 L2 trace의 앞부분만 실행하려면 `--trace-percent 10`처럼 지정합니다. 이 값은
+시간이 아니라 source submission 개수 기준이며, 선택 개수는 올림합니다. Prepare도
+같은 prefix에 필요한 object만 대상으로 하고, `l2_replay_stats.json`에는
+`trace_percent`, 전체/선택 operation 수가 기록됩니다.
+
 `--speedup`은 workload나 GPU compute를 배속하지 않고, 이미 기록된 storage
 record의 monotonic timestamp offset만 나누는 scaled-open replay 옵션입니다.
 예를 들어 `--speedup 5`는 API 제출 schedule을 5배 압축하고, LMCache의
 비동기 L2 I/O가 그 제출률을 따라가지 못할 때 발생하는 contention과 miss를
 관찰하게 합니다. 실제 workload compute까지 바꾼 비교는 recorder speed sweep을
 사용하고, 동일 trace의 storage arrival-rate 실험은 이 옵션을 사용합니다.
+
+L2 trace에서도 `--speedup`은 I/O latency가 아니라 목표 제출 시각만 압축합니다.
+Backend가 요청률을 감당하지 못하면 dependency wait, buffer wait, schedule lag와
+마지막 submit 이후 drain이 증가하므로 total replay time은 더 이상 줄지 않거나
+늘어날 수 있습니다. `l2_replay_stats.json`의 source/actual submission window,
+schedule lag, drain time과 throughput을 함께 비교해야 합니다.
 
 ### How timestamp scaling works
 
@@ -75,13 +107,15 @@ Replayer는 저장된 `.lct`를 LMCache `trace replay` 명령으로 한 번 실�
 더 느리면 원래 schedule보다 뒤처진 상태로 계속 진행합니다.
 `--speedup`이 1보다 크면 이 timestamp 간격만 축소되며, replay 자체는 여전히
 single-threaded API dispatch와 비동기 StorageManager/L2 controller를 사용합니다.
+`l2.lct`는 header에서 자동 감지되어 direct causal L2 replay를 사용합니다.
 
 ```bash
 python -m replayer.main \
-  --trace path/to/storage.lct \
+  --trace path/to/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-path /MNTPNT/lmcache-trace-replay \
-  --output-dir outputs/replay
+  --output-dir outputs/replay \
+  --trace-percent 10
 ```
 
 실행 전 명령만 확인하려면 `--dry-run`을 추가합니다.

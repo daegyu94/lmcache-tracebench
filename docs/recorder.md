@@ -3,6 +3,11 @@
 설치 profile과 공통 경로 표기는 [README](../README.md)의
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
+기본 `--trace-kind storage`는 `storage.lct`를 생성합니다. Backend I/O benchmark용
+L2 adapter trace가 필요하면 같은 recorder command에 `--trace-kind l2`를 추가하며,
+결과는 `l2.lct`에 저장됩니다. 상세 contract와 replay 의미론은
+[L2 adapter trace](replayer.md#l2-adapter-trace)를 참고하세요.
+
 Recorder는 LMCache MP와 vLLM을 시작하고 OpenAI-compatible endpoint로 workload를
 전송합니다. 예제 config의 `lmcache.l2.reset_on_start: true`는 실행 전에
 `--mountpoint`와 `lmcache.l2.subpath`로 정해진 L2 경로를 비웁니다. 필요한

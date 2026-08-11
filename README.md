@@ -2,6 +2,7 @@
 
 vLLM + LMCache MP 환경에서 Tensormesh-Benchmark V3 또는 Mooncake FAST'25
 workload를 실행하고 LMCache storage trace를 기록하고 재생하는 도구입니다.
+StorageManager call trace와 backend 비교용 L2 adapter task trace를 지원합니다.
 
 ## Overview
 

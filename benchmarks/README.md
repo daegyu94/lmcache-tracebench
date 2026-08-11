@@ -46,6 +46,8 @@
 각 case는 별도의 `python -m replayer.main` 실행이며, sweep script들은 이 단일
 replay를 반복 호출하는 launcher입니다. 실제 LMCache storage replay는
 `src/replayer/runner.py`가 실행하는 `lmcache trace replay` subprocess가 담당합니다.
+입력이 `l2.lct`이면 measured replay 전에 source-resident read object를 준비하며,
+`lmcache-prepare.log`와 `l2_prepare_manifest.json`도 case 디렉터리에 생성됩니다.
 
 ## Recommended workflow
 
@@ -187,6 +189,10 @@ x8/
 - `trace_replay_summary.json`: replay API별 count, error, latency
 - `lmcache-replay.log`: LMCache 원문 출력
 - `trace_replay_ops.csv`: record 단위 replay 결과
+
+L2 adapter trace에서는 `l2_replay_stats.json`이 source/actual submission window,
+schedule lag, drain time과 outcome mismatch를 제공합니다. Outcome mismatch가 있으면
+해당 case는 backend 비교에 유효하지 않은 것으로 처리합니다.
 
 speedup sweep은 `sweep-summary.json`, `sweep-results.jsonl`, `sweep.log`를
 추가로 생성합니다. workload sweep은 상위 output root에
