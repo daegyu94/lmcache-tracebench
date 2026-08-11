@@ -102,7 +102,7 @@ bash scripts/setup_runtime.sh \
 ### LMCache tracebench fork
 
 두 profile은 모두 L2 operation profiling과 replay latency 통계
-(`--l2-stats-out`)가 포함된 LMCache `v0.5.1-tracebench` 태그를 사용합니다.
+(`--l2-stats-out`)가 포함된 LMCache `tracebench-v0.5.1` branch를 사용합니다.
 `setup_runtime.sh`는 선택한 profile의 requirements를 강제 재설치하므로, 기존에
 설치한 PyPI LMCache나 다른 fork가 남아 있지 않습니다. 별도의 LMCache source
 checkout이나 patch 적용은 필요하지 않습니다. 설치는 현재 virtual environment의
@@ -122,7 +122,7 @@ python -m pip check
 ```
 
 `setuptools-scm` 설정상 하이픈이 포함된 태그의 package metadata가 `0.1.dev...`로
-표시될 수 있지만, 설치된 소스는 `v0.5.1-tracebench` 태그의 커밋입니다. 설치 출처를
+표시될 수 있지만, 설치된 소스는 `tracebench-v0.5.1` branch의 커밋입니다. 설치 출처를
 확인하려면 다음을 실행합니다.
 
 ```bash
