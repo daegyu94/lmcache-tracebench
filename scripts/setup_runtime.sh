@@ -5,6 +5,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 venv_python="${project_root}/.venv/bin/python"
 check_only=false
+force_reinstall=false
 profile="recorder"
 runtime_requirements=""
 runtime_requirements_override=false
@@ -12,7 +13,7 @@ project_install="${project_root}[test,live]"
 extra_requirements=()
 
 usage() {
-    echo "Usage: bash scripts/setup_runtime.sh [--check] [--profile PROFILE] [--runtime-requirements PATH]" >&2
+    echo "Usage: bash scripts/setup_runtime.sh [--check] [--force-reinstall] [--profile PROFILE] [--runtime-requirements PATH]" >&2
     echo "Profiles: recorder (default), replayer" >&2
 }
 
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --check)
             check_only=true
+            shift
+            ;;
+        --force-reinstall)
+            force_reinstall=true
             shift
             ;;
         --profile)
@@ -105,16 +110,20 @@ if [[ "${check_only}" == false ]]; then
         uv pip install --python "${venv_python}" pip
     fi
 
-    "${venv_python}" -m pip install --upgrade pip
+    install_options=()
+    if [[ "${force_reinstall}" == true ]]; then
+        install_options=(--upgrade --force-reinstall)
+        "${venv_python}" -m pip install --upgrade pip
+    fi
     # LMCache is installed from a VCS source with --no-build-isolation below.
     # Bootstrap its build backend before pip resolves that source distribution.
-    "${venv_python}" -m pip install --upgrade "setuptools>=77.0.3,<81.0.0"
+    "${venv_python}" -m pip install "${install_options[@]}" "setuptools>=77.0.3,<81.0.0"
     # LMCache's metadata build imports torch before pip installs the full
     # requirements file, so bootstrap the pinned torch build dependency too.
-    "${venv_python}" -m pip install --upgrade "torch==2.11.0"
-    # Reinstall the selected runtime so a previously installed LMCache build or
-    # version cannot leak across recorder/replayer profile changes.
-    "${venv_python}" -m pip install --upgrade --force-reinstall --no-build-isolation \
+    "${venv_python}" -m pip install "${install_options[@]}" "torch==2.11.0"
+    # By default, pip installs only missing or incompatible requirements. Use
+    # --force-reinstall when intentionally resetting the selected runtime.
+    "${venv_python}" -m pip install "${install_options[@]}" --no-build-isolation \
         -r "${runtime_requirements}" \
         "${extra_requirements[@]}"
     "${venv_python}" -m pip install -e "${project_install}"

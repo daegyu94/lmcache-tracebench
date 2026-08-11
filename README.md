@@ -80,9 +80,11 @@ bash scripts/setup_runtime.sh --profile replayer
 `recorder`가 선택됩니다. 현재 환경만 검사하려면 각 명령에 `--check`를 추가합니다.
 의존성 정의는 `requirements/common.txt`, `requirements/recorder.txt`,
 `requirements/replayer.txt`에 분리되어 있으며, 기존
-`requirements/runtime.txt`는 Recorder용 호환 profile입니다. `--check`가
-아닌 실행은 선택한 runtime requirements를 다시 설치하므로 기존에 설치된 LMCache
-fork나 다른 version은 profile의 지정 version으로 교체됩니다.
+`requirements/runtime.txt`는 Recorder용 호환 profile입니다. 일반 실행은 pip의
+기본 보정 동작으로 선택한 runtime requirements를 처리하므로, 누락되었거나 버전
+조건을 만족하지 않는 패키지만 설치·교체하고 이미 조건을 만족하는 패키지는
+유지합니다. 프로필 전환이나 LMCache source를 확실히 초기화해야 할 때만
+`--force-reinstall`을 추가합니다.
 
 다른 버전을 시험하려면 해당 profile 파일을 복사해 지정합니다.
 
@@ -103,14 +105,18 @@ bash scripts/setup_runtime.sh \
 
 두 profile은 모두 L2 operation profiling과 replay latency 통계
 (`--l2-stats-out`)가 포함된 LMCache `tracebench-v0.5.1` branch를 사용합니다.
-`setup_runtime.sh`는 선택한 profile의 requirements를 강제 재설치하므로, 기존에
-설치한 PyPI LMCache나 다른 fork가 남아 있지 않습니다. 별도의 LMCache source
-checkout이나 patch 적용은 필요하지 않습니다. 설치는 현재 virtual environment의
-PyTorch/CUDA로 native extension을 빌드합니다.
+`setup_runtime.sh`는 기본적으로 requirements와 현재 환경을 비교해 필요한
+패키지만 보정합니다. 기존 PyPI LMCache나 다른 fork를 확실히 교체해야 하면
+`--force-reinstall`을 사용하세요. 별도의 LMCache source checkout이나 patch
+적용은 필요하지 않습니다. 설치는 현재 virtual environment의 PyTorch/CUDA로
+native extension을 빌드합니다.
 
 ```bash
 # recorder 또는 replayer profile을 선택합니다.
 bash scripts/setup_runtime.sh --profile recorder
+
+# 기존 runtime을 의도적으로 모두 다시 설치해야 할 때만 사용합니다.
+bash scripts/setup_runtime.sh --profile recorder --force-reinstall
 ```
 
 설치 후에는 다음 명령으로 확인합니다.
