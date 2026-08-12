@@ -32,8 +32,7 @@ _L2_IO_INTERVAL_RE = re.compile(
     r"write_ops=(\d+) write_bytes=(\d+) write_GiB/s=([0-9.]+)"
 )
 _L2_IO_INTERVAL_COLUMNS = (
-    "interval_end_seconds",
-    "interval_seconds",
+    "elapsed_seconds",
     "total_ops",
     "total_gb_bytes",
     "total_gb_per_second",
@@ -132,7 +131,7 @@ def _append_l2_io_interval(
 ) -> None:
     (
         elapsed,
-        interval_seconds,
+        _interval_seconds,
         total_ops,
         total_bytes,
         total_gib_per_second,
@@ -145,7 +144,6 @@ def _append_l2_io_interval(
     ) = interval
     row = (
         round(elapsed),
-        round(interval_seconds),
         total_ops,
         f"{total_bytes / _GB_BYTES:.3f}",
         f"{total_gib_per_second * _GIB_TO_GB:.3f}",
