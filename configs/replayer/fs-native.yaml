@@ -6,3 +6,4 @@ l2_adapter:
   base_path: /mnt/std-ssd/lmcache-trace-replay
   num_workers: 32
   use_odirect: true
+  io_log_interval_sec: 5
