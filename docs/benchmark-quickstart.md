@@ -116,6 +116,30 @@ outputs/replay-smoke/wildclaw/
 python -c "import json; print(json.dumps(json.load(open('outputs/replay-smoke/wildclaw/l2_replay_stats.json')), indent=2))"
 ```
 
+### 4.1. 로컬 I/O profiler smoke test
+
+실제 storage node 없이 profiler 연결과 agent 수집 경로만 확인하려면
+`configs/profiling/local.yaml`을 사용합니다. 이 설정은 `localhost`에 SSH로
+접속해 loopback interface `lo`의 counter를 1초 간격으로 수집합니다. 먼저
+replay host에서 passwordless SSH가 되는지 확인합니다.
+
+```bash
+ssh localhost true
+```
+
+그 다음 짧은 replay에 `--io-profile`을 추가합니다.
+
+```bash
+python -m replayer.main --trace /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct --config configs/replayer/fs-native.yaml --l2-path /mnt/nvme/lmcache-l2-replay/kvcache/local-smoke --output-dir outputs/replay-local-profile/wildclaw --trace-percent 1 --io-profile configs/profiling/local.yaml
+```
+
+이 예제는 network counter만 수집합니다. local NVMe I/O도 확인하려면 먼저
+`lsblk -ndo NAME,TYPE`으로 실제 physical disk를 확인한 뒤
+`configs/profiling/local.yaml`의 `devices`에 `/dev/...`를 추가하세요. 결과는
+`outputs/replay-local-profile/wildclaw/profile/local/`과
+`profile_summary.json`에서 확인합니다. `--io-profile`의 기존 호환 alias는
+`--node-profile`과 `--profile`입니다.
+
 ## 5. Speedup sweep
 
 `--speedups`만 변경하고 trace, backend config, worker 수, direct I/O, replay host와

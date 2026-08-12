@@ -39,7 +39,8 @@ Options:
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
   --output-root PATH       Root for workload and speedup outputs (default:
                            outputs/replay-l2/<workload>-<UTC timestamp>)
-  --profile PATH           Optional storage profiling configuration
+  --io-profile PATH        Optional storage-node I/O profiling configuration
+                           (aliases: --node-profile, --profile)
   --keep-l2                Do not reset existing L2 case paths; require them to
                            be empty (default is to reset each case path)
   --dry-run                Print every replay command without starting LMCache
@@ -107,7 +108,7 @@ while (($#)); do
       output_root_set=true
       shift 2
       ;;
-    --profile|--profile-config)
+    --io-profile|--node-profile|--profile|--profile-config)
       require_value "$@"
       profile_config="$2"
       shift 2
@@ -266,7 +267,7 @@ while IFS= read -r raw_workload; do
     --speedups "$speedups"
   )
   if [[ -n "$profile_config" ]]; then
-    command+=(--profile "$profile_config")
+    command+=(--io-profile "$profile_config")
   fi
   if [[ "$keep_l2" == true ]]; then
     command+=(--keep-l2)

@@ -221,14 +221,14 @@ python -m replayer.main \
   --config configs/replayer/smoke.yaml
 ```
 
-Replay 중 storage node의 NVMe와 network counter를 수집하려면 `--profile`을
+Replay 중 storage node의 NVMe와 network counter를 수집하려면 `--io-profile`을
 추가합니다.
 
 ```bash
 python -m replayer.main \
   --trace outputs/smoke/l2.lct \
   --config configs/replayer/smoke.yaml \
-  --profile configs/profiling/storage.yaml
+  --io-profile configs/profiling/storage.yaml
 ```
 
 설정, 결과 파일과 counter 해석은 [Replay profiling](docs/replayer.md#profiling)을

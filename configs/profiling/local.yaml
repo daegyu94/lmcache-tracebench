@@ -1,0 +1,15 @@
+# Local smoke configuration for the node I/O profiler.
+# This uses SSH to localhost and profiles the always-present loopback device.
+sample_interval_seconds: 1
+report_interval_seconds: 1
+remote_tmp_root: /tmp/lmcache-tracebench-profile
+
+nodes:
+  - name: local
+    host: localhost
+    interfaces:
+      - lo
+
+# Add a local physical device after checking `lsblk -ndo NAME,TYPE`, for example:
+#     devices:
+#       - /dev/nvme0n1

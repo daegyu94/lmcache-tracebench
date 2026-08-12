@@ -43,7 +43,8 @@ Options:
                            outputs/replay-l2/<trace-name>-<UTC timestamp>)
   --keep-l2                Do not reset existing L2 case paths; require them to
                            be empty (default is to reset each case path)
-  --profile PATH           Optional storage profiling configuration
+  --io-profile PATH        Optional storage-node I/O profiling configuration
+                           (aliases: --node-profile, --profile)
   --dry-run                Print commands without starting LMCache
   -h, --help               Show this help
 
@@ -117,7 +118,7 @@ while (($#)); do
       output_root_set=true
       shift 2
       ;;
-    --profile|--profile-config)
+    --io-profile|--node-profile|--profile|--profile-config)
       require_value "$@"
       profile_config="$2"
       shift 2
@@ -292,7 +293,7 @@ for spec in "${backend_specs[@]}"; do
       ;;
   esac
   if [[ -n "$profile_config" ]]; then
-    command+=(--profile "$profile_config")
+    command+=(--io-profile "$profile_config")
   fi
   if [[ "$keep_l2" == true ]]; then
     command+=(--keep-l2)

@@ -127,6 +127,28 @@ def test_l1_size_overrides_are_reflected_in_dry_run(capsys, tmp_path):
     assert "--l1-init-size-gb 40" in output
 
 
+def test_io_profile_option_is_reflected_in_dry_run(capsys, tmp_path):
+    trace = tmp_path / "storage.lct"
+    trace.touch()
+
+    assert (
+        main(
+            [
+                "--trace",
+                str(trace),
+                "--config",
+                "configs/replayer/smoke.yaml",
+                "--io-profile",
+                "configs/profiling/local.yaml",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    assert "Profiler: nodes=1 sample=1s report=1s" in capsys.readouterr().out
+
+
 def test_backend_configs_extend_common_base():
     fs_native = load_config("configs/replayer/fs-native.yaml")
     nixl_hf3fs = load_config("configs/replayer/nixl-hf3fs.yaml")

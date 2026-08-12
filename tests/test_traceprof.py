@@ -3,7 +3,6 @@ import subprocess
 from pathlib import Path
 
 import traceprof
-
 from traceprof.aggregate import aggregate_profiles
 from traceprof.config import load_config
 from traceprof.controller import RemoteProfiler
@@ -15,6 +14,18 @@ def test_default_profile_intervals_are_five_seconds():
     assert config.sample_interval_seconds == 5
     assert config.report_interval_seconds == 5
     assert all(node.role == "storage" for node in config.nodes)
+
+
+def test_local_profile_config_uses_local_loopback():
+    config = load_config("configs/profiling/local.yaml")
+
+    assert len(config.nodes) == 1
+    assert config.nodes[0].name == "local"
+    assert config.nodes[0].host == "localhost"
+    assert config.nodes[0].interfaces == ("lo",)
+    assert config.nodes[0].devices == ()
+    assert config.sample_interval_seconds == 1
+    assert config.report_interval_seconds == 1
 
 
 def test_replay_node_is_optional_and_marked_as_replay(tmp_path):
@@ -44,9 +55,7 @@ def test_remote_agent_is_shell_only():
     script = Path(traceprof.__file__).with_name("storage_agent.sh")
 
     assert script.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash")
-    assert subprocess.run(
-        ["bash", "-n", str(script)], check=False
-    ).returncode == 0
+    assert subprocess.run(["bash", "-n", str(script)], check=False).returncode == 0
 
 
 def test_controller_invokes_deployed_shell_agent(tmp_path):

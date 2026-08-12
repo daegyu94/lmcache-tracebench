@@ -35,7 +35,8 @@ Options:
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
   --output-root PATH       Base path for per-speedup output; appends a UTC
                            timestamp (default: outputs/replay-l2/<trace-name>)
-  --profile PATH           Optional storage profiling configuration
+  --io-profile PATH        Optional storage-node I/O profiling configuration
+                           (aliases: --node-profile, --profile)
   --keep-l2                Reuse L2 contents across cases; base must start empty
   --dry-run                Print every replay command without starting LMCache
   -h, --help               Show this help
@@ -97,7 +98,7 @@ while (($#)); do
       output_root_exact=true
       shift 2
       ;;
-    --profile|--profile-config)
+    --io-profile|--node-profile|--profile|--profile-config)
       require_value "$@"
       profile_config="$2"
       shift 2
@@ -271,7 +272,7 @@ while IFS= read -r raw_speedup; do
     --output-dir "$output_dir"
   )
   if [[ -n "$profile_config" ]]; then
-    command+=(--profile "$profile_config")
+    command+=(--io-profile "$profile_config")
   fi
   if [[ "$dry_run" == true ]]; then
     command+=(--dry-run)

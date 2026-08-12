@@ -43,10 +43,12 @@ def _parser() -> argparse.ArgumentParser:
         help="override the initial L1 capacity in GiB",
     )
     parser.add_argument(
+        "--io-profile",
+        "--node-profile",
         "--profile",
         "--profile-config",
         dest="profile_config",
-        help="profile storage nodes with the supplied YAML config",
+        help="profile storage/replay nodes with the supplied YAML config",
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser

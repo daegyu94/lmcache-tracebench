@@ -135,7 +135,7 @@ output인 trace parent 이름을 base로 사용합니다. 이미 `-YYYYMMDD-HHMM
 경로는 그대로 사용하므로 기존 command와도 호환됩니다.
 
 각 case의 결과와 LMCache 로그는 `output-root/x<SPEEDUP>/`에 저장되며, 전체 실행
-결과는 `sweep-summary.json`과 `sweep-results.jsonl`에 기록됩니다. `--profile`을
+결과는 `sweep-summary.json`과 `sweep-results.jsonl`에 기록됩니다. `--io-profile`을
 추가하면 speedup별 storage node profiling도 함께 실행합니다. 같은 `l2-root` base
 path가 각 case 직전에 삭제되고 다시 생성됩니다. 따라서 speedup별 L2 하위 경로를
 따로 만들 필요가 없고, 이전 case의 warm cache도 남지 않습니다. `--dry-run`에서는
@@ -257,7 +257,7 @@ Replay 계측은 두 계층으로 구분합니다.
    submitted/completed, bytes, average, p50/p90/p99/min/max latency와 aggregate
    throughput을 adapter별로 제공합니다. 단위는 microseconds입니다.
 2. **Node profiling**은 Linux sysfs counter로 storage node의 block device와 network
-   처리량을 수집합니다. Tracebench의 `--profile`이 제공하는 기능입니다.
+   처리량을 수집합니다. Tracebench의 `--io-profile`이 제공하는 기능입니다.
 
 `storage` trace의 per-API latency는 backend I/O latency가 아닙니다. Backend 비교에는
 `l2` trace의 direct task latency와 top-level replay timing, node profile을 함께
@@ -280,7 +280,7 @@ nodes:
       - bond0
 ```
 
-`--profile` 실행 시 replay host는 SSH preflight 후 shell agent를 각 node의
+`--io-profile` 실행 시 replay host는 SSH preflight 후 shell agent를 각 node의
 `/tmp/lmcache-tracebench-profile/<run-id>/`에 배포합니다. 원격 node에는
 project checkout, Python, LMCache, `iostat`, `nvme-cli`가 필요하지 않으며
 `bash`, `awk`, `cat`, `date`, `sleep`, `readlink`와 sysfs만 사용합니다. 수집과
