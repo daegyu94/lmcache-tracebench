@@ -4,15 +4,19 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "$BASH_SOURCE")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=replay_common.sh
+source "$script_dir/replay_common.sh"
 trace_root=""
 trace_name="storage.lct"
 config=""
 workloads=""
 l2_root=""
-output_root="outputs/replay-workload-sweep"
+output_root=""
+output_root_set=false
 speedups="1,2,5,10"
 profile_config=""
 dry_run=false
+keep_l2=false
 
 usage() {
   cat <<'EOF'
@@ -34,8 +38,10 @@ Options:
   --trace-name NAME        Trace filename under each workload (default: storage.lct)
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
   --output-root PATH       Root for workload and speedup outputs (default:
-                           outputs/replay-workload-sweep)
+                           outputs/replay-l2/<workload>-<UTC timestamp>)
   --profile PATH           Optional storage profiling configuration
+  --keep-l2                Do not reset existing L2 case paths; require them to
+                           be empty (default is to reset each case path)
   --dry-run                Print every replay command without starting LMCache
   -h, --help               Show this help
 
@@ -98,6 +104,7 @@ while (($#)); do
     --output-root)
       require_value "$@"
       output_root="$2"
+      output_root_set=true
       shift 2
       ;;
     --profile|--profile-config)
@@ -112,6 +119,10 @@ while (($#)); do
     -h|--help)
       usage
       exit 0
+      ;;
+    --keep-l2)
+      keep_l2=true
+      shift
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -162,6 +173,10 @@ if [[ -n "$profile_config" ]]; then
   fi
 fi
 
+if [[ "$output_root_set" == false ]]; then
+  output_label="$(printf '%s' "$workloads" | tr -d '[:space:]' | tr ',' '-')"
+  output_root="$(replay_default_output_root "$output_label")"
+fi
 mkdir -p -- "$output_root"
 matrix_log="$output_root/workload-sweep.log"
 results_jsonl="$output_root/workload-results.jsonl"
@@ -252,6 +267,9 @@ while IFS= read -r raw_workload; do
   )
   if [[ -n "$profile_config" ]]; then
     command+=(--profile "$profile_config")
+  fi
+  if [[ "$keep_l2" == true ]]; then
+    command+=(--keep-l2)
   fi
   if [[ "$dry_run" == true ]]; then
     command+=(--dry-run)

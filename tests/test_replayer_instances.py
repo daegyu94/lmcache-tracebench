@@ -6,6 +6,7 @@ from replayer.instances import (
     build_instance_command,
     build_instance_plans,
     main,
+    run_instances,
 )
 
 
@@ -82,6 +83,9 @@ def test_instances_write_summary_after_success(monkeypatch, tmp_path):
         l2_root=tmp_path / "l2",
         output_root=tmp_path / "outputs",
     )
+    for plan in plans:
+        plan.l2_path.mkdir(parents=True)
+        (plan.l2_path / "old-cache-entry").write_text("stale", encoding="utf-8")
 
     class CompletedProcess:
         def __init__(self):
@@ -108,8 +112,6 @@ def test_instances_write_summary_after_success(monkeypatch, tmp_path):
 
     monkeypatch.setattr("replayer.instances.subprocess.Popen", PopenStub)
 
-    from replayer.instances import run_instances
-
     assert (
         run_instances(
             trace=trace,
@@ -124,6 +126,30 @@ def test_instances_write_summary_after_success(monkeypatch, tmp_path):
     )
     assert summary["instances"] == 2
     assert [item["returncode"] for item in summary["results"]] == [0, 0]
+    assert all(
+        not (plan.l2_path / "old-cache-entry").exists() for plan in plans
+    )
+
+
+def test_instances_keep_l2_rejects_nonempty_paths(tmp_path):
+    trace = tmp_path / "storage.lct"
+    trace.touch()
+    plans = build_instance_plans(
+        1,
+        l2_root=tmp_path / "l2",
+        output_root=tmp_path / "outputs",
+    )
+    plans[0].l2_path.mkdir(parents=True)
+    (plans[0].l2_path / "old-cache-entry").write_text("stale", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not empty"):
+        run_instances(
+            trace=trace,
+            config="configs/replayer/smoke.yaml",
+            plans=plans,
+            output_root=tmp_path / "outputs",
+            keep_l2=True,
+        )
 
 
 def test_instance_count_and_l2_root_are_validated(tmp_path):

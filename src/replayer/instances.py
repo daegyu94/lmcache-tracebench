@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import shlex
+import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -132,6 +134,34 @@ def _write_summary(
     return summary_path
 
 
+def _ensure_l2_path_available(path: Path) -> None:
+    if path.is_symlink():
+        raise ValueError(f"L2 case path is a symlink: {path}")
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"L2 case path is not a directory: {path}")
+    if path == Path("/"):
+        raise ValueError("L2 case path must not be the filesystem root")
+    if path.is_dir():
+        try:
+            next(path.iterdir())
+        except StopIteration:
+            return
+        raise ValueError(f"L2 case path is not empty: {path}")
+
+
+def _reset_l2_path(path: Path) -> None:
+    if path.is_symlink():
+        raise ValueError(f"L2 case path is a symlink; refusing to reset it: {path}")
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"L2 case path is not a directory: {path}")
+    if path == Path("/"):
+        raise ValueError("L2 case path must not be the filesystem root")
+    if path.is_dir():
+        print(f"[INFO] Resetting L2 case path: {path}")
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
 def run_instances(
     *,
     trace: str | Path,
@@ -139,6 +169,7 @@ def run_instances(
     plans: list[InstancePlan],
     output_root: str | Path,
     dry_run: bool = False,
+    keep_l2: bool = False,
 ) -> int:
     """Run all plans concurrently and return a process-style exit code."""
     trace_path = Path(trace).expanduser()
@@ -157,6 +188,11 @@ def run_instances(
         for plan, command in zip(plans, commands, strict=True):
             print(f"Instance {plan.instance_id}: {shlex.join(command)}")
         return 0
+    for plan in plans:
+        if keep_l2:
+            _ensure_l2_path_available(plan.l2_path)
+        else:
+            _reset_l2_path(plan.l2_path)
 
     output_root_path = Path(output_root).expanduser()
     running: list[RunningInstance] = []
@@ -236,6 +272,24 @@ def run_instances(
     return 0
 
 
+def _default_output_root(trace: str | Path) -> Path:
+    trace_path = Path(trace).expanduser()
+    label = trace_path.parent.name or trace_path.stem
+    label = "".join(
+        character if character.isalnum() or character in "._-" else "-"
+        for character in label
+    )
+    label = label or "replay"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    base = Path("outputs") / "replay-l2" / f"{label}-{timestamp}"
+    candidate = base
+    suffix = 1
+    while candidate.exists():
+        candidate = Path(f"{base}-{suffix}")
+        suffix += 1
+    return candidate
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instances", required=True, type=_positive_int)
@@ -247,9 +301,14 @@ def _parser() -> argparse.ArgumentParser:
         help="absolute root; each instance uses root/instance-N",
     )
     parser.add_argument(
+        "--keep-l2",
+        action="store_true",
+        help="preserve existing L2 instance paths; require them to be empty",
+    )
+    parser.add_argument(
         "--output-root",
-        default="outputs/replay-instances",
-        help="root for per-instance output and summary",
+        default=None,
+        help="root for per-instance output and summary (default: outputs/replay-l2/<trace-name>-<UTC timestamp>)",
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -257,18 +316,20 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    output_root = args.output_root or _default_output_root(args.trace)
     try:
         plans = build_instance_plans(
             args.instances,
             l2_root=args.l2_root,
-            output_root=args.output_root,
+            output_root=output_root,
         )
         return run_instances(
             trace=args.trace,
             config=args.config,
             plans=plans,
-            output_root=args.output_root,
+            output_root=output_root,
             dry_run=args.dry_run,
+            keep_l2=args.keep_l2,
         )
     except (FileNotFoundError, ValueError) as exc:
         _parser().error(str(exc))

@@ -4,13 +4,17 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "$BASH_SOURCE")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=replay_common.sh
+source "$script_dir/replay_common.sh"
 trace=""
 config=""
 l2_root=""
-output_root="outputs/replay-speed-sweep"
+output_root=""
+output_root_set=false
 speedups="1,2,5,10"
 profile_config=""
 dry_run=false
+keep_l2=false
 
 usage() {
   cat <<'EOF'
@@ -29,8 +33,10 @@ Required:
 Options:
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
   --output-root PATH       Root for per-speedup output (default:
-                           outputs/replay-speed-sweep)
+                           outputs/replay-l2/<trace-name>-<UTC timestamp>)
   --profile PATH           Optional storage profiling configuration
+  --keep-l2                Do not reset existing L2 case paths; require them to
+                           be empty (default is to reset each case path)
   --dry-run                Print every replay command without starting LMCache
   -h, --help               Show this help
 
@@ -81,12 +87,17 @@ while (($#)); do
     --output-root)
       require_value "$@"
       output_root="$2"
+      output_root_set=true
       shift 2
       ;;
     --profile|--profile-config)
       require_value "$@"
       profile_config="$2"
       shift 2
+      ;;
+    --keep-l2)
+      keep_l2=true
+      shift
       ;;
     --dry-run)
       dry_run=true
@@ -130,6 +141,9 @@ if [[ ! -f "$trace" ]]; then
 fi
 if [[ ! -f "$config" ]]; then
   die "Replayer config not found: $config"
+fi
+if [[ "$output_root_set" == false ]]; then
+  output_root="$(replay_default_output_root "$(replay_trace_label "$trace")")"
 fi
 
 mkdir -p -- "$output_root"
@@ -176,6 +190,25 @@ ensure_case_path_available() {
   fi
 }
 
+reset_l2_case_path() {
+  local path="$1"
+  local label="$2"
+  if [[ -L "$path" ]]; then
+    die "$label is a symlink; refusing to reset it: $path"
+  fi
+  if [[ -e "$path" && ! -d "$path" ]]; then
+    die "$label is not a directory: $path"
+  fi
+  if [[ "$path" == "/" ]]; then
+    die "$label must not be the filesystem root"
+  fi
+  if [[ -d "$path" ]]; then
+    echo "[INFO] Resetting $label: $path"
+    rm -rf --one-file-system -- "$path"
+  fi
+  mkdir -p -- "$path"
+}
+
 while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
   [[ -n "$speedup" ]] || die "speedup entries must not be empty"
@@ -187,12 +220,30 @@ done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
   case_name="x$speedup"
-  ensure_case_path_available "$l2_root/$case_name" "L2 case path"
+  if [[ "$keep_l2" == true ]]; then
+    ensure_case_path_available "$l2_root/$case_name" "L2 case path"
+  else
+    reset_path="$l2_root/$case_name"
+    if [[ -L "$reset_path" ]]; then
+      die "L2 case path is a symlink; refusing to reset it: $reset_path"
+    fi
+    if [[ -e "$reset_path" && ! -d "$reset_path" ]]; then
+      die "L2 case path is not a directory: $reset_path"
+    fi
+  fi
   ensure_case_path_available "$output_root/$case_name" "output case path"
 done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
 if [[ "$dry_run" == false ]]; then
   mkdir -p -- "$l2_root"
+  if [[ "$keep_l2" == false ]]; then
+    while IFS= read -r raw_speedup; do
+      speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
+      reset_l2_case_path "$l2_root/x$speedup" "L2 case path"
+    done < <(printf '%s\n' "$speedups" | tr ',' '\n')
+  fi
+elif [[ "$keep_l2" == false ]]; then
+  echo "[INFO] Dry run: existing L2 case paths will not be reset"
 fi
 
 results_jsonl="$output_root/sweep-results.jsonl"

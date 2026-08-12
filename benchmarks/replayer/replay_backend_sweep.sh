@@ -4,14 +4,18 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "$BASH_SOURCE")" && pwd)"
 project_dir="$(cd -- "$script_dir/../.." && pwd)"
+# shellcheck source=replay_common.sh
+source "$script_dir/replay_common.sh"
 trace=""
 experiment="speedup"
 speedups="1,2,4,8"
 l1_sizes="20,40,80,160"
 speedup="1"
-output_root="outputs/replay-backend-sweep"
+output_root=""
+output_root_set=false
 profile_config=""
 dry_run=false
+keep_l2=false
 backend_specs=()
 
 usage() {
@@ -36,7 +40,9 @@ Options:
   --speedup VALUE          Storage timestamp speedup for the l1-size experiment
                            (default: 1)
   --output-root PATH       Root for per-backend outputs (default:
-                           outputs/replay-backend-sweep)
+                           outputs/replay-l2/<trace-name>-<UTC timestamp>)
+  --keep-l2                Do not reset existing L2 case paths; require them to
+                           be empty (default is to reset each case path)
   --profile PATH           Optional storage profiling configuration
   --dry-run                Print commands without starting LMCache
   -h, --help               Show this help
@@ -108,6 +114,7 @@ while (($#)); do
     --output-root)
       require_value "$@"
       output_root="$2"
+      output_root_set=true
       shift 2
       ;;
     --profile|--profile-config)
@@ -117,6 +124,10 @@ while (($#)); do
       ;;
     --dry-run)
       dry_run=true
+      shift
+      ;;
+    --keep-l2)
+      keep_l2=true
       shift
       ;;
     -h|--help)
@@ -166,6 +177,9 @@ if [[ -n "$profile_config" ]]; then
   if [[ ! -f "$profile_config" ]]; then
     die "Profiler config not found: $profile_config"
   fi
+fi
+if [[ "$output_root_set" == false ]]; then
+  output_root="$(replay_default_output_root "$(replay_trace_label "$trace")")"
 fi
 
 mkdir -p -- "$output_root"
@@ -279,6 +293,9 @@ for spec in "${backend_specs[@]}"; do
   esac
   if [[ -n "$profile_config" ]]; then
     command+=(--profile "$profile_config")
+  fi
+  if [[ "$keep_l2" == true ]]; then
+    command+=(--keep-l2)
   fi
   if [[ "$dry_run" == true ]]; then
     command+=(--dry-run)
