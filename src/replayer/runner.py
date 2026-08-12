@@ -359,6 +359,16 @@ def run_command(
 
     if progress_seen:
         print()
+    if return_code == 0 and trace_level == "l2":
+        stats_path = output_dir / "l2_replay_stats.json"
+        if stats_path.is_file():
+            from .report import write_l2_summary
+
+            try:
+                summary_path = write_l2_summary(stats_path)
+                print(f"[INFO] L2 replay summary: {summary_path}", flush=True)
+            except (OSError, TypeError, ValueError) as exc:
+                print(f"[WARN] Failed to write L2 replay summary: {exc}", flush=True)
     if profiler_error is not None:
         print(
             f"[ERROR] Replay exit code {return_code}; profiler finalization failed. "

@@ -372,6 +372,12 @@ Path(summary_path).write_text(
 print(f"[INFO] Replay speed sweep summary: {summary_path}")
 PY
 
+if [[ "$dry_run" == false ]]; then
+  python -m replayer.report sweep-csv \
+    --results "$results_jsonl" \
+    --output "$output_root/sweep-summary.csv"
+fi
+
 if ((overall_status != 0)); then
   echo "[ERROR] Replay speed sweep completed with failures. See: $sweep_log" >&2
   exit "$overall_status"

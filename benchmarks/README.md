@@ -200,6 +200,7 @@ L2 adapter trace replay case의 output은 다음과 같습니다.
 x8/
 ├── l2_prepare_manifest.json
 ├── l2_replay_stats.json
+├── l2_replay_summary.md
 ├── lmcache-prepare.log
 └── lmcache-replay.log
 ```
@@ -207,16 +208,16 @@ x8/
 - `l2_prepare_manifest.json`: measured replay 전에 준비한 object/byte와 elapsed time
 - `l2_replay_stats.json`: read/write task latency, bytes, throughput, submission timing,
   wait/drain 및 source/target outcome 비교 metric
+- `l2_replay_summary.md`: 주요 metric의 사람이 읽는 요약
 - `lmcache-prepare.log`, `lmcache-replay.log`: LMCache prepare/replay 원문 출력
-
 
 L2 outcome mismatch는 다른 backend나 source concurrency를 재현하는 과정에서 생길
 수 있는 비교 지표이며 그 자체로 replay 실패나 case 무효를 뜻하지 않습니다. Trace
 구조 오류, missing/duplicate end marker, event drop, dispatch 오류 또는 drain timeout은
 실패로 처리합니다.
 
-speedup sweep은 `sweep-summary.json`, `sweep-results.jsonl`, `sweep.log`를
-추가로 생성합니다. workload sweep은 상위 output root에
+speedup sweep은 `sweep-summary.json`, 비교용 `sweep-summary.csv`,
+`sweep-results.jsonl`, `sweep.log`를 추가로 생성합니다. workload sweep은 상위 output root에
 `workload-summary.json`, `workload-results.jsonl`, `workload-sweep.log`를
 생성합니다. backend sweep은 상위 output root에 backend별 결과와
 `backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log`를 생성합니다.
@@ -228,7 +229,8 @@ submission gap을 축소해 offered I/O rate를 높이는 scaled-open replay입�
 Speedup별 `l2_replay_stats.json`의 latency/throughput뿐 아니라 schedule lag,
 dependency/buffer wait와 drain time을 함께 비교해야 합니다.
 이 결과만으로 application TTFT나 end-to-end throughput을 의미한다고 해석하지
-않습니다. 자세한 제한사항은 [Replayer guide](../docs/replayer.md)를 참고합니다.
+않습니다. 각 field의 계산식과 해석은
+[L2 replay metric guide](../docs/l2-replay-metrics.md)를 참고합니다.
 
 동일 workload의 speedup 비교에서는 config, L2 backend, L1 설정을 고정하고
 case별 L2 path를 분리합니다. 여러 replay process를 같은 physical storage에
