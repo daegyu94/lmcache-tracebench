@@ -37,7 +37,8 @@ def test_qwen_tp8_base_config_has_no_session_cap():
     assert config.workload.timing_mode == "respect-gaps"
     assert config.workload.pre_gap_scale == 1.0
     assert config.workload.max_concurrent_sessions == 20
-    assert config.lmcache.l1.size_gb == 20
+    assert config.lmcache.l1.size_gb == 64
+    assert config.lmcache.l1.init_size_gb == 64
 
 
 def test_source_specific_configs_disable_mixed_interleaving():
