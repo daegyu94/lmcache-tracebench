@@ -180,7 +180,7 @@ write_interval() {
         io_ms=$(delta "$(field "$start_snapshot" "$device" 7 D)" "$(field "$end_snapshot" "$device" 7 D)")
         io_util=$(awk -v value="$io_ms" -v interval="$interval" \
             'BEGIN { if (interval <= 0) interval = 1; value = value / interval / 10; if (value > 100) value = 100; printf "%.3f", value }')
-        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
             "$tsv_timestamp" "$elapsed" "$device" "$read_bytes" "$write_bytes" \
             "$(rate "$read_ios" "$interval")" "$(rate "$write_ios" "$interval")" \
             "$(mibps "$read_bytes" "$interval")" "$(mibps "$write_bytes" "$interval")" "$io_util" >> "$DISK_TSV"
@@ -190,7 +190,7 @@ write_interval() {
         tx_bytes=$(delta "$(field "$start_snapshot" "$interface" 4 N)" "$(field "$end_snapshot" "$interface" 4 N)")
         rx_packets=$(delta "$(field "$start_snapshot" "$interface" 5 N)" "$(field "$end_snapshot" "$interface" 5 N)")
         tx_packets=$(delta "$(field "$start_snapshot" "$interface" 6 N)" "$(field "$end_snapshot" "$interface" 6 N)")
-        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
             "$tsv_timestamp" "$elapsed" "$interface" "$rx_bytes" "$tx_bytes" \
             "$rx_packets" "$tx_packets" "$(mibps "$rx_bytes" "$interval")" \
             "$(mibps "$tx_bytes" "$interval")" "$(rate "$rx_packets" "$interval")" \
