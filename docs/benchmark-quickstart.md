@@ -106,6 +106,7 @@ python -m replayer.main \
 outputs/replay-smoke/wildclaw/
 ├── l2_prepare_manifest.json
 ├── l2_replay_stats.json
+├── l2_replay_summary.md
 ├── lmcache-prepare.log
 └── lmcache-replay.log
 ```
@@ -140,6 +141,104 @@ python -m replayer.main --trace /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wi
 `profile_summary.json`에서 확인합니다. `--io-profile`의 기존 호환 alias는
 `--node-profile`과 `--profile`입니다.
 
+### 4.2. 실제 storage node I/O profiling
+
+실제 backend benchmark에서는 replay host가 SSH로 각 storage node에 profiler agent를
+배포합니다. `configs/profiling/storage.yaml`은 네 개의 예시 node
+(`storage_node1`~`storage_node4`)를 가리키므로, 그대로 실행하지 말고 cluster의
+host, physical device, network interface로 바꿔 별도 파일에 저장합니다.
+
+예를 들어 storage node 하나를 측정할 때 다음처럼 작성합니다.
+
+```bash
+cp configs/profiling/storage.yaml configs/profiling/storage.local.yaml
+```
+
+```yaml
+sample_interval_seconds: 5
+report_interval_seconds: 5
+remote_tmp_root: /tmp/lmcache-tracebench-profile
+ssh_user: benchmark
+
+nodes:
+  - name: storage_node1
+    host: 10.0.0.11
+    devices:
+      - /dev/nvme0n1
+    interfaces:
+      - bond0
+```
+
+실제 값은 storage node에서 확인합니다.
+
+```bash
+ssh -o BatchMode=yes benchmark@10.0.0.11 true
+ssh benchmark@10.0.0.11 'lsblk -ndo NAME,TYPE && ip -br link'
+ssh benchmark@10.0.0.11 \
+  'test -r /sys/class/block/nvme0n1/stat && test -r /sys/class/net/bond0/statistics/rx_bytes'
+```
+
+`ssh -o BatchMode=yes`가 실패하면 replay를 시작하기 전에 SSH key, user, host와
+port를 고칩니다. 다른 SSH port를 사용하면 node 아래에 `port: 2222`를 추가합니다.
+Profiler agent는 원격 Python이나 LMCache를 요구하지 않지만, 원격 host에 `bash`,
+`awk`, `cat`, `date`, `sleep`, `readlink`와 Linux sysfs가 있어야 합니다. Bond
+interface와 slave interface를 동시에 넣지 말고, partition device 대신 실제
+physical device를 지정하세요.
+
+이제 1% 단일 replay에서 profiling 연결과 결과 경로를 확인합니다.
+
+```bash
+python -m replayer.main \
+  --trace /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct \
+  --config configs/replayer/fs-native.yaml \
+  --l2-path /mnt/nvme/lmcache-l2-replay/kvcache/profile-smoke \
+  --output-dir outputs/replay-profile-smoke/wildclaw \
+  --trace-percent 1 \
+  --io-profile configs/profiling/storage.local.yaml
+```
+
+성공하면 다음 파일을 확인합니다.
+
+```text
+outputs/replay-profile-smoke/wildclaw/
+├── profile_preflight.json
+├── profile_summary.json
+└── profile/storage_node1/
+    ├── disk.tsv
+    ├── network.tsv
+    ├── samples.jsonl
+    ├── summary.json
+    └── agent.log
+```
+
+예를 들어 device별 I/O를 표 형태로 확인합니다.
+
+```bash
+column -ts $'\t' \
+  outputs/replay-profile-smoke/wildclaw/profile/storage_node1/disk.tsv | less -S
+python -m json.tool outputs/replay-profile-smoke/wildclaw/profile_summary.json
+```
+
+실험에 사용할 profiling 조건을 고정했다면 speedup sweep에도 같은 config를
+전달합니다. Profiler는 각 replay case마다 새로 시작·종료되며 preparation I/O는
+측정 구간에서 제외됩니다.
+
+```bash
+bash benchmarks/replayer/replay_speed_sweep.sh \
+  --trace /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct \
+  --config configs/replayer/fs-native.yaml \
+  --l2-root /mnt/nvme/lmcache-l2-replay/kvcache/wildclaw \
+  --output-root outputs/replay-l2/wildclaw \
+  --speedups 1,2,4 \
+  --io-profile configs/profiling/storage.local.yaml
+```
+
+각 case의 `profile/`과 `profile_summary.json`을 `l2_replay_stats.json`의 replay
+latency/throughput과 함께 비교합니다. `profile_summary.json`은 node별 counter를
+합친 결과이고, 원본 시간 구간은 각 node의 `disk.tsv`와 `network.tsv`에 있습니다.
+Replay client network까지 보고 싶으면 config에 `replay_node`를 추가하되, storage
+node와 같은 interface를 중복 집계하지 않도록 합니다.
+
 ## 5. Speedup sweep
 
 `--speedups`만 변경하고 trace, backend config, worker 수, direct I/O, replay host와
@@ -156,7 +255,9 @@ bash benchmarks/replayer/replay_speed_sweep.sh \
 ```
 
 실제 결과 root는 `outputs/replay-l2/wildclaw-<UTC timestamp>/`가 됩니다.
-`$(date ...)`를 직접 붙일 필요가 없습니다. 결과 root의 `sweep-summary.json`과 각 `x<SPEEDUP>/l2_replay_stats.json`을
+`$(date ...)`를 직접 붙일 필요가 없습니다. 결과 root의
+`sweep-summary.json`, `sweep-summary.csv`와 각
+`x<SPEEDUP>/l2_replay_stats.json`, `x<SPEEDUP>/l2_replay_summary.md`를
 확인합니다. Latency와 throughput 외에 `schedule_lag`, dependency/buffer wait와
 `drain_time`을 함께 비교하세요.
 
