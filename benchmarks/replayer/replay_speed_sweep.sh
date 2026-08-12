@@ -28,15 +28,14 @@ Usage:
 Required:
   --trace PATH             Source storage trace (.lct)
   --config PATH            Replayer YAML configuration
-  --l2-root PATH           Absolute root; each speedup uses root/x<SPEEDUP>
+  --l2-root PATH           Absolute L2 path reused and reset before each speedup
 
 Options:
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
   --output-root PATH       Root for per-speedup output (default:
                            outputs/replay-l2/<trace-name>-<UTC timestamp>)
   --profile PATH           Optional storage profiling configuration
-  --keep-l2                Do not reset existing L2 case paths; require them to
-                           be empty (default is to reset each case path)
+  --keep-l2                Reuse L2 contents across cases; base must start empty
   --dry-run                Print every replay command without starting LMCache
   -h, --help               Show this help
 
@@ -190,7 +189,7 @@ ensure_case_path_available() {
   fi
 }
 
-reset_l2_case_path() {
+reset_l2_root() {
   local path="$1"
   local label="$2"
   if [[ -L "$path" ]]; then
@@ -221,29 +220,23 @@ while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
   case_name="x$speedup"
   if [[ "$keep_l2" == true ]]; then
-    ensure_case_path_available "$l2_root/$case_name" "L2 case path"
+    ensure_case_path_available "$l2_root" "L2 root"
   else
-    reset_path="$l2_root/$case_name"
+    reset_path="$l2_root"
     if [[ -L "$reset_path" ]]; then
-      die "L2 case path is a symlink; refusing to reset it: $reset_path"
+      die "L2 root is a symlink; refusing to reset it: $reset_path"
     fi
     if [[ -e "$reset_path" && ! -d "$reset_path" ]]; then
-      die "L2 case path is not a directory: $reset_path"
+      die "L2 root is not a directory: $reset_path"
     fi
   fi
   ensure_case_path_available "$output_root/$case_name" "output case path"
 done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
-if [[ "$dry_run" == false ]]; then
+if [[ "$dry_run" == false && "$keep_l2" == true ]]; then
   mkdir -p -- "$l2_root"
-  if [[ "$keep_l2" == false ]]; then
-    while IFS= read -r raw_speedup; do
-      speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
-      reset_l2_case_path "$l2_root/x$speedup" "L2 case path"
-    done < <(printf '%s\n' "$speedups" | tr ',' '\n')
-  fi
-elif [[ "$keep_l2" == false ]]; then
-  echo "[INFO] Dry run: existing L2 case paths will not be reset"
+elif [[ "$dry_run" == true && "$keep_l2" == false ]]; then
+  echo "[INFO] Dry run: existing L2 roots will not be reset"
 fi
 
 results_jsonl="$output_root/sweep-results.jsonl"
@@ -254,8 +247,11 @@ overall_status=0
 while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
   case_name="x$speedup"
-  l2_path="$l2_root/$case_name"
+  l2_path="$l2_root"
   output_dir="$output_root/$case_name"
+  if [[ "$dry_run" == false && "$keep_l2" == false ]]; then
+    reset_l2_root "$l2_root" "L2 root"
+  fi
   command=(
     python -m replayer.main
     --trace "$trace"
