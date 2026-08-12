@@ -146,6 +146,11 @@ seconds() {
         'BEGIN { printf "%.3f", (end - start) / 1000000000 }'
 }
 
+seconds_int() {
+    awk -v start="$1" -v end="$2" \
+        'BEGIN { printf "%.0f", (end - start) / 1000000000 }'
+}
+
 rate() {
     awk -v value="$1" -v interval="$2" \
         'BEGIN { if (interval <= 0) interval = 1; printf "%.3f", value / interval }'
@@ -163,7 +168,8 @@ write_interval() {
     end_ns=$4
     end_timestamp=$5
     interval=$(seconds "$start_ns" "$end_ns")
-    elapsed=$(seconds "$START_NS" "$end_ns")
+    elapsed=$(seconds_int "$START_NS" "$end_ns")
+    tsv_timestamp=${end_timestamp%.*}Z
     for device in $DEVICES; do
         read_sectors=$(delta "$(field "$start_snapshot" "$device" 4 D)" "$(field "$end_snapshot" "$device" 4 D)")
         write_sectors=$(delta "$(field "$start_snapshot" "$device" 6 D)" "$(field "$end_snapshot" "$device" 6 D)")
@@ -175,7 +181,7 @@ write_interval() {
         io_util=$(awk -v value="$io_ms" -v interval="$interval" \
             'BEGIN { if (interval <= 0) interval = 1; value = value / interval / 10; if (value > 100) value = 100; printf "%.3f", value }')
         printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "$end_timestamp" "$elapsed" "$interval" "$device" "$read_bytes" "$write_bytes" \
+            "$tsv_timestamp" "$elapsed" "$device" "$read_bytes" "$write_bytes" \
             "$(rate "$read_ios" "$interval")" "$(rate "$write_ios" "$interval")" \
             "$(mibps "$read_bytes" "$interval")" "$(mibps "$write_bytes" "$interval")" "$io_util" >> "$DISK_TSV"
     done
@@ -185,7 +191,7 @@ write_interval() {
         rx_packets=$(delta "$(field "$start_snapshot" "$interface" 5 N)" "$(field "$end_snapshot" "$interface" 5 N)")
         tx_packets=$(delta "$(field "$start_snapshot" "$interface" 6 N)" "$(field "$end_snapshot" "$interface" 6 N)")
         printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-            "$end_timestamp" "$elapsed" "$interval" "$interface" "$rx_bytes" "$tx_bytes" \
+            "$tsv_timestamp" "$elapsed" "$interface" "$rx_bytes" "$tx_bytes" \
             "$rx_packets" "$tx_packets" "$(mibps "$rx_bytes" "$interval")" \
             "$(mibps "$tx_bytes" "$interval")" "$(rate "$rx_packets" "$interval")" \
             "$(rate "$tx_packets" "$interval")" "$(field "$end_snapshot" "$interface" 7 N)" \
@@ -247,8 +253,8 @@ run_agent() {
     DISK_TSV="$RUN_DIR/disk.tsv"
     NETWORK_TSV="$RUN_DIR/network.tsv"
     printf '%s\n' "$$" > "$pid_file"
-    printf 'timestamp\telapsed_s\tinterval_s\tdevice\tread_bytes\twrite_bytes\tread_iops\twrite_iops\tread_mibps\twrite_mibps\tio_util_percent\n' > "$DISK_TSV"
-    printf 'timestamp\telapsed_s\tinterval_s\tinterface\trx_bytes\ttx_bytes\trx_packets\ttx_packets\trx_mibps\ttx_mibps\trx_pps\ttx_pps\trx_errors\ttx_errors\trx_drops\ttx_drops\n' > "$NETWORK_TSV"
+    printf 'timestamp\telapsed_s\tdevice\tread_bytes\twrite_bytes\tread_iops\twrite_iops\tread_mibps\twrite_mibps\tio_util_percent\n' > "$DISK_TSV"
+    printf 'timestamp\telapsed_s\tinterface\trx_bytes\ttx_bytes\trx_packets\ttx_packets\trx_mibps\ttx_mibps\trx_pps\ttx_pps\trx_errors\ttx_errors\trx_drops\ttx_drops\n' > "$NETWORK_TSV"
     : > "$samples_file"
     : > "$log_file"
     START_NS=$(now_ns)

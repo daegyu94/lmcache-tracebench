@@ -304,6 +304,8 @@ Block sector는 512 byte로 환산하며 마지막의 짧은 구간도 종료 �
 | `summary.json` | Node별 전체 byte와 평균 MiB/s |
 | `agent.log` | Profiler 시작·종료 로그 |
 
+`disk.tsv`와 `network.tsv`의 `elapsed_s`는 정수 초이며, `timestamp`는 소수점 없는 UTC 초 단위입니다. `interval_s` 컬럼은 포함하지 않습니다.
+
 Bond interface와 slave interface를 동시에 집계하면 traffic이 중복됩니다. 둘 중
 하나만 선택하고, loop/partition device의 counter는 실제 physical device와 중복될
 수 있으므로 장치 구성을 확인하세요. Replay client network도 필요하면 profile

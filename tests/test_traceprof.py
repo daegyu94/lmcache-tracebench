@@ -54,7 +54,12 @@ def test_remote_agent_is_shell_only():
     assert traceprof.__file__ is not None
     script = Path(traceprof.__file__).with_name("storage_agent.sh")
 
-    assert script.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash")
+    script_text = script.read_text(encoding="utf-8")
+    assert script_text.startswith("#!/usr/bin/env bash")
+    assert "timestamp\\telapsed_s\\tinterval_s" not in script_text
+    assert "timestamp\\telapsed_s\\tdevice" in script_text
+    assert "timestamp\\telapsed_s\\tinterface" in script_text
+    assert "seconds_int" in script_text
     assert subprocess.run(["bash", "-n", str(script)], check=False).returncode == 0
 
 
