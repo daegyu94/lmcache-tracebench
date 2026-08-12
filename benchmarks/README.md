@@ -26,10 +26,17 @@ benchmarks/
   bash scripts/setup_runtime.sh --profile replayer
   ```
 
-- replay마다 새로운 L2 root와 output root를 사용합니다. 기존 case 디렉터리가
-  비어 있지 않으면 warm-cache 결과를 방지하기 위해 실행이 중단됩니다.
+- `replay_speed_sweep.sh`는 기본적으로 각 L2 case 디렉터리(`l2-root/x<SPEEDUP>/`)를
+  실행 전에 삭제하고 다시 만들어 base path를 reset합니다. 기존 replay 결과가 있는
+  output case 디렉터리는 계속 실행 전에 비어 있어야 합니다. L2 case를 보존하려면
+  `--keep-l2`를 사용하며, 이때 기존 L2 case path는 비어 있어야 합니다.
+- `replay_l1_size_sweep.sh`도 각 L2 case(`l1-<SIZE>gb`)를 실행 전에 reset합니다.
+  `replay_instances.sh`는 각 instance L2 path를 reset합니다. 두 script 모두
+  `--keep-l2`를 사용하면 기존 경로가 비어 있을 때만 실행합니다.
 - 실행 전에 `--dry-run`으로 trace, config, L2 path, output path와 최종 command를
   확인합니다.
+- `--output-root`를 생략하면 launcher가 trace/workload 이름과 UTC timestamp를 사용해
+  `outputs/replay-l2/<trace-or-workload>-<UTC timestamp>/`를 자동 생성합니다.
 - `--l2-root`는 실제 storage mount를 가리키는 absolute path를 사용합니다.
   `--output-root`에는 JSON summary와 launcher log가 저장됩니다.
 
@@ -195,9 +202,9 @@ replay_backend_sweep.sh
 
 backend sweep은 병렬 실행하지 않습니다. 한 backend의 speedup sweep이 끝난 뒤
 다음 backend로 넘어갑니다. 개별 replay가 실패해도 다음 case를 계속 시도하고,
-최종 summary와 exit code에 실패를 기록합니다. 단, L2 case directory가 이미
-존재하거나 비어 있지 않으면 warm-cache 결과 방지를 위해 해당 sweep이 중단될 수
-있습니다.
+최종 summary와 exit code에 실패를 기록합니다. speedup/L1 size 하위 sweep은 시작 전에
+각 L2 case directory를 기본적으로 reset하며, 기존 output case directory가 남아 있으면
+결과 보호를 위해 해당 sweep이 중단될 수 있습니다.
 
 L1 capacity를 비교하려면 `--experiment l1-size --l1-sizes 20,40,80,160
 --speedup 1`로 변경합니다. scaled-open과 함께 실험하려면 `--speedup 8`을

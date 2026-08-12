@@ -144,13 +144,17 @@ bash benchmarks/replayer/replay_speed_sweep.sh \
   --output-root outputs/replay/speed-sweep/gaia \
   --speedups 1,2,5,10
 ```
+`--output-root`를 생략하면 trace parent 이름과 UTC timestamp를 사용한
+`outputs/replay-l2/<trace-name>-<UTC timestamp>/`가 자동 생성됩니다.
 
 각 case의 결과와 LMCache 로그는 `output-root/x<SPEEDUP>/`에 저장되며, 전체 실행
 결과는 `sweep-summary.json`과 `sweep-results.jsonl`에 기록됩니다. `--profile`을
 추가하면 speedup별 storage node profiling도 함께 실행합니다. 기존 case 경로가
-비어 있지 않으면 warm-cache 결과를 방지하기 위해 실행을 중단하므로, 비교 실험에는
-새 L2 root와 output root를 사용하세요. 실행 전 command만 확인하려면 `--dry-run`을
-추가합니다.
+기본적으로 실행 전에 삭제되고 다시 생성되어 base path의 기존 데이터를 reset합니다.
+따라서 같은 `l2-root`를 재사용해도 이전 warm-cache가 남지 않습니다. 실행 전 command만
+확인하는 `--dry-run`에서는 삭제하지 않습니다. L2 case path를 보존하려면
+`--keep-l2`를 사용하며, 이때 기존 L2 case path는 비어 있어야 합니다. 기존 replay
+결과를 보호하기 위해 `output-root/x<SPEEDUP>/`는 계속 비어 있어야 합니다.
 
 ## Replay workload sweep
 
@@ -169,12 +173,14 @@ bash benchmarks/replayer/replay_workload_sweep.sh \
   --speedups 1,2,4,8
 ```
 
+`--output-root`를 생략하면 요청한 workload 목록을 label로 만든
+`outputs/replay-l2/<workload>-<UTC timestamp>/`가 자동 생성됩니다.
 각 workload의 결과는 `output-root/<WORKLOAD>/x<SPEEDUP>/`에 저장됩니다.
 상위 launcher 로그와 workload별 결과는 각각 `workload-sweep.log`,
 `workload-summary.json`, `workload-results.jsonl`에 기록됩니다. 한 workload가
 실패해도 나머지 workload를 계속 실행하며, 마지막에 전체 exit code로 실패를 알립니다.
-비교 실험에서는 이전 실행의 warm cache가 섞이지 않도록 새 L2 root와 output root를
-사용하세요.
+L2 case path는 speedup sweep 시작 전에 기본적으로 reset되므로 같은 L2 root를
+재사용할 수 있습니다. 기존 결과를 덮어쓰지 않도록 output root는 새 경로를 사용하세요.
 
 ## Parallel replicated replay
 
@@ -203,12 +209,15 @@ bash benchmarks/replayer/replay_instances.sh \
   --l2-root /MNTPNT/lmcache-trace-replay \
   --dry-run
 ```
+`--output-root`를 생략하면 trace parent 이름과 UTC timestamp를 사용한
+`outputs/replay-l2/<trace-name>-<UTC timestamp>/`가 자동 생성됩니다.
 
 결과는 `instance-0/`, `instance-1/` 등의 디렉터리와
 `outputs/replay/gaia-x5-n8/instances-summary.json`에 저장됩니다. 각 instance의
 LMCache 출력은 해당 디렉터리의 `lmcache-replay.log`, launcher 출력은
-`launcher.log`에서 확인합니다. 실행 전 L2 instance 디렉터리가 비어 있는지
-확인하세요.
+`launcher.log`에서 확인합니다. 기본적으로 실행 전에 각 L2 instance 디렉터리를
+삭제하고 다시 생성합니다. 기존 L2 경로를 보존하려면 `--keep-l2`를 사용하며,
+이때 instance 디렉터리는 비어 있어야 합니다.
 
 동일 trace 복제는 storage backend의 aggregate 부하를 높이는 실험에는 적합하지만,
 동일 KV key가 반복될 수 있으므로 N개의 서로 다른 workload를 정확히 재현하는
