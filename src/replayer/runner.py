@@ -18,6 +18,12 @@ if TYPE_CHECKING:
 
 
 _PROGRESS_RE = re.compile(r"\[(\d+)/(\d+)\]\s+(?:OK|FAIL)\s+")
+_L2_PROGRESS_RE = re.compile(
+    r"L2 replay progress: elapsed=([0-9.]+)s dispatched=(\d+)/(\d+) "
+    r"completed=(\d+) pending=(\d+) "
+    r"in_flight\(store=(\d+) lookup=(\d+) load=(\d+)\) "
+    r"bytes_submitted=(\d+)"
+)
 
 
 def _progress_from_log_line(line: str) -> tuple[int, int] | None:
@@ -25,6 +31,36 @@ def _progress_from_log_line(line: str) -> tuple[int, int] | None:
     if match is None:
         return None
     return int(match.group(1)), int(match.group(2))
+
+
+def _l2_progress_from_log_line(
+    line: str,
+) -> tuple[float, int, int, int, int, int, int, int, int] | None:
+    match = _L2_PROGRESS_RE.search(line)
+    if match is None:
+        return None
+    (
+        elapsed,
+        dispatched,
+        total,
+        completed,
+        pending,
+        stores,
+        lookups,
+        loads,
+        raw_bytes,
+    ) = match.groups()
+    return (
+        float(elapsed),
+        int(dispatched),
+        int(total),
+        int(completed),
+        int(pending),
+        int(stores),
+        int(lookups),
+        int(loads),
+        int(raw_bytes),
+    )
 
 
 def build_command(config: ReplayerConfig, trace_path: str) -> list[str]:
@@ -128,36 +164,72 @@ def run_command(
             profiler.start()
             profiler_started = True
 
-        with log_path.open("w", encoding="utf-8") as log_file:
-            with subprocess.Popen(
+        if trace_level == "l2":
+            print(
+                f"[INFO] Starting L2 replay. LMCache log: {log_path}",
+                flush=True,
+            )
+
+        with (
+            log_path.open("w", encoding="utf-8") as log_file,
+            subprocess.Popen(
                 build_command(config, str(trace)),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-            ) as process:
-                assert process.stdout is not None
-                for line in process.stdout:
-                    log_file.write(line)
-                    log_file.flush()
-                    progress = _progress_from_log_line(line)
-                    if progress is None:
+            ) as process,
+        ):
+            assert process.stdout is not None
+            for line in process.stdout:
+                log_file.write(line)
+                log_file.flush()
+                if trace_level == "l2":
+                    l2_progress = _l2_progress_from_log_line(line)
+                    if l2_progress is None:
                         continue
-                    completed, total = progress
-                    now = time.monotonic()
-                    if completed < total and now - last_update_at < 0.5:
-                        continue
-                    elapsed = now - started_at
-                    percent = 100.0 * completed / total if total else 0.0
+                    (
+                        elapsed,
+                        dispatched,
+                        total,
+                        completed,
+                        pending,
+                        stores,
+                        lookups,
+                        loads,
+                        submitted_bytes,
+                    ) = l2_progress
+                    percent = 100.0 * dispatched / total if total else 100.0
+                    in_flight = stores + lookups + loads
                     print(
-                        f"\r[progress] records={completed}/{total} "
-                        f"({percent:.1f}%) elapsed={elapsed:.1f}s",
+                        f"\r[progress] L2 submitted={dispatched}/{total} "
+                        f"({percent:.1f}%) completed={completed} "
+                        f"pending={pending} in_flight={in_flight} "
+                        f"submitted_GiB={submitted_bytes / 1024**3:.2f} "
+                        f"elapsed={elapsed:.1f}s",
                         end="",
                         flush=True,
                     )
                     progress_seen = True
-                    last_update_at = now
-                return_code = process.wait()
+                    continue
+                progress = _progress_from_log_line(line)
+                if progress is None:
+                    continue
+                completed, total = progress
+                now = time.monotonic()
+                if completed < total and now - last_update_at < 0.5:
+                    continue
+                elapsed = now - started_at
+                percent = 100.0 * completed / total if total else 0.0
+                print(
+                    f"\r[progress] records={completed}/{total} "
+                    f"({percent:.1f}%) elapsed={elapsed:.1f}s",
+                    end="",
+                    flush=True,
+                )
+                progress_seen = True
+                last_update_at = now
+            return_code = process.wait()
     finally:
         if profiler is not None:
             try:
@@ -171,7 +243,7 @@ def run_command(
                         f"{output_dir / 'profile_summary.json'}",
                         flush=True,
                     )
-            except BaseException as exc:
+            except BaseException as exc:  # noqa: BLE001
                 profiler_error = exc
                 print(f"[ERROR] Profiler finalization failed: {exc}", flush=True)
 
