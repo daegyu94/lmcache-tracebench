@@ -5,6 +5,8 @@
 출력 구조를 독립적으로 관리합니다. `.lct` contract와 replay semantics의 상세 설명은
 [Replayer guide](../docs/replayer.md), recorder 설정은
 [Recorder guide](../docs/recorder.md)를 기준으로 합니다.
+처음 설치하는 환경에서 검증된 순서대로 실행하려면
+[L2 benchmark quickstart](../docs/benchmark-quickstart.md)를 먼저 참고하세요.
 
 ```text
 benchmarks/

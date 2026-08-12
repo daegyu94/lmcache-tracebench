@@ -181,6 +181,7 @@ WildClaw에서는 무시됩니다. 자세한 recorder output과 speed sweep은
 
 ## Guides
 
+- [L2 benchmark quickstart](docs/benchmark-quickstart.md): 새 replay host에서 설치, trace 다운로드, sweep과 결과 확인
 - [Recorder guide](docs/recorder.md): Tensormesh V3, Mooncake workload, GPU quota와 Recorder output
 - [Replayer guide](docs/replayer.md): trace 선택, replay backend와 profiling
 - [L2 tracing guide](docs/l2-tracing.md): StorageManager replay의 한계와 L2 causal replay contract
