@@ -35,15 +35,17 @@ _L2_IO_INTERVAL_COLUMNS = (
     "interval_end_seconds",
     "interval_seconds",
     "total_ops",
-    "total_bytes",
-    "total_gib_per_second",
+    "total_gb_bytes",
+    "total_gb_per_second",
     "read_ops",
-    "read_bytes",
-    "read_gib_per_second",
+    "read_gb_bytes",
+    "read_gb_per_second",
     "write_ops",
-    "write_bytes",
-    "write_gib_per_second",
+    "write_gb_bytes",
+    "write_gb_per_second",
 )
+_GB_BYTES = 1_000_000_000
+_GIB_TO_GB = 1024**3 / _GB_BYTES
 
 
 def _progress_from_log_line(line: str) -> tuple[int, int] | None:
@@ -128,8 +130,34 @@ def _append_l2_io_interval(
     path: Path,
     interval: tuple[float, float, int, int, float, int, int, float, int, int, float],
 ) -> None:
+    (
+        elapsed,
+        interval_seconds,
+        total_ops,
+        total_bytes,
+        total_gib_per_second,
+        read_ops,
+        read_bytes,
+        read_gib_per_second,
+        write_ops,
+        write_bytes,
+        write_gib_per_second,
+    ) = interval
+    row = (
+        round(elapsed),
+        round(interval_seconds),
+        total_ops,
+        f"{total_bytes / _GB_BYTES:.3f}",
+        f"{total_gib_per_second * _GIB_TO_GB:.3f}",
+        read_ops,
+        f"{read_bytes / _GB_BYTES:.3f}",
+        f"{read_gib_per_second * _GIB_TO_GB:.3f}",
+        write_ops,
+        f"{write_bytes / _GB_BYTES:.3f}",
+        f"{write_gib_per_second * _GIB_TO_GB:.3f}",
+    )
     with path.open("a", encoding="utf-8", newline="") as stream:
-        csv.writer(stream, delimiter="\t", lineterminator="\n").writerow(interval)
+        csv.writer(stream, delimiter="\t", lineterminator="\n").writerow(row)
 
 
 def _render_progress(message: str, previous_width: int) -> int:

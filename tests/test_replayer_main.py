@@ -318,10 +318,10 @@ def test_l2_replay_writes_interval_io_tsv(monkeypatch, tmp_path):
     rows = (output_dir / "l2_io_interval.tsv").read_text().splitlines()
     assert rows == [
         (
-            "interval_end_seconds\tinterval_seconds\ttotal_ops\ttotal_bytes\t"
-            "total_gib_per_second\tread_ops\tread_bytes\tread_gib_per_second\t"
-            "write_ops\twrite_bytes\twrite_gib_per_second"
+            "interval_end_seconds\tinterval_seconds\ttotal_ops\ttotal_gb_bytes\t"
+            "total_gb_per_second\tread_ops\tread_gb_bytes\tread_gb_per_second\t"
+            "write_ops\twrite_gb_bytes\twrite_gb_per_second"
         ),
-        "5.0\t5.0\t12\t1610612736\t0.3\t4\t536870912\t0.1\t8\t1073741824\t0.2",
-        "10.0\t5.0\t9\t805306368\t0.15\t3\t268435456\t0.05\t6\t536870912\t0.1",
+        "5\t5\t12\t1.611\t0.322\t4\t0.537\t0.107\t8\t1.074\t0.215",
+        "10\t5\t9\t0.805\t0.161\t3\t0.268\t0.054\t6\t0.537\t0.107",
     ]
