@@ -127,10 +127,12 @@ bash benchmarks/replayer/replay_speed_sweep.sh \
   --trace /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /mnt/nvme/lmcache-l2-replay/kvcache/wildclaw \
+  --output-root outputs/replay-l2/wildclaw \
   --speedups 1,2,4,8
 ```
 
-결과 root의 `sweep-summary.json`과 각 `x<SPEEDUP>/l2_replay_stats.json`을
+실제 결과 root는 `outputs/replay-l2/wildclaw-<UTC timestamp>/`가 됩니다.
+`$(date ...)`를 직접 붙일 필요가 없습니다. 결과 root의 `sweep-summary.json`과 각 `x<SPEEDUP>/l2_replay_stats.json`을
 확인합니다. Latency와 throughput 외에 `schedule_lag`, dependency/buffer wait와
 `drain_time`을 함께 비교하세요.
 

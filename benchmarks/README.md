@@ -36,8 +36,9 @@ benchmarks/
 - `replay_instances.sh`는 각 instance L2 path를 reset합니다.
 - 실행 전에 `--dry-run`으로 trace, config, L2 path, output path와 최종 command를
   확인합니다.
-- `--output-root`를 생략하면 launcher가 recorder output의 trace/workload 이름과 UTC timestamp를 사용해
-  `outputs/replay-l2/<trace-or-workload>-<UTC timestamp>/`를 자동 생성합니다.
+- Speedup sweep에서 `--output-root BASE`를 지정하면
+  `<BASE>-<UTC timestamp>/`를 자동 생성합니다. 생략하면 recorder output의 trace
+  이름을 base로 사용합니다. 이미 `-YYYYMMDD-HHMMSS`가 붙은 경로는 그대로 사용합니다.
 - `--l2-root`는 실제 storage mount를 가리키는 absolute path를 사용합니다.
   `--output-root`에는 JSON summary와 launcher log가 저장됩니다.
 
@@ -109,7 +110,7 @@ bash benchmarks/replayer/replay_speed_sweep.sh \
   --trace /path/to/workload/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /mnt/lmcache-replay/workload \
-  --output-root outputs/replay-speed-sweep/workload \
+  --output-root outputs/replay-l2/workload \
   --speedups 1,2,4,8
 ```
 
@@ -117,6 +118,9 @@ bash benchmarks/replayer/replay_speed_sweep.sh \
 `x<SPEEDUP>/` output directory를 사용합니다.
 단일 speedup만 확인할 때도 `--speedups 8`처럼 실행할 수 있습니다.
 float speedup도 지원하므로 `--speedups 1.0,1.5,2.0`처럼 지정할 수 있습니다.
+위 예시의 실제 output root는
+`outputs/replay-l2/workload-<UTC timestamp>/`입니다. Shell에서 `$(date ...)`를
+직접 붙일 필요가 없습니다.
 
 ### 3. Replay multiple workloads
 

@@ -126,11 +126,13 @@ bash benchmarks/replayer/replay_speed_sweep.sh \
   --trace outputs/speed-sweep/tensormesh-gaia-x1/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /MNTPNT/lmcache-trace-replay/speed-sweep \
-  --output-root outputs/replay/speed-sweep/gaia \
+  --output-root outputs/replay-l2/gaia \
   --speedups 1,2,5,10
 ```
-`--output-root`를 생략하면 recorder output인 trace parent 이름과 UTC timestamp를 사용한
-`outputs/replay-l2/<trace-name>-<UTC timestamp>/`가 자동 생성됩니다.
+`--output-root`는 base path이며 실제 root는
+`outputs/replay-l2/gaia-<UTC timestamp>/`가 됩니다. 옵션을 생략하면 recorder
+output인 trace parent 이름을 base로 사용합니다. 이미 `-YYYYMMDD-HHMMSS`가 붙은
+경로는 그대로 사용하므로 기존 command와도 호환됩니다.
 
 각 case의 결과와 LMCache 로그는 `output-root/x<SPEEDUP>/`에 저장되며, 전체 실행
 결과는 `sweep-summary.json`과 `sweep-results.jsonl`에 기록됩니다. `--profile`을
