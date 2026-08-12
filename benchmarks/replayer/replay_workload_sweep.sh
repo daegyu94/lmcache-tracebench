@@ -262,7 +262,7 @@ while IFS= read -r raw_workload; do
     --trace "$trace"
     --config "$config"
     --l2-root "$workload_l2_root"
-    --output-root "$workload_output_root"
+    --output-root-exact "$workload_output_root"
     --speedups "$speedups"
   )
   if [[ -n "$profile_config" ]]; then

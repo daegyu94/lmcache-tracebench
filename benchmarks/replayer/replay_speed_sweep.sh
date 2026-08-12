@@ -11,6 +11,7 @@ config=""
 l2_root=""
 output_root=""
 output_root_set=false
+output_root_exact=false
 speedups="1,2,5,10"
 profile_config=""
 dry_run=false
@@ -32,8 +33,8 @@ Required:
 
 Options:
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
-  --output-root PATH       Root for per-speedup output (default:
-                           outputs/replay-l2/<trace-name>-<UTC timestamp>)
+  --output-root PATH       Base path for per-speedup output; appends a UTC
+                           timestamp (default: outputs/replay-l2/<trace-name>)
   --profile PATH           Optional storage profiling configuration
   --keep-l2                Reuse L2 contents across cases; base must start empty
   --dry-run                Print every replay command without starting LMCache
@@ -41,7 +42,7 @@ Options:
 
 Examples:
   bash benchmarks/replayer/replay_speed_sweep.sh \
-    --trace outputs/speed-sweep/tensormesh-gaia-x1/storage.lct \
+    --trace outputs/speed-sweep/tensormesh-gaia-x1/l2.lct \
     --config configs/replayer/fs-native.yaml \
     --l2-root /MNTPNT/lmcache-trace-replay/speed-sweep \
     --output-root outputs/replay/speed-sweep/gaia \
@@ -87,6 +88,13 @@ while (($#)); do
       require_value "$@"
       output_root="$2"
       output_root_set=true
+      shift 2
+      ;;
+    --output-root-exact)
+      require_value "$@"
+      output_root="$2"
+      output_root_set=true
+      output_root_exact=true
       shift 2
       ;;
     --profile|--profile-config)
@@ -143,6 +151,8 @@ if [[ ! -f "$config" ]]; then
 fi
 if [[ "$output_root_set" == false ]]; then
   output_root="$(replay_default_output_root "$(replay_trace_label "$trace")")"
+elif [[ "$output_root_exact" == false ]]; then
+  output_root="$(replay_timestamped_output_root "$output_root")"
 fi
 
 mkdir -p -- "$output_root"

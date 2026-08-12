@@ -30,3 +30,26 @@ replay_default_output_root() {
   done
   printf '%s\n' "$candidate"
 }
+
+replay_timestamped_output_root() {
+  local requested_root="$1"
+  local timestamp
+  local base
+  local candidate
+  local suffix=1
+
+  # Preserve an explicitly timestamped path for backward compatibility.
+  if [[ "$requested_root" =~ -[0-9]{8}-[0-9]{6}(-[0-9]+)?$ ]]; then
+    printf '%s\n' "$requested_root"
+    return
+  fi
+
+  timestamp="$(date -u +%Y%m%d-%H%M%S)"
+  base="${requested_root}-${timestamp}"
+  candidate="$base"
+  while [[ -e "$candidate" ]]; do
+    candidate="${base}-${suffix}"
+    suffix=$((suffix + 1))
+  done
+  printf '%s\n' "$candidate"
+}

@@ -275,7 +275,7 @@ for spec in "${backend_specs[@]}"; do
         --trace "$trace"
         --config "$backend_config"
         --l2-root "$backend_l2_path"
-        --output-root "$backend_output_root"
+        --output-root-exact "$backend_output_root"
         --speedups "$speedups"
       )
       ;;
