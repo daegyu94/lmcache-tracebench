@@ -3,43 +3,29 @@
 설치 profile과 공통 경로 표기는 [README](../README.md)의
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
-## Storage trace contract
+## 왜 L2 trace를 사용하는가
 
-Recorder의 `--trace-level storage`는 L2 adapter의 low-level `get`/`put` system
-call이 아니라 LMCache `StorageManager`의 진입 시점과 인자를 기록합니다.
+처음에는 LMCache의 기존 StorageManager-level record/replay를 사용하려 했지만,
+이 방식은 replay-side에서 L1 reserve, lock, eviction과 async controller lifecycle을
+다시 계산합니다. Record와 replay 환경의 L1 상태나 backend 완료 timing이 다르면
+실제 L2 operation sequence도 달라져 backend 자체를 통제된 조건으로 비교할 수
+없습니다. 그래서 Tracebench는 LMCache `priv/dg/l2-tracing` branch에서 실제 adapter
+task를 기록한 `l2.lct`를 사용합니다.
 
-| 기록 API | 의미 |
-| --- | --- |
-| `reserve_write(keys, layout_desc, mode)` | KV chunk를 쓰기 위한 L1 object와 write lock을 예약 |
-| `finish_write(keys)` | Object write 완료를 알리고 store policy에 따라 비동기 L2 저장을 시작 |
-| `submit_prefetch_task(...)` | L1 miss object를 L2에서 가져오는 prefetch를 제출 |
-| `read_prefetched_results.__enter__/__exit__(keys)` | Prefetched object의 read lock lifecycle을 기록 |
-| `finish_read_prefetched(keys, extra_count)` | Prefetched object 사용 종료 후 read lock을 해제 |
-
-`.lct`는 length-prefixed MessagePack binary입니다. 각 record에는 relative
-monotonic timestamp, wall-clock timestamp, fully qualified API name과 직렬화된
-인자가 들어 있고, header에는 record 당시의 `StorageManagerConfig`와 config
-digest가 저장됩니다. Replay는 같은 key, object layout, API 순서와 호출
-간격으로 새 L2 backend에 write/read를 재현합니다.
-
-Storage trace에는 실제 KV payload, API 반환값·exception, record 환경의 API
-완료 시각·latency, L1/L2 hit·miss 결과, adapter 내부 queue wait·I/O 완료
-시각이 포함되지 않습니다. 따라서 `.lct`는 storage workload 재현 입력으로
-사용하고, L2 성능은 replay 중 adapter·backend에서 새로 측정해야 합니다.
+L2 방식이 필요한 이유와 정확한 event/dependency contract는
+[L2-level tracing](l2-tracing.md)을 authoritative reference로 사용합니다.
 
 ## L2 adapter trace
 
-기존 storage trace의 한계와 L2 replay의 dependency·prepare 설계는
-[L2-level tracing](l2-tracing.md)에서 설명합니다. 이 문서는 실행 옵션과 결과
-해석을 중심으로 다룹니다.
-
-Backend I/O 비교에는 recorder의 `--trace-kind l2`로 생성한 `l2.lct`를 사용할 수
-있습니다. 이 trace는 StorageManager lifecycle 대신 실제 adapter의
+Backend I/O 비교에는 recorder의 `--trace-kind l2`로 생성한 `l2.lct`를
+사용합니다. 이 trace는 StorageManager lifecycle 대신 실제 adapter의
 `store`, `lookup_and_lock`, `load`, `unlock`, `delete` task와 source completion
-결과를 기록합니다. KV payload는 포함하지 않고 object key, batch, byte size와
-lookup/load bitmap만 저장합니다.
-Replay는 trace 종료 marker가 없거나 recorder/EventBus drop count가 0이 아니면
-불완전한 입력으로 판단해 실행하지 않습니다.
+결과를 기록합니다. KV payload는 포함하지 않고 `cache_salt`를 포함한 완전한 object key, batch,
+byte size, aggregate store 결과와 lookup/load result index를 저장합니다.
+`cache_salt`가 없는 legacy trace는 빈 문자열로 읽지만, non-empty salt를 사용하는
+workload는 현재 branch에서 다시 record해야 namespace를 보존할 수 있습니다.
+Replay는 trace 종료 marker가 없거나 중복되거나 recorder/EventBus drop count가
+0이 아니면 불완전한 입력으로 판단해 실행하지 않습니다.
 
 L2 replay는 source lookup hit 중 선행 successful store가 없는 object만 dummy
 data로 먼저 저장한 뒤 측정을 시작합니다. Trace 안의 `store → read` object와 lookup
@@ -48,7 +34,7 @@ miss는 prepare하지 않습니다. Tracebench replayer가 이 prepare 단계를
 adapter를 직접 구동하므로 record/replay 환경의 L1 상태 차이로 인한
 `finish_write` 또는 `finish_read` warning은 발생하지 않습니다.
 
-Replay는 source의 실제 I/O mix를 유지하는 `causal exact` 방식입니다.
+Replay는 source L2 submission을 보존하는 causal, timestamp-scaled 방식입니다.
 `store → lookup → load → unlock` dependency만 target backend의 completion으로
 보장하고, 관계없는 task는 원본 제출 시각에 따라 계속 제출합니다. 현재는 source와
 target이 각각 하나의 L2 adapter인 trace만 지원합니다.
@@ -58,12 +44,10 @@ target이 각각 하나의 L2 adapter인 trace만 지원합니다.
 같은 prefix에 필요한 object만 대상으로 하고, `l2_replay_stats.json`에는
 `trace_percent`, 전체/선택 operation 수가 기록됩니다.
 
-`--speedup`은 workload나 GPU compute를 배속하지 않고, 이미 기록된 storage
-record의 monotonic timestamp offset만 나누는 scaled-open replay 옵션입니다.
-예를 들어 `--speedup 5`는 API 제출 schedule을 5배 압축하고, LMCache의
-비동기 L2 I/O가 그 제출률을 따라가지 못할 때 발생하는 contention과 miss를
-관찰하게 합니다. 실제 workload compute까지 바꾼 비교는 recorder speed sweep을
-사용하고, 동일 trace의 storage arrival-rate 실험은 이 옵션을 사용합니다.
+`--speedup`은 workload나 GPU compute를 배속하지 않고 기록된 submission 간격만
+압축하는 scaled-open replay 옵션입니다. 예를 들어 `--speedup 5`는 L2 task 목표
+제출 schedule을 5배 압축합니다. 실제 workload compute까지 바꾼 비교는 recorder
+speed sweep을 사용하고, 동일 L2 trace의 arrival-rate 실험은 이 옵션을 사용합니다.
 
 L2 trace에서도 `--speedup`은 I/O latency가 아니라 목표 제출 시각만 압축합니다.
 Backend가 요청률을 감당하지 못하면 dependency wait, buffer wait, schedule lag와
@@ -73,13 +57,14 @@ schedule lag, drain time과 throughput을 함께 비교해야 합니다.
 
 ### How timestamp scaling works
 
-각 record의 `t_mono`는 trace 시작 후 해당 API가 호출된 시각을 초 단위 offset으로
-저장합니다. Replay는 `.lct` 안의 `t_mono`나 wall-clock `t_wall` 값을 다시 쓰지
-않고, 실행 중 각 record의 목표 제출 시각을 다음처럼 계산합니다.
+L2 replay는 선택된 첫 submission을 시간 원점으로 정규화합니다. `.lct`의
+`t_mono`와 `t_wall` 자체는 바꾸지 않고 각 operation의 목표 제출 시각을 다음처럼
+계산합니다.
 
 ```text
-target_i = replay_start_monotonic + record_i.t_mono / speedup
-sleep_i  = max(0, target_i - current_monotonic)
+schedule_origin = first_selected_op.t_mono
+target_i = replay_start + (record_i.t_mono - schedule_origin) / speedup
+earliest_submit_i = max(target_i, dependency_completion_time)
 ```
 
 예를 들어 원본 trace에 다음 timestamp가 기록되어 있다고 가정합니다.
@@ -91,28 +76,26 @@ sleep_i  = max(0, target_i - current_monotonic)
 | C | 5.0 s | 3.0 s | 1.0 s | 0.6 s |
 | D | 11.0 s | 6.0 s | 2.2 s | 1.2 s |
 
-즉 trace 시작 후 11초에 제출됐던 D는 replay 시작 후 2.2초가 목표가 되고,
+즉 첫 선택 operation으로부터 11초 뒤 제출됐던 D는 replay 시작 후 2.2초가
+목표가 되고,
 모든 record 사이의 간격도 5분의 1로 줄어듭니다. 이는 timestamp 필드를
 `0.0, 0.4, 1.0, 2.2`로 수정한 새 trace를 만드는 것이 아니라, 원본 offset을
 나눈 값으로 현재 replay process의 `time.monotonic()` 기준 sleep 시간을 정하는
 방식입니다.
 
-목표 시각은 직전 record 기준이 아니라 replay 시작 시각 기준으로 매번 계산합니다.
+목표 시각은 직전 record 기준이 아니라 정규화한 replay 시작 시각 기준으로 매번
+계산합니다.
 따라서 C dispatch가 느려져 다음 record의 목표 시각을 이미 지난 경우에는 추가로
-sleep하지 않고 D를 바로 dispatch합니다. 이때 뒤처진 시간을 되돌리기 위해 API를
-병렬 호출하거나 record를 건너뛰지는 않으며, 원래 순서를 유지한 채 가능한 한
-scaled schedule을 따라갑니다. 마지막 record dispatch 뒤에는 speedup과 별개로
-비동기 Store/Prefetch 작업이 idle 상태가 될 때까지 drain을 기다립니다.
+sleep하지 않고 D를 바로 dispatch합니다. 이때 뒤처진 시간을 되돌리기 위해 operation을 건너뛰지 않으며, dependency가 없는
+task는 가능한 한 scaled schedule을 따라 제출합니다. 마지막 submission 뒤에는
+speedup과 별개로 in-flight store, lookup과 load task가 끝날 때까지 drain합니다.
 
 ## Replay
 
-Replayer는 저장된 `.lct`를 LMCache `trace replay` 명령으로 한 번 실행합니다.
-공용 `base.yaml`을 상속하는 `fs-native.yaml` 또는 `nixl-hf3fs.yaml`을 선택합니다.
-각 storage record는 trace의 monotonic timestamp 간격에 맞춰 재생되며, replay host가
-더 느리면 원래 schedule보다 뒤처진 상태로 계속 진행합니다.
-`--speedup`이 1보다 크면 이 timestamp 간격만 축소되며, replay 자체는 여전히
-single-threaded API dispatch와 비동기 StorageManager/L2 controller를 사용합니다.
-`l2.lct`는 header에서 자동 감지되어 direct causal L2 replay를 사용합니다.
+Replayer는 저장된 `l2.lct`를 LMCache `trace replay` 명령으로 한 번 실행합니다.
+공용 `base.yaml`을 상속하는 `fs-native.yaml` 또는 `nixl-hf3fs.yaml`을 선택하고,
+아래처럼 L2 trace를 지정합니다.
+Replay host가 목표 schedule보다 느리면 schedule lag와 drain time에 반영됩니다.
 
 ```bash
 python -m replayer.main \
@@ -127,40 +110,42 @@ python -m replayer.main \
 실행 중에는 터미널에 record 진행률을 표시하며, LMCache 원문 로그는
 `output_dir/lmcache-replay.log`에 저장됩니다. `--l2-path`는 `fs_native`의
 `l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
-`--output-dir`는 summary, operation CSV와 로그를 저장할 디렉터리를 덮어씁니다.
+`--output-dir`는 L2 prepare manifest, replay 통계와 로그를 저장할 디렉터리를
+덮어씁니다.
 
 ## Replay speedup sweep
 
 이미 기록된 하나의 `.lct`에 여러 `--speedup` 값을 적용해 storage arrival-rate를
 비교하려면 `benchmarks/replayer/replay_speed_sweep.sh`를 사용합니다. 이 스크립트는
-speedup별로 replay를 순차 실행하고, 각 case에 독립적인 L2 경로와 output 디렉터리를
-사용합니다. 따라서 한 case의 warm cache가 다음 speedup에 영향을 주지 않습니다.
+speedup별로 replay를 순차 실행하고, 각 case 전에 같은 L2 base path를 삭제한 뒤 다시
+만듭니다. 결과 output 디렉터리는 case별로 분리되므로 한 case의 warm cache와 결과가
+다음 speedup에 영향을 주지 않습니다.
 
 ```bash
 bash benchmarks/replayer/replay_speed_sweep.sh \
-  --trace outputs/speed-sweep/tensormesh-gaia-x1/storage.lct \
+  --trace outputs/speed-sweep/tensormesh-gaia-x1/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /MNTPNT/lmcache-trace-replay/speed-sweep \
   --output-root outputs/replay/speed-sweep/gaia \
   --speedups 1,2,5,10
 ```
-`--output-root`를 생략하면 trace parent 이름과 UTC timestamp를 사용한
+`--output-root`를 생략하면 recorder output인 trace parent 이름과 UTC timestamp를 사용한
 `outputs/replay-l2/<trace-name>-<UTC timestamp>/`가 자동 생성됩니다.
 
 각 case의 결과와 LMCache 로그는 `output-root/x<SPEEDUP>/`에 저장되며, 전체 실행
 결과는 `sweep-summary.json`과 `sweep-results.jsonl`에 기록됩니다. `--profile`을
-추가하면 speedup별 storage node profiling도 함께 실행합니다. 기존 case 경로가
-기본적으로 실행 전에 삭제되고 다시 생성되어 base path의 기존 데이터를 reset합니다.
-따라서 같은 `l2-root`를 재사용해도 이전 warm-cache가 남지 않습니다. 실행 전 command만
-확인하는 `--dry-run`에서는 삭제하지 않습니다. L2 case path를 보존하려면
-`--keep-l2`를 사용하며, 이때 기존 L2 case path는 비어 있어야 합니다. 기존 replay
+추가하면 speedup별 storage node profiling도 함께 실행합니다. 같은 `l2-root` base
+path가 각 case 직전에 삭제되고 다시 생성됩니다. 따라서 speedup별 L2 하위 경로를
+따로 만들 필요가 없고, 이전 case의 warm cache도 남지 않습니다. `--dry-run`에서는
+삭제하지 않습니다. `--keep-l2`를 사용하면 L2 contents를 case 사이에도 재사용하며,
+base path는 실행 시작 시 비어 있어야 합니다. 기존 replay
 결과를 보호하기 위해 `output-root/x<SPEEDUP>/`는 계속 비어 있어야 합니다.
 
 ## Replay workload sweep
 
 여러 workload trace에 동일한 speedup sweep을 적용하려면
 `benchmarks/replayer/replay_workload_sweep.sh`를 사용합니다. trace root 아래에
-`<WORKLOAD>/storage.lct` 구조가 있어야 하며, workload별로 L2와 output 경로를
+`<WORKLOAD>/l2.lct` 구조가 있어야 하며, workload별로 L2와 output 경로를
 분리합니다.
 
 ```bash
@@ -179,8 +164,9 @@ bash benchmarks/replayer/replay_workload_sweep.sh \
 상위 launcher 로그와 workload별 결과는 각각 `workload-sweep.log`,
 `workload-summary.json`, `workload-results.jsonl`에 기록됩니다. 한 workload가
 실패해도 나머지 workload를 계속 실행하며, 마지막에 전체 exit code로 실패를 알립니다.
-L2 case path는 speedup sweep 시작 전에 기본적으로 reset되므로 같은 L2 root를
-재사용할 수 있습니다. 기존 결과를 덮어쓰지 않도록 output root는 새 경로를 사용하세요.
+각 workload의 speedup sweep은 같은 L2 base를 case 직전에 reset하므로 workload별
+speedup 하위 경로를 따로 만들 필요가 없습니다. 기존 결과를 덮어쓰지 않도록
+output root는 새 경로를 사용하세요.
 
 ## Parallel replicated replay
 
@@ -193,7 +179,7 @@ subdirectory와 output directory를 사용하지만, 같은 physical storage를 
 ```bash
 bash benchmarks/replayer/replay_instances.sh \
   --instances 8 \
-  --trace outputs/speed-sweep/tensormesh-gaia-x5/storage.lct \
+  --trace outputs/speed-sweep/tensormesh-gaia-x5/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /MNTPNT/lmcache-trace-replay \
   --output-root outputs/replay/gaia-x5-n8
@@ -204,7 +190,7 @@ bash benchmarks/replayer/replay_instances.sh \
 ```bash
 bash benchmarks/replayer/replay_instances.sh \
   --instances 4 \
-  --trace path/to/storage.lct \
+  --trace path/to/l2.lct \
   --config configs/replayer/fs-native.yaml \
   --l2-root /MNTPNT/lmcache-trace-replay \
   --dry-run
@@ -227,9 +213,9 @@ replayer 노드의 network locality를 그대로 재현하지는 않습니다. �
 
 ## Backend configuration
 
-Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config의 adapter로
-새 `StorageManager`를 만듭니다. 따라서 로컬 SSD의 `fs_native`로 record한 trace를
-pNFS mount나 NIXL/HF3FS에 재생할 수 있습니다.
+Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config로 target L2
+adapter를 생성합니다. 따라서 로컬 SSD의 `fs_native`로 record한 trace를 pNFS
+mount나 NIXL/HF3FS에 재생할 수 있습니다.
 
 pNFS가 `/MNTPNT`에 mount되어 있다면 `configs/replayer/fs-native.yaml`의
 `base_path`를 mount 아래 경로로 지정합니다. LMCache에서는 `fs_native`이지만 실제
@@ -264,16 +250,16 @@ LMCache version을 사용해야 합니다.
 
 Replay 계측은 두 계층으로 구분합니다.
 
-1. **L2 operation profiling**은 LMCache adapter/controller에서 `get`, `put`의
-   queue wait, I/O 시작·완료, object 크기와 latency를 수집합니다.
+1. **L2 replay 통계**는 target adapter에 store/load task를 제출한 시점부터 완료를
+   관측한 시점까지의 latency를 `l2_replay_stats.json`에 기록합니다. Read/write별
+   submitted/completed, bytes, average, p50/p90/p99/min/max latency와 aggregate
+   throughput을 adapter별로 제공합니다. 단위는 microseconds입니다.
 2. **Node profiling**은 Linux sysfs counter로 storage node의 block device와 network
    처리량을 수집합니다. Tracebench의 `--profile`이 제공하는 기능입니다.
 
-Replay dispatcher가 기록하는 API latency는 `StorageManager` API를 호출하는
-동기 구간입니다. `finish_write` 후 L2 store와 `submit_prefetch_task` 후
-retrieve는 비동기로 진행될 수 있으므로 API latency를 backend I/O latency로
-해석하지 않습니다. L2 성능 비교에는 adapter/controller의 queue wait, service
-time, byte 수, throughput과 p50/p90/p99 latency를 함께 수집하세요.
+`storage` trace의 per-API latency는 backend I/O latency가 아닙니다. Backend 비교에는
+`l2` trace의 direct task latency와 top-level replay timing, node profile을 함께
+사용하세요. Preparation I/O는 measured replay 통계와 node profile에서 제외됩니다.
 
 Node profiler의 기본 설정은 `configs/profiling/storage.yaml`입니다.
 

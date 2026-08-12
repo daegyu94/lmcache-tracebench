@@ -1,401 +1,299 @@
-# LMCache record/replay와 L2-level tracing
+# [구현 명세] L2 어댑터 수준의 trace 기록 및 causal replay
 
-이 문서는 기존 LMCache storage trace가 무엇을 재현하는지, 왜 서로 다른
-record/replay 환경에서 L1 lifecycle이 어긋날 수 있는지, 그리고 backend I/O
-비교를 위해 도입한 L2-level trace가 어떤 경계와 의미론을 갖는지를 설명합니다.
+## 상태
 
-실행 방법과 config 옵션은 [Recorder guide](recorder.md)와
-[Replayer guide](replayer.md)를 authoritative reference로 사용합니다.
+`implemented`
 
-## 1. 결론
+## 기준 버전
 
-기존 `storage` trace는 LMCache `StorageManager`의 public API workload를
-재현합니다. 따라서 L1 eviction, lock, hit/miss, 비동기 controller의 상태가
-replay 환경에서 record 환경과 달라질 수 있습니다. `skip_l1`과 L1 capacity를
-같게 설정해도 이 동적 상태까지 같아지는 것은 아닙니다.
+이 문서는 LMCache `v0.5.3` 태그 이후 7개 커밋이 추가된 현재 브랜치 `priv/dg/l2-tracing`의 구현을 기준으로 합니다.
+정확한 기준 커밋은 `68551f01` (`feat(trace-replay): report L2 operation latency`)이며, `git describe` 기준 버전은 `v0.5.3-7-g68551f01`입니다.
+따라서 LMCache `v0.5.3` 릴리스 자체와는 L2 trace/replay 동작이 다를 수 있습니다.
 
-이 trace를 사용해 pNFS, 3FS, local filesystem 같은 backend의 I/O를 비교하면
-backend 차이와 L1 상태 차이가 결과에 섞일 수 있습니다. 특히 다음과 같은
-warning이 발생할 수 있습니다.
+## 먼저 읽기
+
+이 문서는 L2 backend의 동작을 기록하고 다른 backend에서 같은 요청 순서를 재생하는 방법을 설명합니다.
+원본 KV 데이터나 source의 L1 상태를 복사하는 문서가 아닙니다. Tracebench의
+실행 wrapper와 결과 경로는 [Recorder guide](recorder.md)와
+[Replayer guide](replayer.md)를 참고하세요.
+
+### 한눈에 보기
+
+1. **Record:** source에서 L2 adapter 요청을 `l2.lct`에 기록합니다.
+2. **Replay:** trace의 요청을 target L2 adapter 하나에 직접 제출합니다.
+3. **Measure:** 제출 시간, 대기 시간, store/load task latency, byte throughput 및 outcome 차이를 JSON으로 확인합니다.
+4. **판정:** outcome mismatch는 metric/warning으로 남고, trace 구조 오류는 replay를 중단합니다.
 
 ```text
-finish write on non-write-locked key
-finish read on non-existing key
+source process
+      |
+      v
+  l2.lct trace
+      |
+      v
+target L2 adapter  --->  l2_replay_stats.json
 ```
 
-따라서 목적을 분리합니다.
+### 용어
 
-| 측정 목적 | 사용할 trace | 재현하는 것 |
-| --- | --- | --- |
-| serving/L1 동작과 StorageManager lifecycle | `storage.lct` | `reserve_*`, `finish_*`, prefetch 호출과 L1 상태 전이의 workload |
-| L2 backend I/O와 storage-node 자원 사용량 | `l2.lct` | L2 adapter task, key reuse, batch/byte size, 제출·완료 event와 replay에서 파생한 dependency |
+- **Source:** trace를 생성한 원래 실행 환경입니다.
+- **Target:** trace를 재생하면서 성능을 측정할 L2 adapter입니다.
+- **Submission:** adapter task를 제출한 시점입니다.
+- **Completion:** store/lookup/load task의 완료와 결과가 기록된 시점입니다.
+- **Dependency:** 앞선 task가 끝나야 다음 task를 제출할 수 있는 causal 관계입니다.
 
-`l2.lct`는 L1을 재현하지 않는다는 뜻이 아니라, **L1을 workload 생성기의
-원인으로 사용하고 backend 비교 시에는 L2 adapter 경계에서 다시 시작한다**는
-뜻입니다.
+### 빠른 시작
 
-## 2. 기존 LMCache storage record/replay
+1. 기록할 때 L2 trace level과 출력 파일을 지정합니다.
 
-### 2.1 기록 경계
+   ```bash
+   lmcache server --trace-level l2 --trace-output l2.lct
+   ```
 
-기존 `--trace-kind storage`는 low-level filesystem `read`/`write` 또는
-syscall을 기록하지 않습니다. `StorageManager` public API의 진입 시점과 인자를
-기록합니다.
+2. target adapter를 설정하고, source에만 존재한 read object가 있다면 함께
+   준비하면서 trace를 재생합니다.
 
-대표적인 record는 다음과 같습니다.
+   ```bash
+   lmcache trace replay l2.lct --prepare-l2 --l2-adapter '{...}' --speedup 4
+   ```
 
-| API | 역할 |
-| --- | --- |
-| `reserve_write(keys, layout_desc, mode)` | L1 object와 write lock 예약 |
-| `finish_write(keys)` | L1 write 완료 및 비동기 L2 store 시작 |
-| `submit_prefetch_task(...)` | L1 miss object의 L2 prefetch 제출 |
-| `read_prefetched_results.__enter__/__exit__(keys)` | prefetch 결과의 read-lock lifecycle |
-| `finish_read_prefetched(keys, extra_count)` | read access 종료 및 lock 해제 |
+옵션은 다음처럼 이해하면 됩니다.
 
-각 `.lct` record에는 대략 다음 정보가 있습니다.
+- `--speedup 4`: trace의 timestamp 간격을 4배 빠르게 재생합니다.
+- `--trace-percent 10`: 전체 L2 submission 중 앞의 10%만 재생합니다.
+- `--prepare-l2`: source에만 존재하던 read object를 synthetic object로 측정 전에 준비합니다. 필요하지 않다면 생략할 수 있습니다.
+- `--prepare-only`: target 준비와 manifest 기록만 수행하고 측정 replay는 실행하지 않습니다.
 
-- trace 시작 기준의 relative monotonic timestamp
-- wall-clock timestamp
-- fully-qualified API name
-- codec으로 직렬화한 입력 인자
-- record 시점의 `StorageManagerConfig`와 config digest
+이후의 세부 섹션은 trace event, dependency, 초기 object 준비, outcome metric의 정확한 동작을 설명합니다.
 
-Recorder는 API **진입 시점**에 event를 발행합니다. API의 반환값, exception,
-완료 시각은 record에 포함되지 않습니다. EventBus가 concurrent producer의
-event를 파일에 선형화하므로 replay는 그 파일 순서를 사용하지만, 원본
-thread/request identity나 내부 worker의 실행 순서를 복원하지는 않습니다.
+## 문제와 목적
 
-### 2.2 replay 동작
+Tracebench는 처음에 LMCache의 기존 StorageManager-level record/replay를 사용하려 했습니다.
+이 방식은 replay 환경에서 L1 reserve, lock, eviction, store, prefetch lifecycle을 재구성하므로, 기록 환경과 replay 환경의 L1 상태가 다르면 실제 L2 I/O 요청도 달라질 수 있습니다.
 
-Replay는 trace header의 config를 그대로 복원하지 않고 replay-side config로
-새 `StorageManager`를 생성합니다. 이후 record를 파일 순서대로 single-threaded
-dispatch하고, 각 record의 `t_mono / speedup`을 목표 제출 시각으로 사용합니다.
+이 동작은 `StorageManager`와 L1 semantics를 평가할 때는 유용하지만, 각 backend에 기록 당시와 동일한 L2 adapter operation sequence를 전달해야 하는 통제된 비교 목적은 충족하지 못했습니다.
+따라서 LMCache `priv/dg/l2-tracing` branch에 adapter-level record/replay를 패치하고, Tracebench는 이 branch에서 생성한 `l2.lct`를 사용합니다.
+
+## 구현 범위
+
+실제 adapter task submission과 completion result를 기록하고, 기록된 task를 target L2 adapter에 직접 제출하는 L2 adapter-level trace mode를 구현합니다.
+이 모드의 목적은 L2 backend 동작을 분리하여 평가하는 것이며, source의 L1 상태를 재현하거나 평가하지 않습니다.
+
+구현된 record/replay 경계는 다음과 같습니다.
 
 ```text
-target_i = replay_start + record_i.t_mono / speedup
+vLLM -> StorageManager/L1 -> async controller -> L2 adapter -> backend
+                                             ^ record/replay boundary
 ```
 
-`finish_write` 뒤의 L2 store와 `submit_prefetch_task` 뒤의 load는 비동기입니다.
-따라서 API dispatch가 끝났다는 것과 L2 I/O가 끝났다는 것은 서로 다른 사건입니다.
-Replay는 마지막 record 뒤에 async store/prefetch drain을 기다리지만, 각 record
-사이에 모든 L2 I/O가 완료되기를 기다리지는 않습니다.
+trace level 선택과 기본 실행 명령은 위의 `빠른 시작`을 참고합니다.
 
-## 3. 기존 trace의 한계
+### Event 및 metadata
 
-### 3.1 입력만 기록하므로 결과가 달라진다
+`L2TraceRecorder`는 실제 adapter operation의 submission 및 completion event를 기록합니다.
 
-`reserve_write`는 실행 환경의 L1 상태에 따라 성공한 key의 subset을 반환할 수
-있습니다. 하지만 trace에는 반환값이 없고 `finish_write(keys)`의 입력만 남습니다.
-다음과 같은 차이가 생깁니다.
+submission event는 다음 operation에 대해 기록됩니다.
+
+- store
+- lookup-and-lock
+- load
+- unlock
+- delete
+
+Completion event는 store, lookup-and-lock, load에 대해서만 기록합니다.
+Store completion은 batch 전체의 aggregate `succeeded_count`, `failed_count` 및 `bytes_transferred`를 기록하며, per-object store 성공/실패 index는
+기록하지 않습니다.
+`key_count_per_salt`는 store submission과 성공한 store completion에 포함되는 보조 metadata입니다.
+Lookup completion은 `hit_indices`, load completion은 `success_indices`를 기록합니다.
+Unlock과 delete는 submitted event만 기록하고 completion/result는 기록하지 않습니다.
+두 operation은 replay에서 제출 횟수만 집계합니다.
+
+Workload shape을 재현하고 dependency를 도출하는 정보는 다음과 같이 기록합니다.
+
+- trace 시작 시점 기준의 monotonic submission 및 completion timestamp
+- submission/completion의 adapter ID 및 task ID(해당 operation에 존재하는 경우)
+- lookup/load/unlock을 연결하기 위한 request ID
+- `cache_salt`를 포함한 완전한 object-key identity
+- key list, object byte size 및 lookup layout metadata
+- store completion의 aggregate 성공/실패 개수 및 전송 byte 수
+- lookup의 `hit_indices` 및 load의 `success_indices`
+- unlock/delete의 submitted event와 key 목록(별도 completion/result 없음)
+
+L2 trace는 원본 KV payload를 기록하지 않으므로, 기록된 object size에 맞는 replay buffer를 사용해야 합니다.
+
+#### `cache_salt` 보존
+
+`cache_salt`는 별도의 trace-wide 값이 아니라 각 `ObjectKey` identity의 일부로 기록합니다.
+따라서 store, lookup, load, unlock 및 delete의 `keys`에 포함된 모든 `ObjectKey`는 `cache_salt`까지 직렬화하며,
+replay와 초기 read object 준비에서도 복원된 key를 변경 없이 target adapter에 전달합니다.
+나머지 필드가 같더라도 `cache_salt`가 다른 object는 서로 다른 key이므로 dependency 도출과 준비 object 분류에서도
+합쳐져서는 안 됩니다.
+
+`cache_salt` 필드가 없는 기존 trace는 하위 호환을 위해 빈 문자열(`""`)로 해석합니다.
+다만 기존 trace에서 원래 salt를 복구할 수는 없으므로, `cache_salt`를 사용하는 workload는 이 필드를 지원하는 버전으로 새로 기록해야 tenant isolation을 보존할 수 있습니다.
+
+Trace 마지막에는 recorder 및 event queue의 drop count를 포함하는 completeness marker가 있어야 합니다.
+Marker가 없거나 중복 marker가 있거나 drop count가 0이 아니면 replay를 거부합니다.
+L2 plan은 trace header가 `level="l2"`인지와 source의 store/lookup/load task가 둘 이상의 adapter를 사용하지 않는지도 확인하며, replay target에는 정확히 하나의 adapter가 있어야 합니다.
+
+### 초기 read object 준비
+
+Read object는 모두 미리 만들어 두지 않습니다. 각 object의 첫 lookup 결과와 trace에 기록된 store 시점을 보고 다음처럼 처리합니다.
+
+1. **Lookup 전에 store가 끝난 hit**
+
+   Source에서 lookup이 hit였고, 같은 object를 저장한 store가 lookup 제출 전에 끝났다면, replay lookup이 그 store를 기다리도록 합니다.
+   따라서 object를 미리 만들지 않고, replay에서 store를 먼저 실행합니다.
+
+2. **Lookup 중에 store가 끝난 hit**
+
+   Store가 lookup 제출 후, lookup 완료 전에 끝났다면 source에서도 두 작업이 겹쳐 실행된 것입니다. |
+   이 겹침을 재현하기 위해 lookup에 store dependency를 추가하지 않으며, object도 미리 만들지 않습니다.
+
+3. **Trace 시작 전부터 있었던 것으로 보이는 hit**
+
+   Lookup은 hit였지만 lookup이 끝나기 전까지 해당 object를 성공적으로 저장한 store completion이 trace에 없다면, object가 trace 시작 전에 이미 존재했다고
+   봅니다.
+   이 경우 측정 전에 같은 key와 byte size의 synthetic object를 target에 저장합니다.
+   원본 KV payload를 복사하는 것은 아닙니다.
+   Lookup에는 trace의 layout metadata를 사용하지만, preparation store는 byte-size replay buffer로 수행합니다.
+
+4. **Lookup miss**
+
+   Source에서 miss였던 object는 미리 만들지 않습니다.
+
+Store completion은 batch 전체의 성공 개수만 기록하고 object별 성공 여부는 기록하지 않습니다.
+따라서 `succeeded_count > 0`인 store task는 그 task의 모든 key가 성공했을 가능성이 있는 것으로 취급합니다.
+한 batch에서 일부 key만 성공했는지는 trace만으로 알 수 없습니다.
+
+준비 I/O는 측정 replay 전에 끝내며 replay 통계에는 포함하지 않습니다.
+현재 L2 replay CLI는 별도의 storage-node profiling을 수행하지 않습니다.
+
+### Causal, timestamp-scaled replay
+
+Replay는 기록된 key 및 request lifecycle을 보존하는 데 필요한 dependency만 기다려야 합니다.
+모든 task 뒤에 global completion barrier를 두어서는 안됩니다.
 
 ```text
-Record                              Replay
-------                              ------
-key가 없음                          key가 이미 L1에 있음
-reserve_write(A, mode="new") 성공  reserve_write(A, mode="new") 실패
-write-lock 획득                     write-lock 없음
-finish_write(A) 성공                finish_write(A) 호출
-                                    warning: non-write-locked key
+store(A) -------- completes
+                  `-> lookup(A) -> load(A) -> unlock(A)
+
+store(B) ---------------- completes    # independent; continues concurrently
+lookup(C) ---- completes               # independent; continues concurrently
 ```
 
-이것은 API 순서가 `finish_write` 먼저 도착한 것이 아닙니다. API 순서는 같지만
-첫 번째 호출의 결과와 L1 상태가 달라진 것입니다.
+Dependency는 source에서 실제로 필요했던 순서를 replay에서도 지키기 위한 최소한의 연결입니다.
+핵심은 **store가 lookup보다 먼저 끝났는지**, 아니면 **lookup이 진행 중일 때 store가 끝났는지**를 구분하는 것입니다.
 
-### 3.2 한 번의 차이가 뒤의 workload를 바꾼다
+### Store와 lookup의 관계
 
-예를 들어 L1 capacity가 A와 B 두 object 정도이고, trace가 다음과 같다고
-가정합니다.
+#### Store가 lookup보다 먼저 끝난 경우
 
 ```text
-reserve(A) → finish(A)
-reserve(B) → finish(B)
-reserve(C) → finish(C)
-reserve(A) → finish(A)
+Source
+time ──────────────────────────────────────────────>
+      store(A) 제출 ── store(A) 완료 ── lookup(A) 제출 ── lookup(A) 완료
+                                      └──── source hit
+
+Replay
+      store(A) 제출 ── store(A) 완료 ── lookup(A) 제출
+                                      └──── dependency
 ```
 
-Record에서는 C를 넣을 때 A가 eviction되어 마지막 `reserve(A)`가 성공할 수
-있습니다. Replay에서는 비동기 처리 시점이 달라 B가 eviction되고 A가 남을 수
-있습니다. 그러면 마지막 `reserve(A, mode="new")`가 실패하고, 뒤의
-`finish(A)`도 write-lock 없이 실행됩니다.
+Source lookup이 hit이고, lookup completion 전에 완료된 successful store가 있다면 후보로 수집합니다.
+그중 lookup submission보다 먼저 완료된 store가 있을 때는 가장 최근 store를 선택합니다.
+Replay lookup은 이 store의 target completion을 기다린 뒤 제출합니다.
 
-그 결과는 단일 warning으로 끝나지 않을 수 있습니다.
+#### Lookup 중에 store가 끝난 경우
 
 ```text
-eviction 대상 차이
-  → reserve 결과 차이
-  → finish_write 실패
-  → 해당 key의 L2 store 미제출
-  → 후속 prefetch hit/miss 차이
-  → L1 resident set 차이 확대
-  → 다음 reserve/finish/read lifecycle 추가 실패
+Source
+time ──────────────────────────────────────────────>
+      store(A) 제출 ── lookup(A) 제출 ── store(A) 완료 ── lookup(A) 완료
+                       └──── 두 작업이 겹쳐 실행됨
+
+Replay
+      store(A) 제출 ── lookup(A) 제출
+                       └──── store 완료를 기다리지 않음
 ```
 
-`finish_write`에서 성공한 key만 L2 StoreController로 전달되므로 실패한 key의
-L2 write가 자동으로 보상되지는 않습니다. `finish_read`는 반대로 기존 read lock을
-해제하는 단계이므로, key가 없을 때 warning이 나더라도 그 호출 자체가 새로운
-L2 read를 발생시키지는 않습니다. L2 read는 앞선 prefetch/lookup 단계에서 이미
-제출되었거나 제출되지 않은 상태입니다.
+Store가 lookup submission 뒤, lookup completion 전에 완료되었다면 source의 동시성을 보존하기 위해 lookup에 store dependency를 추가하지 않습니다.
+Replay lookup은 timestamp schedule에 도달하면 store completion을 기다리지 않고 제출합니다.
 
-### 3.3 같은 `skip_l1`과 L1 size로도 해결되지 않는 이유
-
-`skip_l1`은 L2 store policy입니다. L1 object 예약, lock, eviction과
-`StorageManager` API lifecycle을 없애지 않습니다. L1 capacity와 policy를 같게
-맞추면 정적 조건은 같아지지만 다음 동적 조건은 여전히 달라질 수 있습니다.
-
-- 시작 시 L1/L2가 비어 있는지와 warm state
-- L2 lookup/load/store 완료 시각
-- async queue의 backlog와 worker scheduling
-- host, CPU, filesystem, network backend의 처리 속도
-- API 입력만 있고 반환값·exception·payload가 없다는 trace contract
-
-또한 `speedup`은 GPU workload나 I/O latency를 배속하지 않고 API 제출 timestamp
-간격만 압축합니다. 원본보다 높은 제출률에서는 queue contention과 state
-divergence가 더 빨리 나타날 수 있습니다.
-
-그러므로 storage trace는 “원본과 같은 L1 결과를 보장하는 deterministic replay”가
-아니라 “StorageManager-level storage workload replay”로 해석해야 합니다.
-
-## 4. 왜 L2-level trace가 필요한가
-
-이 프로젝트의 backend 실험 목표는 L1 정책 자체가 아니라 다음을 비교하는
-것입니다.
-
-- pNFS, 3FS, local filesystem 등의 aggregate replay time과 throughput
-- backend가 처리하는 read/write byte 및 batch shape
-- storage node의 SSD와 network bandwidth 사용량
-- 요청률을 높였을 때 queueing, contention, drain이 어떻게 변하는지
-
-이 목적에서는 record 환경의 L1 hit/miss가 replay 환경의 L1 hit/miss로 다시
-계산되도록 둘 필요가 없습니다. 오히려 L1 controller를 통과하면서 달라진
-요청을 backend workload 차이로 잘못 해석할 수 있습니다.
-
-따라서 L2-level trace는 `StorageManager`보다 아래, OS syscall보다 위인
-**L2 adapter task 경계**에서 기록합니다.
+### 하나의 read request 안의 관계
 
 ```text
-기존 storage trace:
-vLLM → StorageManager/L1 → async controller → L2 adapter → backend/syscall
-       ^ record/replay 경계
-
-L2-level trace:
-vLLM → StorageManager/L1 → async controller → L2 adapter → backend/syscall
-                                           ^ record/replay 경계
+lookup(request A) 완료 ──> load(request A) 완료 ──> unlock(request A) 제출
+          │                         │
+          └─────────────────────────┘
+             load가 없으면 lookup 완료 후 unlock
 ```
 
-이 경계는 backend 구현이 달라도 공통인 adapter 의미론을 보존하면서, 특정
-filesystem의 syscall 세부사항에 trace가 종속되는 것을 피합니다.
+- Load는 같은 request의 lookup task completion을 기다립니다.
+- Unlock은 같은 request의 load completion을 기다립니다. Load가 제출되지 않았다면 lookup completion을 기다립니다.
+- Delete에는 추가 dependency를 만들지 않습니다. 이 관계에 포함되지 않는 다른 task도 원래 timestamp schedule에 따라 계속 제출합니다.
 
-## 5. L2-level trace 설계
+Store dependency는 target store의 성공 여부가 아니라 completion 여부로 해제됩니다.
+Target lookup의 hit/miss는 제출 전에 알 수 없으므로 dependency 파생과 prepare 판단에는 source trace의 `hit_indices`를 사용합니다.
+Overlap을 유지한 결과 target lookup이 miss가 되더라도 outcome 차이로 기록하며 replay 실패로 처리하지 않습니다.
 
-### 5.1 실제로 기록하는 이벤트
-
-L2 trace의 `header.level`은 `l2`입니다. 각 record에는 공통으로 trace 시작 기준
-`t_mono`, wall-clock `t_wall`, event 이름과 event별 metadata가 들어갑니다.
-Operation을 나타내는 별도 `op` 필드는 없으며, `l2.store.submitted` 같은 event
-이름이 operation을 구분합니다.
-
-| Event | 주요 metadata |
-| --- | --- |
-| `l2.store.submitted` | `adapter_index`, `task_id`, `keys`, `object_sizes` |
-| `l2.store.completed` | `task_id`, `succeeded_count`, `failed_count`, `bytes_transferred` |
-| `l2.lookup_task.submitted` | `request_id`, `task_id`, `keys`, `layout_desc` |
-| `l2.lookup_task.completed` | `request_id`, `task_id`, `hit_indices` |
-| `l2.load_task.submitted` | `request_id`, `task_id`, `keys`, `object_sizes` |
-| `l2.load_task.completed` | `request_id`, `task_id`, `success_indices` |
-| `l2.unlock.submitted` | `request_id`, `keys` |
-| `l2.delete.submitted` | `keys` |
-
-Key 목록의 길이가 batch 크기를 나타냅니다. 실제 KV payload는 저장하지 않습니다.
-따라서 replayer는 기록된 byte size에 맞는 synthetic buffer를 사용합니다. Payload
-내용에 따라 compression이나 deduplication 성능이 달라지는 backend를 평가할 때는
-이 trace만으로 충분하지 않습니다.
-
-현재 `ObjectKey` codec은 `chunk_hash`, `model_name`, `kv_rank`와
-`object_group_id`를 기록하지만 `cache_salt`는 기록하지 않습니다. Non-empty
-`cache_salt`로 key namespace를 분리하는 workload는 서로 다른 key가 replay에서
-같은 key가 될 수 있으므로 이 기능의 지원 범위 밖입니다.
-
-Dependency ID는 trace에 직접 기록하지 않습니다. Replayer가 task ID, request ID,
-key와 source completion 결과를 pre-scan하여 필요한 dependency를 파생합니다.
-Trace 마지막에는 recorder와 EventBus의 drop count를 담은 종료 marker가 기록되며,
-marker가 없거나 drop count가 0이 아니면 replay를 거부합니다.
-
-### 5.2 read object prepare
-
-Prepare 대상은 모든 read object가 아닙니다. Source에서 lookup hit가 발생했지만
-그 lookup보다 앞선 successful store completion을 trace에서 찾을 수 없는 object만
-record 시작 전에 이미 L2에 있던 object로 간주합니다.
+선택된 첫 submission을 replay의 시간 원점(`t=0`)으로 정규화합니다.
+따라서 trace 시작부터 첫 submission까지의 선행 idle gap은 재생하지 않고, submission 사이의 간격만 `speedup`에 따라 축소하여 보존합니다.
+각 task에 대해 다음과 같이 계산합니다.
 
 ```text
-선행 store 없음 → lookup(A) hit → load(A)
-                  ^ A를 prepare
-
-store(B) 성공 → lookup(B) hit → load(B)
-                ^ B는 prepare하지 않음
-
-선행 store 없음 → lookup(C) miss
-                  ^ C도 prepare하지 않음
-```
-
-Prepare 대상에는 같은 key와 byte size의 dummy data를 저장합니다. Trace에
-`store(B) → read(B)`가 있으면 replay 측정 구간에서 store를 실행하고, 완료 뒤에
-read를 진행합니다.
-
-```text
-1. source lookup hit object 수집
-2. 선행 successful store가 있는 object 제외
-3. 남은 object의 key/size로 dummy data 저장
-4. prepare 완료 확인
-5. storage-node profiler 시작
-6. L2 task replay 시작
-```
-
-Tracebench replayer는 이 prepare를 measured replay 전에 자동 실행합니다. 따라서
-prepare write는 `l2_replay_stats.json`과 Tracebench가 시작하는 storage-node profile
-구간에 포함되지 않습니다.
-
-### 5.3 causal replay (`causal exact`)
-
-쉽게 말하면 **반드시 순서가 필요한 작업만 기다리고, 관계없는 작업은 원래
-시간표대로 계속 제출하는 방식**입니다.
-
-```text
-store(A) ───────── 완료
-                    └─ lookup(A) ── 완료 ── load(A) ── 완료 ── unlock(A)
-
-store(B) ───────────────── 완료       # A와 무관하므로 계속 진행
-lookup(C) ─── 완료                    # A와 무관하므로 계속 진행
-```
-
-`store(A)`가 느리면 `lookup(A)`만 기다립니다. `store(B)`나 `lookup(C)`까지 모두
-멈추는 global barrier는 두지 않습니다. Adapter I/O는 비동기이므로 관계없는 task는
-target backend queue에서 서로 겹쳐 실행될 수 있습니다.
-
-Replayer는 trace를 pre-scan하여 다음 dependency를 파생합니다.
-
-1. Source에서 같은 key의 successful store 뒤 lookup hit가 발생했다면
-   `store completion → lookup` dependency를 둡니다.
-2. 같은 request의 load는 lookup completion을 기다립니다.
-3. Unlock은 같은 request의 load completion을 기다립니다. Load가 없다면 lookup
-   completion을 기다립니다.
-4. Delete와 위 관계가 없는 다른 task에는 추가 dependency를 만들지 않습니다.
-
-각 task는 timestamp 조건과 dependency 조건을 모두 만족해야 제출할 수 있습니다.
-
-```text
-timestamp_target = replay_start + record.t_mono / speedup
+schedule_origin  = first_selected_op.t_mono
+record_offset    = op.t_mono - schedule_origin
+timestamp_target = replay_start + record_offset / speedup
 earliest_submit  = max(timestamp_target, dependency_completion_time)
 ```
 
-Replay buffer가 부족하거나 dispatch loop가 밀리면 실제 제출은 이보다 더 늦을 수
-있습니다. 이 지연은 schedule lag, dependency wait와 buffer wait 통계에 반영됩니다.
+Target adapter의 I/O latency는 배율에 따라 조정하지 않습니다.
+Backend가 가속된 arrival rate를 따라가지 못하면 actual submission, dependency wait, buffer wait 및 final drain 시간이 자연스럽게 증가해야 합니다.
 
-여기서 `exact`는 source의 전체 실행 순서나 latency를 똑같이 복원한다는 뜻이
-아닙니다. Source의 store 성공 여부, lookup hit indices와 load success indices를
-target 결과와 비교하고, 다르면 outcome mismatch로 표시한다는 제한된 의미입니다.
+### Replay 정확성, outcome 및 출력
 
-### 5.4 앞부분만 replay하기
+Replay 성공 여부는 source/target outcome 일치가 아니라 다음 조건으로 판단합니다.
 
-`--trace-percent N`은 L2 submission 개수를 기준으로 앞에서 `N%`를 선택합니다.
-선택 개수는 올림하며, 선택된 task를 검증하는 completion event는 trace 뒤쪽에 있어도
-사용합니다. Prepare 역시 선택된 prefix에서 필요한 object만 대상으로 합니다.
+- trace header와 completeness marker가 유효한가
+- 선택된 모든 operation이 제출되었는가
+- 기록된 causal dependency를 지키면서 target async task가 drain되었는가
+- replay 중 내부 오류나 drain timeout이 발생하지 않았는가
 
-## 6. 무엇을 재현하고 무엇을 재현하지 않는가
+Source operation outcome과의 불일치는 필수 실패 조건이 아닙니다.
+Backend가 다르면 서로 다른 결과가 나올 수 있으며, 이 차이는 비교 metric으로만 기록합니다.
+`outcome_matches_source`가 `false`여도 replay command는 성공 상태로 반환하고 warning을 출력합니다.
 
-### 재현하는 것
+Outcome comparison은 현재 다음 범위에서만 수행합니다.
 
-- L2 adapter operation과 source 제출 timestamp
-- object key reuse, batch와 byte size, layout
-- source의 store/lookup/load 결과
-- key와 request 정보에서 파생한 필수 dependency
-- dependency가 없는 비동기 task overlap
+- `store`: source `succeeded_count > 0`와 target store task 성공 여부 비교
+- `lookup_task`: source `hit_indices`와 target hit index list 비교
+- `load_task`: source `success_indices`와 target success index list 비교
+- `unlock`, `delete`: completion/result가 없으므로 비교하지 않고 제출 횟수만 기록
 
-### 재현하지 않는 것
+Source와 target의 상세 per-object 결과를 별도 출력하지 않습니다.
+결과 차이는 replay stats의 outcome metric으로 집계합니다.
 
-- 원본 L1 capacity, eviction 및 lock 상태
-- vLLM request latency, TTFT와 GPU compute
-- 원본 backend latency 및 completion 순서
-- 원본의 전체 thread/request scheduling
-- 실제 KV payload 내용
-- `ObjectKey.cache_salt`로 구분한 key namespace
-- 여러 source/target adapter나 여러 replay node의 topology
+`outcome_matches_source`는 비교 결과 요약이며, mismatch가 있어도 replay를 무효화하지 않습니다.
 
-따라서 L2 replay는 다음 질문에 사용합니다.
+L2 replay stats JSON에는 다음 항목이 포함됩니다.
 
-> 기록된 adapter-level I/O 요청률과 필요한 dependency를 target backend에 주었을 때
-> 제출 지연, 처리량, drain과 storage-node 자원 사용량이 어떻게 달라지는가?
+- **Input:** `speedup`, `trace_percent`, source operation total 및 selected count
+- **Timing:** source/actual submission window, total replay, drain, schedule lag,
+  dependency wait 및 replay-buffer wait
+- **Workload:** operation별 제출 수, store/load task의 전송 byte 및 throughput
+- **L2 latency:** target adapter별 store/load task의 제출·완료 수, latency percentile 및 task latency 기준 aggregate throughput
+- **Outcome metrics:** `outcome_matches_source`, `outcome_comparisons`, mismatch count/counts/rate/samples 및 unlock/delete 제출 count
 
-이 결과만으로 L1 hit ratio, request TTFT 또는 serving throughput을 판단할 수는
-없습니다. 그런 질문에는 storage trace와 실제 serving 실험이 별도로 필요합니다.
+`--prepare-l2` 또는 `--prepare-only`를 사용하면 측정 replay와 별도로 `l2_prepare_manifest.json`에 prepared object/byte 수, prepare store 성공 task 수,
+prepare elapsed time을 기록합니다.
 
-## 7. 측정과 해석
+Top-level `throughput_bytes_per_second`는 측정 replay 전체 elapsed time을 분모로 하며, preparation byte와 lookup/unlock/delete는 포함하지 않습니다.
 
-현재 `l2_replay_stats.json`의 주요 값은 다음과 같습니다.
+이 값들은 다음 두 질문을 구분합니다.
 
-| 값 | 의미 |
-| --- | --- |
-| `source_submission_window_seconds` | speedup을 반영한 source 목표 제출 구간 |
-| `actual_submission_window_seconds` | target에서 실제 제출에 걸린 구간 |
-| `total_replay_seconds` | 모든 task completion까지 포함한 전체 시간 |
-| `drain_seconds` | 마지막 submit 이후 남은 task가 끝날 때까지의 시간 |
-| `max/mean_schedule_lag_seconds` | 목표 timestamp보다 늦게 제출된 정도 |
-| `max/total_dependency_wait_seconds` | 선행 task completion 때문에 기다린 시간 |
-| `max/total_buffer_wait_seconds` | dependency 충족 뒤 buffer/dispatch 때문에 늦어진 시간 |
-| `operations_submitted` | operation별 제출 task 수 |
-| `bytes_submitted` | store/load별 제출 bytes |
-| `throughput_bytes_per_second` | 제출한 store/load bytes를 전체 replay 시간으로 나눈 값 |
-| `outcome_mismatches` | source와 target의 store/lookup/load 결과 차이 |
+1. 선택된 L2 operation이 causal order와 timestamp schedule에 따라 제출되고 drain되었는가?
+2. Target backend의 store/lookup/load outcome은 source와 어떻게 달랐는가?
 
-현재 이 JSON은 per-task backend service latency나 p50/p90/p99 latency를 제공하지
-않습니다. SSD와 network bandwidth는 `--profile`로 별도 수집한 storage-node
-`profile_summary.json`에서 확인합니다.
-
-현재 direct L2 replay는 source trace와 target config가 각각 L2 adapter 하나만
-사용하는 경우를 지원합니다.
-
-`--speedup`은 backend I/O latency를 줄이지 않고 목표 제출 간격만 압축합니다.
-Backend가 요청률을 감당하지 못하면 actual submission window, wait, schedule lag와
-drain이 커져 total replay time이 더 이상 줄지 않거나 늘어날 수 있습니다. 이것이
-scaled-open 실험에서 관찰하려는 saturation 신호입니다.
-
-Backend와 speedup을 비교할 때는 case마다 별도의 빈 L2 path와 output directory를
-사용해야 이전 case의 warm state가 다음 결과에 섞이지 않습니다.
-
-## 8. 사용 흐름
-
-한 번의 recorder 실행은 `storage` 또는 `l2` 중 하나만 기록합니다. 두 trace가 모두
-필요하면 같은 workload를 각각 실행해야 합니다. 두 실행의 비동기 timing과 cache
-상태가 다를 수 있으므로, 두 파일을 동일 실행의 서로 다른 view로 해석하면 안 됩니다.
-
-```bash
-# 첫 번째 workload 실행: StorageManager lifecycle
-python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
-  --mountpoint /MNTPNT \
-  --trace-kind storage \
-  --output-dir outputs/gaia-storage
-
-# 두 번째 workload 실행: L2 adapter task
-python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
-  --mountpoint /MNTPNT \
-  --trace-kind l2 \
-  --output-dir outputs/gaia-l2
-```
-
-Tracebench replayer는 `l2.lct` header를 감지해 prepare를 먼저 끝낸 뒤 direct L2
-replay를 실행합니다.
-
-```bash
-python -m replayer.main \
-  --trace outputs/gaia-l2/l2.lct \
-  --config configs/replayer/fs-native.yaml \
-  --l2-path /MNTPNT/lmcache-l2-replay/gaia-x1 \
-  --output-dir outputs/replay/gaia-l2-x1 \
-  --speedup 1 \
-  --trace-percent 100
-```
-
-정리하면 `storage.lct`는 StorageManager/L1 lifecycle workload를 살펴보는 용도이고,
-`l2.lct`는 그 lifecycle을 다시 계산하지 않고 backend I/O를 비교하는 용도입니다.
-두 trace는 서로 다른 측정 계층이며 서로 대체하지 않습니다.
+`--trace-percent 10`은 전체 L2 submission 중 앞의 `ceil(N * 10 / 100)`개를 선택합니다.
+선택된 submission에 대응하는 completion만 dependency, prepare 및 outcome 비교에 사용하며, unlock/delete에는 completion record가 없습니다.

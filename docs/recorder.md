@@ -3,10 +3,11 @@
 설치 profile과 공통 경로 표기는 [README](../README.md)의
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
-기본 `--trace-kind storage`는 `storage.lct`를 생성합니다. Backend I/O benchmark용
-L2 adapter trace가 필요하면 같은 recorder command에 `--trace-kind l2`를 추가하며,
-결과는 `l2.lct`에 저장됩니다. 상세 contract와 replay 의미론은
-[L2 adapter trace](replayer.md#l2-adapter-trace)를 참고하세요.
+Tracebench의 record/replay 실험은 `--trace-kind l2`로 실제 adapter task를
+`l2.lct`에 기록합니다. 기존 StorageManager-level 방식은 replay 환경의 L1 상태에
+따라 L2 operation sequence가 달라져 backend 비교 목적을 충족하지 못했습니다.
+패치한 `priv/dg/l2-tracing` branch의 event, `cache_salt`, end marker와 replay
+의미론은 [L2 tracing guide](l2-tracing.md)를 authoritative reference로 사용합니다.
 
 Recorder는 LMCache MP와 vLLM을 시작하고 OpenAI-compatible endpoint로 workload를
 전송합니다. 예제 config의 `lmcache.l2.reset_on_start: true`는 실행 전에
@@ -21,10 +22,10 @@ Recorder는 LMCache MP와 vLLM을 시작하고 OpenAI-compatible endpoint로 wor
 사용하는 Tensormesh V3입니다. 약 787개 multi-turn session과 24,881개 LLM
 iteration으로 구성되며 SWE-bench, GAIA, WildClaw source를 제공합니다.
 
-이 dataset의 agentic trace는 Recorder가 생성하는 `storage.lct`와 다릅니다.
+이 dataset의 agentic trace는 Recorder가 생성하는 LMCache `.lct`와 다릅니다.
 
 - **Agentic trace:** vLLM에 보낼 request sequence를 정의하는 workload 입력
-- **Storage trace:** workload 실행 중 LMCache `StorageManager` API 호출을 기록한 결과
+- **LMCache L2 trace:** 실제 L2 adapter task를 기록한 `l2.lct`
 
 Dataset의 각 row는 session 하나의 LLM iteration이며 주요 field는 다음과 같습니다.
 
@@ -47,6 +48,7 @@ API request로 전송합니다. `respect-gaps`는 `pre_gap`을 반영하고,
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-gaia.yaml \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --output-dir outputs/gaia
 ```
 
@@ -87,6 +89,7 @@ session 순서를 유지한 prefix를 선택합니다. GAIA와 WildClaw는 이 �
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-swebench.yaml \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --dataset-percent 10 \
   --output-dir outputs/swebench-10pct
 ```
@@ -97,143 +100,59 @@ python -m recorder.main \
 ```bash
 bash benchmarks/recorder/record_source_traces.sh \
   --mountpoint /MNTPNT \
-  --output-root /MNTPNT/lmcache-tracebench/outputs
-```
-
-각 결과는 timestamped 디렉터리 아래 `gaia/`, `wildclaw/`, `swebench/`에 저장됩니다.
-작은 working set의 GAIA부터 시작하며, 한 source가 실패하면 script는 즉시 멈춥니다. 이때
-실패한 source만 해당 config로 다시 실행하면 됩니다.
-
-GAIA와 WildClaw만 L2 adapter trace로 기록하려면 `--trace-kind l2`와
-`--sources gaia,wildclaw`를 추가합니다. 각 source 디렉터리에 `l2.lct`가 생성됩니다.
-
-```bash
-bash benchmarks/recorder/record_source_traces.sh \
-  --mountpoint /MNTPNT \
   --output-root /MNTPNT/lmcache-tracebench/outputs \
   --trace-kind l2 \
-  --sources gaia,wildclaw
+  --sources gaia,wildclaw,swebench
 ```
 
-`source-traces-20260804-082231` 실행에서 모든 session을 record한 실측 결과는
-다음과 같습니다. KV cache 점유량은 L2 directory의 filesystem 사용량이고, trace는
-생성된 `storage.lct`의 크기입니다.
-
-| Source | L2 KV cache 경로 | KV cache 점유량 | `storage.lct` 크기 |
-| --- | --- | ---: | ---: |
-| GAIA | `/MNTPNT/lmcache-trace/gaia` | 537G | 135M |
-| SWE-bench | `/MNTPNT/lmcache-trace/swebench` | 4.9T | 5.9G |
-| WildClaw | `/MNTPNT/lmcache-trace/wildclaw` | 56G | 24M |
-
-L2 점유량은 실제 KV object의 filesystem 사용량이고, `storage.lct`는 payload
-대신 API 호출과 인자를 저장하므로 훨씬 작습니다. 이 수치는 해당 실행과 dataset
-revision의 관측값이며 model, session 수, chunk size, cache policy가 바뀌면
-달라집니다.
+각 결과는 timestamped 디렉터리 아래 `gaia/`, `wildclaw/`, `swebench/`에
+`l2.lct`로 저장됩니다. 작은 working set의 GAIA부터 시작하며, 한 source가 실패하면
+script는 즉시 멈춥니다. 이때 실패한 source만 해당 config로 다시 실행하면 됩니다.
 
 Mixed workload의 source 비율, session ordering, timing policy와 대표성 검증은
 현재 **TBD**입니다.
 
 ## Speed sweep
 
-### Why each speedup needs its own trace
+Recorder speed sweep은 workload의 request timing 자체를 바꿔 전체 workload를 다시
+실행하고, speedup마다 독립적인 `l2.lct`를 기록합니다. 반면 Replayer의
+`--speedup`은 이미 기록된 한 L2 trace의 submission gap만 압축합니다. Application
+compute까지 포함한 입력 부하를 바꾸려면 recorder sweep을, 동일 operation stream의
+L2 arrival-rate만 바꾸려면 replay sweep을 사용합니다.
 
-`storage.lct`는 workload가 실제로 실행되는 동안 발생한 storage operation의
-순서와 상대 시간 간격을 기록합니다. GPU compute 시간, serving-side scheduling,
-request 처리 지연은 포함하지 않습니다. 따라서 원본 `storage.lct`를 replay 단계에서
-배속하면 storage operation 간격만 압축되고 GPU compute 시간은 함께 조정되지 않아,
-의도한 workload speedup을 재현하지 못합니다.
+`benchmarks/recorder/record_speed_sweep.sh`는 각 case 시작 시 L2 경로를 초기화하고,
+종료 직전 사용량을 `l2_usage.json`과 `l2_usage.jsonl`에 기록한 뒤 중간 L2
+contents를 기본적으로 정리합니다. Trace, 로그, Hugging Face dataset cache와
+Mooncake 입력 trace는 보존합니다. L2 object도 남기려면 `--keep-l2`를 사용합니다.
 
-배속 비교에서는 recorder 단계에서 각 speedup으로 workload를 실행해
-`storage.lct`를 별도로 생성해야 합니다. 아래 스크립트는 이 과정을 자동화하며,
-배속별 결과 trace는 서로 다른 output 디렉터리에 저장합니다.
-
-```text
-Record phase: workload (GPU compute + serving + storage)
-
-  source workload ──┬─ x1  ──> storage.lct (x1)  ──> replay x1
-                     ├─ x2  ──> storage.lct (x2)  ──> replay x2
-                     ├─ x5  ──> storage.lct (x5)  ──> replay x5
-                     └─ x10 ──> storage.lct (x10) ──> replay x10
-
-  One source trace cannot be replay-time scaled faithfully:
-  GPU compute time is not represented in storage.lct, so only storage gaps shrink.
-```
-
-The timing limitation can also be viewed directly at the operation level:
-
-```text
-Record: full workload timeline
-
-  GPU compute ── storage S1 ───── GPU compute ── storage S2
-                    │                              │
-                    └──────── storage.lct ────────┘
-
-Replay: storage operations only
-
-  storage S1 ─── storage S2
-       └─ GPU compute time is not present in storage.lct
-
-  Replay-time x5 compresses the storage gap, but does not scale GPU compute.
-```
-
-`benchmarks/recorder/record_speed_sweep.sh`는 workload별로 speedup마다 하나의
-`storage.lct` 또는 `l2.lct`를
-순차적으로 기록합니다. config의 L2 `subpath`는 `--mountpoint` 아래에서
-사용합니다. 각 case는 시작할 때 L2 경로를 초기화하고, 실행이 끝나면 중간 L2
-directory도 기본적으로 비웁니다. `storage.lct`와 로그가 있는 output directory는
-그대로 보존하며, Hugging Face dataset cache와 Mooncake 입력 trace도 삭제하지
-않습니다. 정리 직전에 L2 사용량을 측정해 각 case의 `l2_usage.json`과
-전체 sweep의 `l2_usage.jsonl`에 bytes, decimal GB와 GiB를 기록합니다. 실행 후
-L2 object를 남겨야 할 때만 `--keep-l2`를 추가하세요.
-
-Mooncake 기록(기본 Tool/Agent·Conversation, 전체 trace의 10%):
+Mooncake 기록 예시:
 
 ```bash
 bash benchmarks/recorder/record_speed_sweep.sh \
   --backend mooncake \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --speedups 1,2,5,10 \
   --dataset-percent 10
 ```
 
-SWE-bench는 전체 session의 비율을 선택하고, GAIA와 WildClaw는 비율을 무시하고
-각 source의 전체 dataset을 사용합니다. 세 workload를 함께 실행하려면 다음과
-같이 지정합니다.
+Tensormesh 기록 예시:
 
 ```bash
 bash benchmarks/recorder/record_speed_sweep.sh \
   --backend tensormesh \
   --workloads swebench,gaia,wildclaw \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --speedups 1,2,5,10 \
   --dataset-percent 10
 ```
 
-Tensormesh 기록(기본 GAIA·WildClaw·SWE-bench):
-
-```bash
-bash benchmarks/recorder/record_speed_sweep.sh \
-  --backend tensormesh \
-  --mountpoint /MNTPNT \
-  --speedups 1,2,5,10
-```
-
-배속별 L2 adapter trace가 필요하면 같은 명령에 `--trace-kind l2`를 추가합니다.
-각 speedup 디렉터리에 `l2.lct`가 생성됩니다.
-
-결과는 다음과 같이 저장됩니다.
-
-```text
-outputs/speed-sweep/mooncake-toolagent-x1/storage.lct
-outputs/speed-sweep/mooncake-toolagent-x5/storage.lct
-outputs/speed-sweep/tensormesh-gaia-x1/storage.lct
-outputs/speed-sweep/tensormesh-swebench-x10/storage.lct
-```
-
-Mooncake의 `speedup`은 `time_scale=1/speedup`으로, Tensormesh의 `speedup`은
-`respect-gaps` 모드에서 `pre_gap_scale=1/speedup`으로 변환됩니다. Tensormesh의
-`max-pressure`는 gap을 제거한 별도 baseline이므로 speedup sweep에 포함하지
-않습니다. 실행 전 계획만 확인하려면 `--dry-run`을 추가합니다.
+SWE-bench는 전체 session의 비율을 선택하고 GAIA와 WildClaw는 이 비율을
+무시합니다. Mooncake의 `speedup`은 `time_scale=1/speedup`으로, Tensormesh의
+`speedup`은 `respect-gaps` 모드에서 `pre_gap_scale=1/speedup`으로 변환됩니다.
+결과는 `outputs/speed-sweep/<workload>-x<speedup>/l2.lct`에 저장됩니다. 실행 전
+계획만 확인하려면 `--dry-run`을 추가합니다.
 
 ## GPU memory quota
 
@@ -328,6 +247,7 @@ TRACE=toolagent  # conversation으로 바꿔 실행할 수 있습니다.
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-mooncake.yaml \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --mooncake-trace "$TRACE" \
   --dataset-percent 10 \
   --output-dir "outputs/qwen3-coder-tp8-mooncake-${TRACE}"
@@ -356,7 +276,7 @@ LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다
 
 | 파일 | 내용 |
 | --- | --- |
-| `storage.lct` | LMCache storage operation trace |
+| `l2.lct` | 실제 L2 adapter task를 기록한 trace |
 | `manifest.json` | Workload 요약, 오류와 process 종료 상태 |
 | `request_stats.jsonl` | 요청별 latency와 성공 여부 |
 | `session_outcomes.jsonl` | Session별 실행 결과 |
@@ -365,5 +285,7 @@ LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다
 | `l2_usage.json` | speed sweep case 종료 직전 측정한 L2 사용량 |
 | `lmcache.log`, `vllm.log`, `workload.log` | Process별 로그 |
 
-Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면 `manifest.json`을
-확인한 뒤 각 process 로그를 살펴보세요.
+Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면
+`manifest.json`을 확인한 뒤 각 process 로그를 살펴보세요.
+L2 trace는 graceful shutdown 시 end marker를 기록하며, replay는 marker 누락·중복이나
+recorder/EventBus drop을 불완전한 trace로 거부합니다.

@@ -1,8 +1,11 @@
 # LMCache Tracebench
 
 vLLM + LMCache MP 환경에서 Tensormesh-Benchmark V3 또는 Mooncake FAST'25
-workload를 실행하고 LMCache storage trace를 기록하고 재생하는 도구입니다.
-StorageManager call trace와 backend 비교용 L2 adapter task trace를 지원합니다.
+workload를 실행하고 LMCache L2 trace를 기록하고 재생하는 도구입니다.
+기존 StorageManager-level record/replay는 replay 환경의 L1 상태에 따라 실제 L2
+요청이 달라져 backend 비교에 필요한 동일 operation sequence를 보장하지 못합니다.
+따라서 LMCache `priv/dg/l2-tracing` branch에서 실제 adapter task를 기록한
+`l2.lct`를 사용합니다.
 
 ## Overview
 
@@ -11,17 +14,17 @@ Tensormesh V3 / Mooncake timed trace
                   ↓
 Recorder → vLLM API server → LMCache MP → L2 storage
                                       ↓
-                                  storage.lct
+                                  l2.lct
                                       ↓
                                   Replayer
 ```
 
-Record 단계는 workload를 실행하고 로컬 SSD의 `fs_native` L2에 KV object를 저장하며
-`storage.lct`를 만듭니다. Replay 단계는 이 trace를 다른 L2 backend에 재생해 동일한
-operation sequence의 처리량, latency와 resource 사용량을 비교합니다. Record에
-사용한 L2 backend와 replay 대상 backend는 같을 필요가 없습니다. Storage trace의
-기록 범위와 `.lct` contract는 [Replayer guide](docs/replayer.md#storage-trace-contract)를
-참고하세요. 한 노드에서 동일 trace를 여러 instance로 복제하는 replay는
+Record 단계는 workload를 실행하고 로컬 SSD의 `fs_native` L2에 KV object를
+저장하면서 실제 adapter task를 `l2.lct`에 기록합니다. Replayer는 이 task를 target
+backend에 직접 causal replay하므로 backend latency, throughput과 resource 사용량을
+비교할 수 있습니다. Record와 replay의 L2 backend는 같을 필요가 없습니다.
+자세한 contract는 [L2 tracing guide](docs/l2-tracing.md)를 참고하세요.
+한 노드에서 동일 trace를 여러 instance로 복제하는 replay는
 [Parallel replicated replay](docs/replayer.md#parallel-replicated-replay)를
 참고하세요.
 
@@ -49,7 +52,7 @@ git submodule update --init --recursive
 ## Prerequisites
 
 현재 저장소는 Ubuntu 24.04와 Python 3.12 환경에서 검증했습니다. Recorder는 CUDA가
-연결된 NVIDIA GPU가 필요하지만, storage trace Replayer는 `fs_native` 기준
+연결된 NVIDIA GPU가 필요하지만, Replayer는 `fs_native` 기준
 GPU·vLLM·모델 없이 실행할 수 있습니다. 모든 profile은 같은 프로젝트 `.venv`를
 사용합니다.
 
@@ -156,6 +159,7 @@ request(turn) 수는 결과의 `workload.json`과 `manifest.json`에서 확인�
 python -m recorder.main \
   --config configs/recorder/qwen3-coder-480b-tp8-swebench.yaml \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --dataset-percent 10 \
   --output-dir outputs/swebench-10pct
 ```
@@ -166,6 +170,7 @@ Mooncake은 같은 옵션으로 전체 timed trace의 request 비율을 선택�
 bash benchmarks/recorder/record_speed_sweep.sh \
   --backend mooncake \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --speedups 1,5,10 \
   --dataset-percent 10
 ```
@@ -177,14 +182,15 @@ WildClaw에서는 무시됩니다. 자세한 recorder output과 speed sweep은
 ## Guides
 
 - [Recorder guide](docs/recorder.md): Tensormesh V3, Mooncake workload, GPU quota와 Recorder output
-- [Replayer guide](docs/replayer.md): `.lct` contract, replay backend와 profiling
+- [Replayer guide](docs/replayer.md): trace 선택, replay backend와 profiling
+- [L2 tracing guide](docs/l2-tracing.md): StorageManager replay의 한계와 L2 causal replay contract
 - [Benchmark guide](benchmarks/README.md): benchmark script와 artifact layout
 - [Trace assets](docs/trace-assets.md): GitHub Release and Hugging Face Dataset upload/download
 
 ## Smoke test
 
 `configs/recorder/smoke.yaml`은 1 GPU, 작은 Qwen 모델, V3 세션 10개·각 2 turn(최대
-20개 request)으로 실제 storage trace를 만드는 최소 설정입니다. 첫 turn의 write와
+20개 request)으로 실제 L2 adapter trace를 만드는 최소 설정입니다. 첫 turn의 write와
 두 번째 turn의 prefix reuse/prefetch 경로를 함께 확인합니다. V3 dataset은
 `workload.hf_cache_dir`에 지정한 경로에 cache합니다. 실행 전에 이 값을
 `/MNTPNT/hf-datasets`와 같은 실제 경로로 바꾸세요. 최초 실행에는 Hugging
@@ -197,19 +203,20 @@ source .venv/bin/activate
 python -m recorder.main \
   --config configs/recorder/smoke.yaml \
   --mountpoint /MNTPNT \
+  --trace-kind l2 \
   --output-dir outputs/smoke
 ```
 
-성공하면 `outputs/smoke/storage.lct`와 `outputs/smoke/manifest.json`이 생성됩니다.
+성공하면 `outputs/smoke/l2.lct`와 `outputs/smoke/manifest.json`이 생성됩니다.
 문제가 생기면 `outputs/smoke/lmcache.log`와 `outputs/smoke/vllm.log`를 먼저 확인합니다.
 
-방금 기록한 trace를 새 StorageManager에 replay하려면 다음을 실행합니다. Replay는
+방금 기록한 L2 trace를 target adapter에 replay하려면 다음을 실행합니다. Replay는
 vLLM이나 GPU server를 다시 시작하지 않으며, `configs/replayer/smoke.yaml`의 별도 L2
 경로를 사용합니다.
 
 ```bash
 python -m replayer.main \
-  --trace outputs/smoke/storage.lct \
+  --trace outputs/smoke/l2.lct \
   --config configs/replayer/smoke.yaml
 ```
 
@@ -218,18 +225,17 @@ Replay 중 storage node의 NVMe와 network counter를 수집하려면 `--profile
 
 ```bash
 python -m replayer.main \
-  --trace outputs/smoke/storage.lct \
+  --trace outputs/smoke/l2.lct \
   --config configs/replayer/smoke.yaml \
   --profile configs/profiling/storage.yaml
 ```
 
 설정, 결과 파일과 counter 해석은 [Replay profiling](docs/replayer.md#profiling)을
-참고하세요. 결과는 `outputs/smoke-replay/trace_replay_summary.json`과
-`outputs/smoke-replay/trace_replay_ops.csv`에 저장됩니다. 먼저 실행 명령만 보려면
-끝에 `--dry-run`을 추가합니다.
-L1 retrieve 및 L2 lookup/load key-level outcome은
-`outputs/smoke-replay/cache_replay_stats.json`에서 확인할 수 있으며,
-동일 trace의 storage arrival-rate 실험은 `--speedup 5`처럼 실행합니다.
+참고하세요. L2 준비 결과와 측정 통계는 각각
+`outputs/smoke-replay/l2_prepare_manifest.json`과
+`outputs/smoke-replay/l2_replay_stats.json`에 저장됩니다. 먼저 실행 명령만 보려면
+끝에 `--dry-run`을 추가합니다. 동일 trace의 L2 submission arrival-rate 실험은
+`--speedup 5`처럼 실행합니다.
 
 ## Tests
 
