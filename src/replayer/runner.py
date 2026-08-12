@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 import subprocess
@@ -23,6 +24,25 @@ _L2_PROGRESS_RE = re.compile(
     r"completed=(\d+) pending=(\d+) "
     r"in_flight\(store=(\d+) lookup=(\d+) load=(\d+)\) "
     r"bytes_submitted=(\d+)"
+)
+_L2_IO_INTERVAL_RE = re.compile(
+    r"FS native I/O interval: elapsed=([0-9.]+)s interval=([0-9.]+)s "
+    r"total_ops=(\d+) total_bytes=(\d+) total_GiB/s=([0-9.]+) "
+    r"read_ops=(\d+) read_bytes=(\d+) read_GiB/s=([0-9.]+) "
+    r"write_ops=(\d+) write_bytes=(\d+) write_GiB/s=([0-9.]+)"
+)
+_L2_IO_INTERVAL_COLUMNS = (
+    "interval_end_seconds",
+    "interval_seconds",
+    "total_ops",
+    "total_bytes",
+    "total_gib_per_second",
+    "read_ops",
+    "read_bytes",
+    "read_gib_per_second",
+    "write_ops",
+    "write_bytes",
+    "write_gib_per_second",
 )
 
 
@@ -61,6 +81,61 @@ def _l2_progress_from_log_line(
         int(loads),
         int(raw_bytes),
     )
+
+
+def _l2_io_interval_from_log_line(
+    line: str,
+) -> tuple[float, float, int, int, float, int, int, float, int, int, float] | None:
+    match = _L2_IO_INTERVAL_RE.search(line)
+    if match is None:
+        return None
+    (
+        elapsed,
+        interval,
+        total_ops,
+        total_bytes,
+        total_gib_per_second,
+        read_ops,
+        read_bytes,
+        read_gib_per_second,
+        write_ops,
+        write_bytes,
+        write_gib_per_second,
+    ) = match.groups()
+    return (
+        float(elapsed),
+        float(interval),
+        int(total_ops),
+        int(total_bytes),
+        float(total_gib_per_second),
+        int(read_ops),
+        int(read_bytes),
+        float(read_gib_per_second),
+        int(write_ops),
+        int(write_bytes),
+        float(write_gib_per_second),
+    )
+
+
+def _initialize_l2_io_interval_tsv(path: Path) -> None:
+    with path.open("w", encoding="utf-8", newline="") as stream:
+        csv.writer(stream, delimiter="\t", lineterminator="\n").writerow(
+            _L2_IO_INTERVAL_COLUMNS
+        )
+
+
+def _append_l2_io_interval(
+    path: Path,
+    interval: tuple[float, float, int, int, float, int, int, float, int, int, float],
+) -> None:
+    with path.open("a", encoding="utf-8", newline="") as stream:
+        csv.writer(stream, delimiter="\t", lineterminator="\n").writerow(interval)
+
+
+def _render_progress(message: str, previous_width: int) -> int:
+    width = max(len(message), previous_width)
+    print(f"\r{message:<{width}}", end="", flush=True)
+    return width
 
 
 def build_command(config: ReplayerConfig, trace_path: str) -> list[str]:
@@ -132,6 +207,9 @@ def run_command(
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / "lmcache-replay.log"
     trace_level = _read_trace_level(trace)
+    io_interval_path = (
+        output_dir / "l2_io_interval.tsv" if trace_level == "l2" else None
+    )
     if trace_level == "l2":
         print("[INFO] Preparing L2 replay target", flush=True)
         prepare_code = _run_prepare(config, trace, output_dir)
@@ -148,6 +226,7 @@ def run_command(
     started_at = time.monotonic()
     last_update_at = 0.0
     progress_seen = False
+    progress_width = 0
     profiler = None
     profiler_started = False
     profiler_error: BaseException | None = None
@@ -165,6 +244,8 @@ def run_command(
             profiler_started = True
 
         if trace_level == "l2":
+            assert io_interval_path is not None
+            _initialize_l2_io_interval_tsv(io_interval_path)
             print(
                 f"[INFO] Starting L2 replay. LMCache log: {log_path}",
                 flush=True,
@@ -182,6 +263,12 @@ def run_command(
         ):
             assert process.stdout is not None
             for line in process.stdout:
+                if trace_level == "l2":
+                    io_interval = _l2_io_interval_from_log_line(line)
+                    if io_interval is not None:
+                        assert io_interval_path is not None
+                        _append_l2_io_interval(io_interval_path, io_interval)
+                        continue
                 log_file.write(line)
                 log_file.flush()
                 if trace_level == "l2":
@@ -197,18 +284,16 @@ def run_command(
                         stores,
                         lookups,
                         loads,
-                        submitted_bytes,
+                        _submitted_bytes,
                     ) = l2_progress
                     percent = 100.0 * dispatched / total if total else 100.0
                     in_flight = stores + lookups + loads
-                    print(
-                        f"\r[progress] L2 submitted={dispatched}/{total} "
+                    progress_width = _render_progress(
+                        f"[progress] L2 submitted={dispatched}/{total} "
                         f"({percent:.1f}%) completed={completed} "
                         f"pending={pending} in_flight={in_flight} "
-                        f"submitted_GiB={submitted_bytes / 1024**3:.2f} "
                         f"elapsed={elapsed:.1f}s",
-                        end="",
-                        flush=True,
+                        progress_width,
                     )
                     progress_seen = True
                     continue
@@ -221,11 +306,10 @@ def run_command(
                     continue
                 elapsed = now - started_at
                 percent = 100.0 * completed / total if total else 0.0
-                print(
-                    f"\r[progress] records={completed}/{total} "
+                progress_width = _render_progress(
+                    f"[progress] records={completed}/{total} "
                     f"({percent:.1f}%) elapsed={elapsed:.1f}s",
-                    end="",
-                    flush=True,
+                    progress_width,
                 )
                 progress_seen = True
                 last_update_at = now

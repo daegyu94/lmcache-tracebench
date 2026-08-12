@@ -2,6 +2,7 @@ import replayer.runner as runner_module
 from replayer.config import apply_overrides, load_config
 from replayer.main import main
 from replayer.runner import (
+    _l2_io_interval_from_log_line,
     _l2_progress_from_log_line,
     _progress_from_log_line,
     build_command,
@@ -170,6 +171,30 @@ def test_l2_replay_progress_is_parsed_from_lmcache_log_line():
     assert _l2_progress_from_log_line("LMCache startup message") is None
 
 
+def test_l2_io_interval_is_parsed_from_lmcache_log_line():
+    line = (
+        "LMCache INFO: FS native I/O interval: elapsed=10.001s interval=5.000s "
+        "total_ops=30 total_bytes=3221225472 total_GiB/s=0.600000 "
+        "read_ops=10 read_bytes=1073741824 read_GiB/s=0.200000 "
+        "write_ops=20 write_bytes=2147483648 write_GiB/s=0.400000"
+    )
+
+    assert _l2_io_interval_from_log_line(line) == (
+        10.001,
+        5.0,
+        30,
+        3221225472,
+        0.6,
+        10,
+        1073741824,
+        0.2,
+        20,
+        2147483648,
+        0.4,
+    )
+    assert _l2_io_interval_from_log_line("LMCache startup message") is None
+
+
 def test_l2_replay_reports_start_and_submission_progress(capsys, monkeypatch, tmp_path):
     class FakeProcess:
         stdout = iter(
@@ -179,7 +204,25 @@ def test_l2_replay_reports_start_and_submission_progress(capsys, monkeypatch, tm
                     "completed=70 pending=25 "
                     "in_flight(store=2 lookup=1 load=2) "
                     "bytes_submitted=1073741824\n"
-                )
+                ),
+                (
+                    "FS native I/O interval: elapsed=5.0s interval=5.0s "
+                    "total_ops=12 total_bytes=1610612736 total_GiB/s=0.300000 "
+                    "read_ops=4 read_bytes=536870912 read_GiB/s=0.100000 "
+                    "write_ops=8 write_bytes=1073741824 write_GiB/s=0.200000\n"
+                ),
+                (
+                    "L2 replay progress: elapsed=10.0s dispatched=100/100 "
+                    "completed=100 pending=0 "
+                    "in_flight(store=0 lookup=0 load=0) "
+                    "bytes_submitted=2147483648\n"
+                ),
+                (
+                    "FS native I/O interval: elapsed=10.0s interval=5.0s "
+                    "total_ops=9 total_bytes=805306368 total_GiB/s=0.150000 "
+                    "read_ops=3 read_bytes=268435456 read_GiB/s=0.050000 "
+                    "write_ops=6 write_bytes=536870912 write_GiB/s=0.100000\n"
+                ),
             ]
         )
 
@@ -213,4 +256,72 @@ def test_l2_replay_reports_start_and_submission_progress(capsys, monkeypatch, tm
     assert "[INFO] Starting L2 replay." in output
     assert "L2 submitted=75/100 (75.0%)" in output
     assert "completed=70 pending=25 in_flight=5" in output
+    assert "submitted_GiB" not in output
+    assert "L2 submitted=100/100 (100.0%)" in output
+    assert output.count("\r[progress]") == 2
+    progress_output = output[output.index("\r[progress]") :]
+    progress_output = progress_output[
+        : progress_output.index("\n[INFO] Replay complete.")
+    ]
+    assert "\n" not in progress_output
     assert "[INFO] Replay complete." in output
+
+
+def test_l2_replay_writes_interval_io_tsv(monkeypatch, tmp_path):
+    class FakeProcess:
+        stdout = iter(
+            [
+                (
+                    "FS native I/O interval: elapsed=5.0s interval=5.0s "
+                    "total_ops=12 total_bytes=1610612736 total_GiB/s=0.300000 "
+                    "read_ops=4 read_bytes=536870912 read_GiB/s=0.100000 "
+                    "write_ops=8 write_bytes=1073741824 write_GiB/s=0.200000\n"
+                ),
+                (
+                    "FS native I/O interval: elapsed=10.0s interval=5.0s "
+                    "total_ops=9 total_bytes=805306368 total_GiB/s=0.150000 "
+                    "read_ops=3 read_bytes=268435456 read_GiB/s=0.050000 "
+                    "write_ops=6 write_bytes=536870912 write_GiB/s=0.100000\n"
+                ),
+            ]
+        )
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def wait(self):
+            return 0
+
+    trace = tmp_path / "l2.lct"
+    trace.touch()
+    output_dir = tmp_path / "output"
+    config = apply_overrides(
+        load_config("configs/replayer/smoke.yaml"),
+        output_dir=str(output_dir),
+    )
+    monkeypatch.setattr(runner_module, "_read_trace_level", lambda _: "l2")
+    monkeypatch.setattr(runner_module, "_run_prepare", lambda *_: 0)
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+
+    assert runner_module.run_command(config, str(trace)) == 0
+
+    replay_log = (output_dir / "lmcache-replay.log").read_text()
+    assert "FS native I/O interval:" not in replay_log
+
+    rows = (output_dir / "l2_io_interval.tsv").read_text().splitlines()
+    assert rows == [
+        (
+            "interval_end_seconds\tinterval_seconds\ttotal_ops\ttotal_bytes\t"
+            "total_gib_per_second\tread_ops\tread_bytes\tread_gib_per_second\t"
+            "write_ops\twrite_bytes\twrite_gib_per_second"
+        ),
+        "5.0\t5.0\t12\t1610612736\t0.3\t4\t536870912\t0.1\t8\t1073741824\t0.2",
+        "10.0\t5.0\t9\t805306368\t0.15\t3\t268435456\t0.05\t6\t536870912\t0.1",
+    ]
