@@ -6,12 +6,45 @@
 이 방식을 **staged remote replay**라고 부릅니다.
 
 ```text
-controller node (connected) ── SSH + rsync/scp ──> isolated replay node
-        │                                               │
-        ├─ HF trace download                            ├─ trace extraction
-        ├─ repository/.venv staging                     ├─ venv path repair
-        └─ result retrieval <───────────────────────────└─ replay/sweep execution
+                                      connected / WAN
+┌───────────────────────────────┐
+│ controller node               │
+│                               │
+│ - HF trace download           │
+│ - Git repository + .venv      │
+│ - result collection           │
+└───────────────┬───────────────┘
+                │ SSH + rsync/scp
+                │ trace archive, repository, .venv
+                ▼
+┌────────────────────────────── isolated storage cluster ─────────────────────┐
+│                                                                              │
+│  ┌──────────────────────────────┐       L2 I/O / replay traffic             │
+│  │ replay node                  │────────────────────────────────────────┐  │
+│  │                              │                                        │  │
+│  │ - trace extraction           │                                        │  │
+│  │ - venv path repair           │                                        │  │
+│  │ - replay / sweep execution   │                                        │  │
+│  │ - optional profiler control  │── SSH profiler (optional) ───────────┐  │  │
+│  └──────────────┬───────────────┘                                      │  │  │
+│                 │ results: output, logs, stats                         │  │  │
+│                 └───────────────────────────────────────────────────────┘  │  │
+│                                                                              │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       ┌─────────────┐     │
+│  │ storage-01  │ │ storage-02  │ │ storage-03  │  ...  │ storage-06  │     │
+│  │ L2 target   │ │ L2 target   │ │ L2 target   │       │ L2 target   │     │
+│  └─────────────┘ └─────────────┘ └─────────────┘       └─────────────┘     │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+                ▲
+                │ output retrieval via SSH + rsync/scp
+                └──────────────────────────────────────────────────────────────
 ```
+
+Controller↔cluster 전송은 WAN이 필요하지만, replay가 시작된 뒤의 L2 I/O와 선택적
+storage profiler SSH는 storage cluster 내부 경로만 사용합니다. `storage-01`부터
+`storage-06`의 host/device/interface 정보는 replay repository의
+`configs/profiling/storage.yaml` 또는 별도 profiling config에 기록합니다.
 
 이 가이드는 controller node에서
 `benchmarks/replayer/staged_remote_replay.sh`를 실행하는 절차를 설명합니다.
