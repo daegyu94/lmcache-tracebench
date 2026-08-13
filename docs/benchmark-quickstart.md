@@ -47,7 +47,7 @@ L2 trace replay만 수행할 때는 Tensormesh submodule이 필요하지 않습�
 ```bash
 git clone https://github.com/daegyu94/lmcache-tracebench.git
 cd lmcache-tracebench
-git switch dev
+git switch main
 bash scripts/setup_runtime.sh --profile replayer
 source .venv/bin/activate
 bash scripts/setup_runtime.sh --profile replayer --check

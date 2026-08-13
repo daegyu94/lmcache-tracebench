@@ -117,7 +117,7 @@ replay_trace_root: {remote_traces}
 replay_output_root: {remote_outputs}
 replay_l2_root: {remote_l2}
 git_repo_url: git@github.com:daegyu94/lmcache-tracebench.git
-git_revision: dev
+git_revision: main
 hf_repo_id: daegyu94/lmcache-storage-traces
 hf_revision: main
 transfer_method: scp
@@ -257,7 +257,7 @@ replay_trace_root: {remote_traces}
 replay_output_root: {remote_outputs}
 replay_l2_root: {remote_l2}
 git_repo_url: git@github.com:daegyu94/lmcache-tracebench.git
-git_revision: dev
+git_revision: main
 hf_repo_id: daegyu94/lmcache-storage-traces
 hf_revision: main
 transfer_method: scp

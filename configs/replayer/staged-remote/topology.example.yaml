@@ -32,7 +32,7 @@ replay_l2_root: /mnt/nvme/lmcache-l2-replay/kvcache
 
 # Connected-side sources to stage.
 git_repo_url: git@github.com:daegyu94/lmcache-tracebench.git
-git_revision: dev
+git_revision: main
 hf_repo_id: daegyu94/lmcache-storage-traces
 hf_revision: main
 
