@@ -183,6 +183,7 @@ controller_trace_root="$(topology_get controller_trace_root)"
 controller_output_root="$(topology_get controller_output_root)"
 replay_host="$(topology_get replay_host)"
 replay_user="$(topology_get replay_user)"
+replay_jump_user="$(topology_get replay_jump_user || true)"
 replay_port="$(topology_get replay_port)"
 replay_repo_root="$(topology_get replay_repo_root)"
 replay_venv_root="$(topology_get replay_venv_root)"
@@ -204,6 +205,9 @@ case "$transfer_method" in
   rsync|scp) ;;
   *) die "transfer_method must be rsync or scp: $transfer_method" ;;
 esac
+if [[ -n "$replay_jump_user" && "$transfer_method" != rsync ]]; then
+  die "transfer_method must be rsync when replay_jump_user is set (scp has no --rsync-path equivalent for sudo wrapping): $transfer_method"
+fi
 case "$replay_require_uv" in
   true|false) ;;
   *) die "replay_require_uv must be true or false: $replay_require_uv" ;;
@@ -256,6 +260,19 @@ done
 
 ssh_target="${replay_user}@${replay_host}"
 
+# replay_jump_user가 설정된 경우, jump_user로 SSH 로그인한 뒤 모든 remote
+# command를 sudo -n -u $replay_user로 실행한다. 그렇지 않으면 기존대로
+# replay_user로 직접 SSH한다.
+if [[ -n "$replay_jump_user" ]]; then
+  ssh_target="${replay_jump_user}@${replay_host}"
+  sudo_prefix="sudo -n -u $replay_user"
+  rsync_remote_path="$sudo_prefix rsync"
+else
+  ssh_target="${replay_user}@${replay_host}"
+  sudo_prefix=""
+  rsync_remote_path="rsync"
+fi
+
 shell_quote() {
   printf '%q' "$1"
 }
@@ -264,25 +281,39 @@ remote_exec() {
   local command="$1"
   local quoted_command
   printf -v quoted_command '%q' "$command"
+  local ssh_command
+  if [[ -n "$sudo_prefix" ]]; then
+    ssh_command="$sudo_prefix bash -lc $quoted_command"
+  else
+    ssh_command="bash -lc $quoted_command"
+  fi
   if [[ "$dry_run" == true ]]; then
-    printf '[DRY-RUN] ssh -o BatchMode=yes -p %s %s bash -lc %s\n' \
-      "$replay_port" "$ssh_target" "$quoted_command"
+    printf '[DRY-RUN] ssh -o BatchMode=yes -o RemoteCommand=none -o RequestTTY=no -p %s %s %s\n' \
+      "$replay_port" "$ssh_target" "$ssh_command"
     return 0
   fi
-  ssh -o BatchMode=yes -p "$replay_port" "$ssh_target" "bash -lc $quoted_command"
+  ssh -o BatchMode=yes -o RemoteCommand=none -o RequestTTY=no -p "$replay_port" "$ssh_target" "$ssh_command"
 }
 
 remote_path_exists() {
   local path="$1"
   local quoted_path
   printf -v quoted_path '%q' "$path"
+  local remote_command="test -e $quoted_path || test -L $quoted_path"
+  local ssh_command
+  if [[ -n "$sudo_prefix" ]]; then
+    local quoted_remote_command
+    printf -v quoted_remote_command '%q' "$remote_command"
+    ssh_command="$sudo_prefix bash -lc $quoted_remote_command"
+  else
+    ssh_command="$remote_command"
+  fi
   if [[ "$dry_run" == true ]]; then
     printf '[DRY-RUN] test -e %s (remote path status unknown; treating as absent)\n' \
       "$path"
     return 1
   fi
-  ssh -o BatchMode=yes -p "$replay_port" "$ssh_target" \
-    "test -e $quoted_path || test -L $quoted_path"
+  ssh -o BatchMode=yes -o RemoteCommand=none -o RequestTTY=no -p "$replay_port" "$ssh_target" "$ssh_command"
 }
 
 local_path_exists() {
@@ -296,7 +327,7 @@ require_transport_command() {
   command -v "$1" >/dev/null 2>&1 || die "$1 is required on the controller node"
 }
 
-rsync_ssh_command="ssh -o BatchMode=yes -p $replay_port"
+rsync_ssh_command="ssh -o BatchMode=yes -o RemoteCommand=none -o RequestTTY=no -p $replay_port"
 
 transfer_file() {
   local local_path="$1"
@@ -317,6 +348,7 @@ transfer_file() {
   require_transport_command "$transfer_method"
   if [[ "$transfer_method" == rsync ]]; then
     rsync -a --ignore-existing -e "$rsync_ssh_command" \
+      --rsync-path "$rsync_remote_path" \
       -- "$local_path" "$ssh_target:$remote_path"
   else
     scp -q -P "$replay_port" -o BatchMode=yes \
@@ -343,6 +375,7 @@ transfer_directory() {
   require_transport_command "$transfer_method"
   if [[ "$transfer_method" == rsync ]]; then
     rsync -a --ignore-existing -e "$rsync_ssh_command" \
+      --rsync-path "$rsync_remote_path" \
       -- "$local_path/" "$ssh_target:$remote_path/"
   else
     scp -q -r -P "$replay_port" -o BatchMode=yes \
@@ -373,6 +406,7 @@ retrieve_directory() {
   if [[ "$transfer_method" == rsync ]]; then
     mkdir -- "$local_path"
     rsync -a --ignore-existing -e "$rsync_ssh_command" \
+      --rsync-path "$rsync_remote_path" \
       -- "$ssh_target:$remote_path/" "$local_path/"
   else
     scp -q -r -P "$replay_port" -o BatchMode=yes \

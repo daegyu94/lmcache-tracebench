@@ -1,0 +1,87 @@
+# B300 staged-remote replay topology.
+#
+# Controller node: sia (이 호스트). Samsung DS pip proxy + artifactory를 통해
+# GitHub/HF에 접근 가능하고, 개인 ~/.ssh/config의 "weka01" alias로 weka01에
+# passwordless SSH가 가능하다. 이 alias는 "user" jump 계정으로 접속된다.
+#
+# Replay node: weka01, 격리된 storage/replay host. 호스트 이름과 달리
+# WekaIO와는 무관하다 — weka CLI도 없고, WekaFS도, fuse mount도 없다.
+# "weka0X"는 그냥 호스트 네이밍 스킴일 뿐이다. "user" jump 계정에는
+# (daegyu) NOPASSWD: ALL이 설정돼 있어서, 스크립트는 replay_user를
+# 통해 실제 작업 계정인 "daegyu"로 전환한다. weka01은 outbound network가
+# 없으므로(pypi, github, artifactory 모두 불가) runtime_mode는 copy_venv로
+# 설정한다: controller가 replayer requirements로 .venv를 만들고 스크립트가
+# 그걸 weka01로 복사하면서 shebang/.pth/pyvenv.cfg/bin/activate* 경로를
+# 고쳐준다. 두 호스트 모두 Ubuntu 24.04 Noble + Python 3.12.x라서 이 복사는
+# 안전하다.
+
+# Controller node (sia): 이 호스트에서 쓰는 경로들.
+controller_repo_root: /home/daegyu94/workspace/b300/lmcache-tracebench
+controller_trace_root: /home/daegyu94/workspace/b300/staged-replay/traces
+controller_output_root: /home/daegyu94/workspace/b300/staged-replay/outputs
+# copy_venv는 controller_venv_root == controller_repo_root/.venv를 요구한다;
+# ensure_controller_venv가 최초 실행 시 scripts/setup_runtime.sh --profile
+# replayer-cpu로 이걸 만든다.
+
+# Replay node (weka01). 계정이 두 개 관여하는데, SSH 로그인 자체에 등장하는
+# 건 첫 번째 계정뿐이다:
+#   - replay_jump_user ("user"): `ssh weka01`이 실제로 로그인하는 계정. 문을 열고
+#     들어가는 용도일 뿐이고, 스크립트는 실제 작업을 이 계정으로 실행하지
+#     않는다.
+#   - replay_user ("daegyu"): 나머지 모든 일을 하는 계정 — 아래의
+#     replay_repo_root/replay_venv_root와 모든 replay_*_root 경로를 소유하고,
+#     실제로 모든 remote command/transfer가 이 계정으로 실행된다. 스크립트는
+#     replay_jump_user로 로그인한 뒤 곧바로 각 명령을 `sudo -u daegyu`로 다시
+#     실행한다(build_remote_command() 참고). "user"가 daegyu로의 NOPASSWD
+#     sudo 권한을 갖고 있기 때문이다. 만약 replay_jump_user가 이 경로들에 이미
+#     직접 write할 수 있었다면 replay_user는 생략했을 것이다.
+replay_host: weka01
+replay_jump_user: user
+replay_port: 22
+replay_user: daegyu
+replay_repo_root: /home/daegyu/lmcache-tracebench
+replay_venv_root: /home/daegyu/lmcache-tracebench/.venv
+
+# Runtime 설정. weka01은 outbound network가 없으므로 copy_venv가 필수다:
+# controller가 venv를 만들고 스크립트가 그걸 복사한다. replay_python은
+# verify_remote_runtime이 복사된 venv의 Python minor 버전이 weka01의
+# interpreter(3.12)와 일치하는지 확인하는 데 여전히 쓰인다.
+runtime_mode: copy_venv
+replay_python: /usr/bin/python3.12
+replay_runtime_requirements: requirements/replayer.txt
+controller_venv_root: /home/daegyu94/workspace/b300/lmcache-tracebench/.venv
+# Package index 및 uv 버전 관련 필드는 copy_venv에서는 쓰이지 않는다;
+# (uv는 controller에서만 실행되고, weka01에는 전달되지 않는다) 의도적으로 미설정.
+# replay_package_index_url: http://repo.samsungds.net/artifactory/api/pypi/pypi-remote/simple
+# replay_extra_index_url: https://pypi.org/simple
+# replay_uv_version: 0.12.3
+
+# weka01의 disposable replay 경로들. Trace/output 데이터는 /mnt/replayer
+# 아래에 있는데, 이건 /dev/nvme3n1 위의 전용 7T XFS mount(noatime)로, node
+# owner가 이미 0777 권한으로 만들어 둔 상태라 daegyu는 별도 sudo 없이 쓸 수
+# 있다. 스크립트가 최초 사용 시 이 경로들을 mkdir하지만, /mnt/replayer
+# mountpoint 자체는 미리 존재하고 daegyu가 쓸 수 있는 상태여야 한다.
+#
+# replay_l2_root는 /mnt/replayer 밑이 아니라 별도 mount인 /mnt/kvcache를
+# 가리킨다: 이건 L2 벤치마킹에 쓰는 backend별 storage mountpoint들의
+# 상위 경로다(예: /mnt/kvcache/pnfs, /mnt/kvcache/3fs — benchmarks/README.md의
+# backend sweep 참고). 스크립트는 이 키를 필수로 요구하지만, 실제 run별 L2
+# 디렉토리는 replay 명령이 @L2_ROOT@/<backend> placeholder를 통해 정한다
+# (예: @L2_ROOT@/pnfs), 그래서 각 벤치마크는 자기 backend의 mountpoint
+# 아래에 자리잡는다. 이 base 값은 고정해 두고, backend/run-name suffix
+# 쪽을 바꿔라. replay_trace_root와 replay_output_root도 마찬가지로 base
+# 경로지만, 스크립트가 이미 replay_output_root 밑에 run-name을 nest한다.
+replay_trace_root: /mnt/replayer/traces
+replay_output_root: /mnt/replayer/outputs
+replay_l2_root: /mnt/kvcache
+
+# 연결 가능한 쪽에서 staging할 source들. git은 HTTPS로(개인 SSH 키는
+# weka01에 연결돼 있지 않음); controller와 replay 모두 main을 쓴다.
+git_repo_url: https://github.com/daegyu94/lmcache-tracebench.git
+git_revision: main
+hf_repo_id: daegyu94/lmcache-storage-traces
+hf_revision: main
+
+# 모든 파일 전송은 rsync로 한다(scp는 지원하지 않음). rsync가 변경된
+# 파일만 전송하고 --exclude로 .venv 등 node-local 경로를 보호한다.
+transfer_method: rsync
