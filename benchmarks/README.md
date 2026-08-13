@@ -49,8 +49,14 @@ benchmarks/
 | `recorder/record_source_traces.sh` | source별 baseline trace 생성 |
 | `recorder/record_speed_sweep.sh` | workload speedup별 `.lct` 생성 |
 
-`record_source_traces.sh`는 source별 L2 adapter trace를 생성할 때 다음처럼
-`--trace-kind l2`를 명시합니다.
+`record_source_traces.sh`는 기본적으로 GAIA, WildClaw, SWE-bench의
+`storage.lct`를 생성합니다. `--sources`에는 다음 source 이름을 사용할 수
+있습니다.
+
+- Tensormesh: `gaia`, `wildclaw`, `swebench`
+- Mooncake: `mooncake-toolagent`, `mooncake-conversation`
+
+L2 adapter trace가 필요하면 다음처럼 source와 trace 종류를 지정합니다.
 
 ```bash
 bash benchmarks/recorder/record_source_traces.sh \
@@ -60,8 +66,21 @@ bash benchmarks/recorder/record_source_traces.sh \
   --sources gaia,wildclaw
 ```
 
-`record_speed_sweep.sh`는 workload별 speedup마다 독립적인 `l2.lct`를 생성합니다.
-실행할 때도 `--trace-kind l2`를 명시합니다.
+Mooncake Tool/Agent와 Conversation을 기록하려면 다음처럼 실행합니다.
+
+```bash
+bash benchmarks/recorder/record_source_traces.sh \
+  --mountpoint /MNTPNT \
+  --output-root outputs/source-traces \
+  --trace-kind l2 \
+  --sources mooncake-toolagent,mooncake-conversation
+```
+
+Mooncake 입력 trace는 config의 `path`를 사용하며, 없으면 recorder가 다운로드합니다.
+각 결과는 `mooncake-toolagent/` 또는 `mooncake-conversation/` 아래에 생성됩니다.
+
+`record_speed_sweep.sh`는 workload별 speedup마다 독립 trace를 생성합니다.
+`--trace-kind l2`를 추가하면 각 speedup 디렉터리에 `l2.lct`를 생성합니다.
 
 ## Replayer scripts
 

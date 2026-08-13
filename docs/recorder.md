@@ -109,6 +109,32 @@ bash benchmarks/recorder/record_source_traces.sh \
 `l2.lct`로 저장됩니다. 작은 working set의 GAIA부터 시작하며, 한 source가 실패하면
 script는 즉시 멈춥니다. 이때 실패한 source만 해당 config로 다시 실행하면 됩니다.
 
+Mooncake Tool/Agent와 Conversation은 source 이름에 backend를 포함해 선택할 수
+있습니다.
+
+```bash
+bash benchmarks/recorder/record_source_traces.sh \
+  --mountpoint /MNTPNT \
+  --output-root /MNTPNT/lmcache-tracebench/outputs \
+  --trace-kind l2 \
+  --sources mooncake-toolagent,mooncake-conversation
+```
+
+`source-traces-20260804-082231` 실행에서 모든 session을 record한 실측 결과는
+다음과 같습니다. KV cache 점유량은 L2 directory의 filesystem 사용량이고, trace는
+생성된 `storage.lct`의 크기입니다.
+
+| Source | L2 KV cache 경로 | KV cache 점유량 | `storage.lct` 크기 |
+| --- | --- | ---: | ---: |
+| GAIA | `/MNTPNT/lmcache-trace/gaia` | 537G | 135M |
+| SWE-bench | `/MNTPNT/lmcache-trace/swebench` | 4.9T | 5.9G |
+| WildClaw | `/MNTPNT/lmcache-trace/wildclaw` | 56G | 24M |
+
+L2 점유량은 실제 KV object의 filesystem 사용량이고, `storage.lct`는 payload
+대신 API 호출과 인자를 저장하므로 훨씬 작습니다. 이 수치는 해당 실행과 dataset
+revision의 관측값이며 model, session 수, chunk size, cache policy가 바뀌면
+달라집니다.
+
 Mixed workload의 source 비율, session ordering, timing policy와 대표성 검증은
 현재 **TBD**입니다.
 

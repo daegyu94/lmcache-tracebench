@@ -21,13 +21,46 @@ record_validate_trace_kind() {
   esac
 }
 
-record_validate_tensormesh_source() {
+record_validate_source() {
+  local source="${1-}"
+  case "$source" in
+    gaia|wildclaw|swebench|mooncake-toolagent|mooncake-conversation)
+      ;;
+    *)
+      echo "Unsupported recorder source: $source" >&2
+      return 1
+      ;;
+  esac
+}
+
+record_backend_for_source() {
   local source="${1-}"
   case "$source" in
     gaia|wildclaw|swebench)
+      printf '%s\n' 'tensormesh'
+      ;;
+    mooncake-toolagent|mooncake-conversation)
+      printf '%s\n' 'mooncake'
       ;;
     *)
-      echo "Unsupported Tensormesh source: $source" >&2
+      return 1
+      ;;
+  esac
+}
+
+record_workload_for_source() {
+  local source="${1-}"
+  case "$source" in
+    gaia|wildclaw|swebench)
+      printf '%s\n' "$source"
+      ;;
+    mooncake-toolagent)
+      printf '%s\n' 'toolagent'
+      ;;
+    mooncake-conversation)
+      printf '%s\n' 'conversation'
+      ;;
+    *)
       return 1
       ;;
   esac

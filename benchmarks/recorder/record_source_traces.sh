@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Record independent SWE-bench, GAIA, and WildClaw LMCache storage traces.
+# Record independent Tensormesh and Mooncake LMCache traces.
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,7 +79,7 @@ if ((${#source_list[@]} == 0)); then
 fi
 for source in "${source_list[@]}"; do
   source="${source//[[:space:]]/}"
-  if ! record_validate_tensormesh_source "$source"; then
+  if ! record_validate_source "$source"; then
     usage >&2
     exit 2
   fi
@@ -99,13 +99,21 @@ echo "[INFO] Each run resets only its own source-specific L2 directory."
 # Record each requested source in the requested order.
 for raw_source in "${source_list[@]}"; do
   source="${raw_source//[[:space:]]/}"
-  config="$(record_config_for_workload tensormesh "$source")"
+  backend="$(record_backend_for_source "$source")"
+  workload="$(record_workload_for_source "$source")"
+  config="$(record_config_for_workload "$backend" "$workload")"
   echo "[INFO] Starting $source trace"
-  python -m recorder.main \
-    --config "$config" \
-    --mountpoint "$mountpoint" \
-    --trace-kind "$trace_kind" \
+  command=(
+    python -m recorder.main
+    --config "$config"
+    --mountpoint "$mountpoint"
+    --trace-kind "$trace_kind"
     --output-dir "$run_root/$source"
+  )
+  if [[ "$backend" == mooncake ]]; then
+    command+=(--mooncake-trace "$workload")
+  fi
+  "${command[@]}"
   echo "[INFO] Finished $source trace"
 done
 
