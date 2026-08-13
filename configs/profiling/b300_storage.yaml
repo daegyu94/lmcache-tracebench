@@ -1,0 +1,42 @@
+# B300 replay profiling for the WekaIO storage cluster (weka02-weka07).
+# Devices are intentionally left empty pending the final NVMe layout; each
+# node still satisfies the profiler's device-or-interface requirement via
+# bond0. Add /dev/nvme* entries per node once the device mapping is decided.
+sample_interval_seconds: 5
+report_interval_seconds: 5
+remote_tmp_root: /tmp/lmcache-tracebench-profile
+ssh_user: user
+
+nodes:
+  - name: weka02
+    host: weka02
+    interfaces:
+      - bond0
+  - name: weka03
+    host: weka03
+    interfaces:
+      - bond0
+  - name: weka04
+    host: weka04
+    interfaces:
+      - bond0
+  - name: weka05
+    host: weka05
+    interfaces:
+      - bond0
+  - name: weka06
+    host: weka06
+    interfaces:
+      - bond0
+  - name: weka07
+    host: weka07
+    interfaces:
+      - bond0
+
+# Uncomment this block when client-side network traffic is also needed.
+# It measures the replay node's interface using the same TSV schema.
+# replay_node:
+#   name: replay_node
+#   host: node1
+#   interfaces:
+#     - bond0
