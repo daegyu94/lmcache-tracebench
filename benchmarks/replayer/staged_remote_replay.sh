@@ -494,12 +494,12 @@ ensure_controller_venv() {
   if local_path_exists "$controller_venv_root"; then
     warn "Controller venv already exists; not rebuilding or overwriting: $controller_venv_root"
   elif [[ "$dry_run" == true ]]; then
-    printf '[DRY-RUN] bash %s --profile replayer\n' \
+    printf '[DRY-RUN] bash %s --profile replayer-cpu\n' \
       "$controller_repo_root/scripts/setup_runtime.sh"
   else
     [[ -x "$controller_repo_root/scripts/setup_runtime.sh" ]] || \
       die "Controller setup script not found: $controller_repo_root/scripts/setup_runtime.sh"
-    bash "$controller_repo_root/scripts/setup_runtime.sh" --profile replayer
+    bash "$controller_repo_root/scripts/setup_runtime.sh" --profile replayer-cpu
   fi
   if [[ "$dry_run" == false && ! -x "$controller_venv_root/bin/python" ]]; then
     die "Controller venv is not ready: $controller_venv_root"
@@ -541,7 +541,7 @@ prepare_remote_runtime() {
   remote_command+="repo=$(shell_quote "$replay_repo_root")"$'\n'
   remote_command+='cd "$repo"'$'\n'
   remote_command+='[[ -x "$repo/scripts/setup_runtime.sh" ]] || { echo "Replay setup script not found: $repo/scripts/setup_runtime.sh" >&2; exit 1; }'$'\n'
-  remote_command+="bash \"\$repo/scripts/setup_runtime.sh\" --profile replayer --python $(shell_quote "$replay_python") --runtime-requirements $(shell_quote "$replay_runtime_requirements")"
+  remote_command+="bash \"\$repo/scripts/setup_runtime.sh\" --profile replayer-cpu --python $(shell_quote "$replay_python") --runtime-requirements $(shell_quote "$replay_runtime_requirements")"
   if [[ -n "$replay_package_index_url" ]]; then
     remote_command+=" --index-url $(shell_quote "$replay_package_index_url")"
   fi

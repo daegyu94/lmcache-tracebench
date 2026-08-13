@@ -25,8 +25,11 @@ benchmarks/
 - replayer만 실행하려면 replayer profile을 설치합니다.
 
   ```bash
-  bash scripts/setup_runtime.sh --profile replayer
+  bash scripts/setup_runtime.sh --profile replayer-cpu
   ```
+
+  GPU가 있는 replay node에서 CUDA torch 기반으로 replay하려면 `replayer-gpu`를
+  사용합니다. 기본값은 CPU torch 기반의 `replayer-cpu`입니다.
 
 - `replay_speed_sweep.sh`는 각 case 직전에 같은 `l2-root` base path를 삭제하고
   다시 만듭니다. speedup별 L2 하위 디렉터리는 만들지 않습니다. 기존 replay 결과가

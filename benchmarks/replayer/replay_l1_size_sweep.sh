@@ -131,7 +131,7 @@ done
 
 cd "$project_dir"
 if [[ ! -f .venv/bin/activate ]]; then
-  die "Project virtual environment is missing. Run: bash scripts/setup_runtime.sh --profile replayer"
+  die "Project virtual environment is missing. Run: bash scripts/setup_runtime.sh --profile replayer-cpu"
 fi
 source .venv/bin/activate
 

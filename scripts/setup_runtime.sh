@@ -17,7 +17,7 @@ extra_requirements=()
 
 usage() {
     echo "Usage: bash scripts/setup_runtime.sh [--check] [--force-reinstall] [--profile PROFILE] [--python PATH] [--index-url URL] [--extra-index-url URL] [--runtime-requirements PATH]" >&2
-    echo "Profiles: recorder (default), replayer" >&2
+    echo "Profiles: recorder, replayer-cpu, replayer-gpu" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -91,7 +91,7 @@ case "${profile}" in
             "${project_root}/third_party/Tensormesh-Benchmark/src/requirements.txt"
         )
         ;;
-    replayer)
+    replayer-cpu|replayer-gpu)
         default_runtime_requirements="${project_root}/requirements/replayer.txt"
         project_install="${project_root}[test]"
         ;;
@@ -130,9 +130,9 @@ elif ! command -v uv >/dev/null 2>&1; then
     exit 1
 fi
 
-if [[ "${profile}" == "recorder" ]]; then
+if [[ "${profile}" == "recorder" || "${profile}" == "replayer-gpu" ]]; then
     if ! command -v nvidia-smi >/dev/null 2>&1; then
-        echo "nvidia-smi was not found; a CUDA-enabled NVIDIA GPU is required for recorder." >&2
+        echo "nvidia-smi was not found; a CUDA-enabled NVIDIA GPU is required for ${profile}." >&2
         exit 1
     fi
     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -163,6 +163,27 @@ if [[ "${check_only}" == false ]]; then
     if [[ -n "${extra_index_url}" ]]; then
         pip_options+=(--extra-index-url "${extra_index_url}")
     fi
+    # replayer-cpu never touches a GPU, so pull torch from the CPU-only wheel
+    # index and build LMCache with NO_GPU_EXT=1. The CPU torch wheel has no
+    # CUDA runtime, so LMCache's CUDAExtension build for lmcache.c_ops would
+    # fail (torch.cuda._is_compiled() is False → torch's internal CUDA_HOME is
+    # None regardless of the env var). NO_GPU_EXT=1 skips the c_ops .so build
+    # entirely; at runtime the lmcache.c_ops PEP 562 shim resolves to
+    # CpuDeviceOps (pure Python), which the replay CLI uses via
+    # StubCPUDevice. replayer-gpu and recorder keep the default index
+    # (CUDA-enabled torch) and build the full c_ops extension. pip already
+    # picks the highest version across all indexes, so adding the CPU index
+    # as --extra-index-url makes 2.11.0+cpu win over the untagged CUDA wheel
+    # on PyPI (PEP 440 ranks local versions higher).
+    torch_pip_options=("${pip_options[@]}")
+    requirements_pip_options=("${pip_options[@]}")
+    if [[ "${profile}" == "replayer-cpu" ]]; then
+        torch_pip_options=(--index-url https://download.pytorch.org/whl/cpu)
+        requirements_pip_options+=(
+            --extra-index-url https://download.pytorch.org/whl/cpu
+        )
+        export NO_GPU_EXT=1
+    fi
     if [[ "${force_reinstall}" == true ]]; then
         install_options=(--upgrade --force-reinstall)
         "${venv_python}" -m pip install "${pip_options[@]}" --upgrade pip
@@ -172,10 +193,13 @@ if [[ "${check_only}" == false ]]; then
     "${venv_python}" -m pip install "${pip_options[@]}" "${install_options[@]}" "setuptools>=77.0.3,<81.0.0"
     # LMCache's metadata build imports torch before pip installs the full
     # requirements file, so bootstrap the pinned torch build dependency too.
-    "${venv_python}" -m pip install "${pip_options[@]}" "${install_options[@]}" "torch==2.11.0"
+    # Re-pin setuptools alongside torch so torch's own setuptools<82 constraint
+    # cannot pull 81.x from PyPI and break LMCache's <81.0.0 pin.
+    "${venv_python}" -m pip install "${torch_pip_options[@]}" "${install_options[@]}" \
+        "torch==2.11.0" "setuptools>=77.0.3,<81.0.0"
     # By default, pip installs only missing or incompatible requirements. Use
     # --force-reinstall when intentionally resetting the selected runtime.
-    "${venv_python}" -m pip install "${pip_options[@]}" "${install_options[@]}" --no-build-isolation \
+    "${venv_python}" -m pip install "${requirements_pip_options[@]}" "${install_options[@]}" --no-build-isolation \
         -r "${runtime_requirements}" \
         "${extra_requirements[@]}"
     "${venv_python}" -m pip install "${pip_options[@]}" -e "${project_install}"

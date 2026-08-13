@@ -190,7 +190,7 @@ bash benchmarks/replayer/staged_remote_replay.sh prepare-trace \
 ### 3.2 Replay 준비
 
 Repository를 controller에 clone한 뒤 replay node로 전송합니다. 기본 `remote_install`
-모드에서는 replay node에서 `setup_runtime.sh --profile replayer --python ...`을 실행해
+모드에서는 replay node에서 `setup_runtime.sh --profile replayer-cpu --python ...`을 실행해
 지정된 Python으로 `.venv`를 만들고, runtime requirements와 사내 package source를
 사용해 설치한 뒤 import/pip 검사를 수행합니다.
 

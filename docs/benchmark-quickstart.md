@@ -48,9 +48,9 @@ L2 trace replay만 수행할 때는 Tensormesh submodule이 필요하지 않습�
 git clone https://github.com/daegyu94/lmcache-tracebench.git
 cd lmcache-tracebench
 git switch main
-bash scripts/setup_runtime.sh --profile replayer
+bash scripts/setup_runtime.sh --profile replayer-cpu
 source .venv/bin/activate
-bash scripts/setup_runtime.sh --profile replayer --check
+bash scripts/setup_runtime.sh --profile replayer-cpu --check
 ```
 
 설치 결과를 확인합니다.
@@ -374,7 +374,7 @@ config, 실행 시각, background workload, 반복 횟수와 순서를 기록합
 
 ## 10. 실패 시 확인 순서
 
-1. `bash scripts/setup_runtime.sh --profile replayer --check`
+1. `bash scripts/setup_runtime.sh --profile replayer-cpu --check`
 2. Trace가 존재하고 크기가 0보다 큰지 확인
 3. `--dry-run`으로 최종 command와 target path 확인
 4. Case의 `lmcache-prepare.log` 확인
