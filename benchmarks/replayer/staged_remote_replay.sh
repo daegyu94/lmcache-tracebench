@@ -12,6 +12,11 @@ run_name=""
 assets=()
 command_args=()
 controller_python_version=""
+runtime_mode=""
+replay_python=""
+replay_runtime_requirements=""
+replay_package_index_url=""
+replay_extra_index_url=""
 
 declare -A topology_values=()
 
@@ -23,8 +28,8 @@ Usage:
 Phases:
   prepare-trace    Download one or more HF archives on the controller and transfer
                    and extract them on the isolated replay node.
-  prepare-replay   Clone/stage the tracebench repository and controller .venv,
-                   then repair and verify the copied environment on the replay node.
+  prepare-replay   Clone/stage the tracebench repository and prepare the replay
+                   node runtime according to topology runtime_mode.
   replay           Run a supplied replay/sweep command and retrieve its output even
                    when the remote command exits non-zero.
   all              Run prepare-trace, prepare-replay, and replay in order.
@@ -161,15 +166,16 @@ require_topology_key() {
 
 load_topology
 for key in \
-  controller_repo_root controller_venv_root controller_trace_root \
-  controller_output_root replay_host replay_user replay_port replay_repo_root \
-  replay_venv_root replay_trace_root replay_output_root replay_l2_root \
-  git_repo_url git_revision hf_repo_id hf_revision transfer_method; do
+  runtime_mode controller_repo_root controller_trace_root controller_output_root \
+  replay_host replay_user replay_port replay_repo_root replay_venv_root \
+  replay_trace_root replay_output_root replay_l2_root git_repo_url git_revision \
+  hf_repo_id hf_revision transfer_method; do
   require_topology_key "$key"
 done
 
+runtime_mode="$(topology_get runtime_mode)"
 controller_repo_root="$(topology_get controller_repo_root)"
-controller_venv_root="$(topology_get controller_venv_root)"
+controller_venv_root="$(topology_get controller_venv_root || true)"
 controller_trace_root="$(topology_get controller_trace_root)"
 controller_output_root="$(topology_get controller_output_root)"
 replay_host="$(topology_get replay_host)"
@@ -180,6 +186,10 @@ replay_venv_root="$(topology_get replay_venv_root)"
 replay_trace_root="$(topology_get replay_trace_root)"
 replay_output_root="$(topology_get replay_output_root)"
 replay_l2_root="$(topology_get replay_l2_root)"
+replay_python="$(topology_get replay_python || true)"
+replay_runtime_requirements="$(topology_get replay_runtime_requirements || true)"
+replay_package_index_url="$(topology_get replay_package_index_url || true)"
+replay_extra_index_url="$(topology_get replay_extra_index_url || true)"
 git_repo_url="$(topology_get git_repo_url)"
 git_revision="$(topology_get git_revision)"
 hf_repo_id="$(topology_get hf_repo_id)"
@@ -190,9 +200,23 @@ case "$transfer_method" in
   rsync|scp) ;;
   *) die "transfer_method must be rsync or scp: $transfer_method" ;;
 esac
+case "$runtime_mode" in
+  remote_install)
+    require_topology_key replay_python
+    require_topology_key replay_runtime_requirements
+    ;;
+  copy_venv)
+    require_topology_key controller_venv_root
+    ;;
+  *)
+    die "runtime_mode must be remote_install or copy_venv: $runtime_mode"
+    ;;
+esac
 [[ "$replay_port" =~ ^[0-9]+$ ]] || die "replay_port must be an integer: $replay_port"
 [[ "$controller_repo_root" == /* ]] || die "controller_repo_root must be absolute"
-[[ "$controller_venv_root" == /* ]] || die "controller_venv_root must be absolute"
+if [[ "$runtime_mode" == copy_venv ]]; then
+  [[ "$controller_venv_root" == /* ]] || die "controller_venv_root must be absolute"
+fi
 [[ "$controller_trace_root" == /* ]] || die "controller_trace_root must be absolute"
 [[ "$controller_output_root" == /* ]] || die "controller_output_root must be absolute"
 [[ "$replay_repo_root" == /* ]] || die "replay_repo_root must be absolute"
@@ -200,13 +224,24 @@ esac
 [[ "$replay_trace_root" == /* ]] || die "replay_trace_root must be absolute"
 [[ "$replay_output_root" == /* ]] || die "replay_output_root must be absolute"
 [[ "$replay_l2_root" == /* ]] || die "replay_l2_root must be absolute"
-controller_expected_venv="${controller_repo_root%/}/.venv"
+if [[ "$runtime_mode" == remote_install ]]; then
+  case "$replay_python" in
+    *[!A-Za-z0-9_./-]*) die "replay_python must be an executable path or command name: $replay_python" ;;
+  esac
+fi
 replay_expected_venv="${replay_repo_root%/}/.venv"
-[[ "$controller_venv_root" == "$controller_expected_venv" ]] || \
-  die "controller_venv_root must be controller_repo_root/.venv for path repair"
+if [[ "$runtime_mode" == copy_venv ]]; then
+  controller_expected_venv="${controller_repo_root%/}/.venv"
+  [[ "$controller_venv_root" == "$controller_expected_venv" ]] || \
+    die "controller_venv_root must be controller_repo_root/.venv for path repair"
+fi
 [[ "$replay_venv_root" == "$replay_expected_venv" ]] || \
-  die "replay_venv_root must be replay_repo_root/.venv for path repair"
-for path_value in "$controller_repo_root" "$replay_repo_root" "$controller_venv_root" "$replay_venv_root"; do
+  die "replay_venv_root must be replay_repo_root/.venv"
+path_values=("$controller_repo_root" "$replay_repo_root" "$replay_venv_root")
+if [[ "$runtime_mode" == copy_venv ]]; then
+  path_values+=("$controller_venv_root")
+fi
+for path_value in "${path_values[@]}"; do
   [[ "$path_value" != *'|'* && "$path_value" != *'&'* && "$path_value" != *$'\n'* ]] || \
     die "repository and venv paths cannot contain '|', '&', or newlines: $path_value"
 done
@@ -436,6 +471,45 @@ ensure_controller_venv() {
   fi
 }
 
+verify_remote_runtime() {
+  local remote_command
+  remote_command="set -euo pipefail"$'\n'
+  remote_command+="venv=$(shell_quote "$replay_venv_root")"$'\n'
+  remote_command+="base_python=$(shell_quote "$replay_python")"$'\n'
+  remote_command+='if [[ "$base_python" == /* ]]; then base_python_path="$base_python"; else base_python_path="$(command -v "$base_python" || true)"; fi'$'\n'
+  remote_command+='[[ -x "$base_python_path" ]] || { echo "Replay Python was not found: $base_python" >&2; exit 1; }'$'\n'
+  remote_command+='expected_version="$($base_python_path -c '\''import sys; print("%d.%d" % sys.version_info[:2])'\'')"'$'\n'
+  remote_command+='actual_version="$($venv/bin/python -c '\''import sys; print("%d.%d" % sys.version_info[:2])'\'')"'$'\n'
+  remote_command+='[[ "$actual_version" == "$expected_version" ]] || { echo "Replay venv Python $actual_version does not match $expected_version" >&2; exit 1; }'$'\n'
+  remote_command+='"$venv/bin/python" -c '\''import lmcache, lmcache.c_ops, replayer'\'''$'\n'
+  remote_command+='"$venv/bin/python" -m pip check'$'\n'
+  remote_exec "$remote_command"
+}
+
+prepare_remote_runtime() {
+  if remote_path_exists "$replay_venv_root"; then
+    warn "Remote venv already exists; not overwriting: $replay_venv_root"
+    verify_remote_runtime
+    return
+  fi
+
+  local remote_command
+  remote_command="set -euo pipefail"$'\n'
+  remote_command+="repo=$(shell_quote "$replay_repo_root")"$'\n'
+  remote_command+='cd "$repo"'$'\n'
+  remote_command+='[[ -x "$repo/scripts/setup_runtime.sh" ]] || { echo "Replay setup script not found: $repo/scripts/setup_runtime.sh" >&2; exit 1; }'$'\n'
+  remote_command+="bash \"\$repo/scripts/setup_runtime.sh\" --profile replayer --python $(shell_quote "$replay_python") --runtime-requirements $(shell_quote "$replay_runtime_requirements")"
+  if [[ -n "$replay_package_index_url" ]]; then
+    remote_command+=" --index-url $(shell_quote "$replay_package_index_url")"
+  fi
+  if [[ -n "$replay_extra_index_url" ]]; then
+    remote_command+=" --extra-index-url $(shell_quote "$replay_extra_index_url")"
+  fi
+  remote_command+=$'\n'
+  remote_exec "$remote_command"
+  verify_remote_runtime
+}
+
 repair_remote_venv() {
   local remote_command
   remote_command="set -euo pipefail"$'\n'
@@ -470,20 +544,28 @@ repair_remote_venv() {
 }
 
 prepare_replay() {
-  local remote_venv_preexisting=false
-  if remote_path_exists "$replay_venv_root"; then
-    remote_venv_preexisting=true
-    warn "Remote venv already exists; not overwriting or repairing it: $replay_venv_root"
-  fi
   prepare_repository
-  ensure_controller_venv
-  if [[ "$remote_venv_preexisting" == true ]]; then
-    remote_exec "test -x $(shell_quote "$replay_venv_root/bin/python")"
-  else
-    transfer_directory "$controller_venv_root" "$replay_venv_root"
-    repair_remote_venv
-  fi
-  info "Replay venv staged and verified on $ssh_target"
+  case "$runtime_mode" in
+    remote_install)
+      prepare_remote_runtime
+      info "Replay runtime prepared and verified on $ssh_target"
+      ;;
+    copy_venv)
+      local remote_venv_preexisting=false
+      if remote_path_exists "$replay_venv_root"; then
+        remote_venv_preexisting=true
+        warn "Remote venv already exists; not overwriting or repairing it: $replay_venv_root"
+      fi
+      ensure_controller_venv
+      if [[ "$remote_venv_preexisting" == true ]]; then
+        remote_exec "test -x $(shell_quote "$replay_venv_root/bin/python")"
+      else
+        transfer_directory "$controller_venv_root" "$replay_venv_root"
+        repair_remote_venv
+      fi
+      info "Replay venv copied and verified on $ssh_target"
+      ;;
+  esac
 }
 
 expand_placeholder() {
