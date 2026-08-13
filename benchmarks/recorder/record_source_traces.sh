@@ -10,9 +10,10 @@ output_root="outputs"
 mountpoint=""
 trace_kind="storage"
 sources="gaia,wildclaw,swebench"
+dataset_percent=""
 
 usage() {
-  echo "Usage: bash benchmarks/recorder/record_source_traces.sh --mountpoint PATH [--output-root PATH] [--trace-kind storage|l2] [--sources LIST]"
+  echo "Usage: bash benchmarks/recorder/record_source_traces.sh --mountpoint PATH [--output-root PATH] [--trace-kind storage|l2] [--sources LIST] [--dataset-percent PERCENT]"
 }
 
 while (($#)); do
@@ -47,6 +48,14 @@ while (($#)); do
         exit 2
       fi
       sources="$2"
+      shift 2
+      ;;
+    --dataset-percent)
+      if (($# < 2)); then
+        usage >&2
+        exit 2
+      fi
+      dataset_percent="$2"
       shift 2
       ;;
     -h|--help)
@@ -112,6 +121,9 @@ for raw_source in "${source_list[@]}"; do
   )
   if [[ "$backend" == mooncake ]]; then
     command+=(--mooncake-trace "$workload")
+  fi
+  if [[ -n "$dataset_percent" ]]; then
+    command+=(--dataset-percent "$dataset_percent")
   fi
   "${command[@]}"
   echo "[INFO] Finished $source trace"

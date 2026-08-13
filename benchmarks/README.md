@@ -78,6 +78,7 @@ bash benchmarks/recorder/record_source_traces.sh \
 
 Mooncake 입력 trace는 config의 `path`를 사용하며, 없으면 recorder가 다운로드합니다.
 각 결과는 `mooncake-toolagent/` 또는 `mooncake-conversation/` 아래에 생성됩니다.
+Mooncake trace의 전체 request를 선택하려면 `--dataset-percent 100`을 추가합니다.
 
 `record_speed_sweep.sh`는 workload별 speedup마다 독립 trace를 생성합니다.
 `--trace-kind l2`를 추가하면 각 speedup 디렉터리에 `l2.lct`를 생성합니다.

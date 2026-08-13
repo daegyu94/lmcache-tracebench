@@ -120,6 +120,9 @@ bash benchmarks/recorder/record_source_traces.sh \
   --sources mooncake-toolagent,mooncake-conversation
 ```
 
+Mooncake 전체 request를 기록하려면 `--dataset-percent 100`을 추가합니다. 생략하면
+공통 Mooncake config의 `num_requests` 설정이 적용됩니다.
+
 `source-traces-20260804-082231` 실행에서 모든 session을 record한 실측 결과는
 다음과 같습니다. KV cache 점유량은 L2 directory의 filesystem 사용량이고, trace는
 생성된 `storage.lct`의 크기입니다.
