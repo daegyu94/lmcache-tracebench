@@ -3,7 +3,9 @@
 이 문서는 새 replay host에서 별도의 도움 없이 설치부터 결과 확인까지 순서대로
 진행하기 위한 실행 가이드입니다. 이미 기록된 `l2.lct`로 L2 backend를 비교하는
 경로를 기준으로 합니다. Trace를 직접 기록할 때는
-[Recorder guide](recorder.md)를 참고하세요.
+[Recorder guide](recorder.md)를 참고하세요. Replay node가 격리망에 있으면
+[Staged remote replay guide](staged-remote-replay.md)의 controller/replay node workflow를
+사용합니다.
 
 ## 실험 범위
 
