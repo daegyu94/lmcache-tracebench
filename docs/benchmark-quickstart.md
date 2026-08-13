@@ -65,12 +65,19 @@ python -m pip check
 
 ## 3. L2 trace 다운로드
 
+HF Dataset archive는 `main` revision에서 받습니다. 현재는 Tensormesh trace가
+업로드되어 있고, Mooncake의 `toolagent.tar.gz`와 `conversation.tar.gz`는 같은
+`mooncake/` 디렉터리에 추가될 예정입니다.
+
 ```bash
 bash tools/artifacts/hf_trace_asset.sh download \
   --repo-id daegyu94/lmcache-storage-traces \
   --revision main \
   --path-in-repo tensormesh/wildclaw.tar.gz \
   --output-dir /mnt/nvme/lmcache-l2-replay/traces
+
+# 압축 내부를 먼저 확인하고 trace root 아래에 풉니다.
+tar -tzf /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw.tar.gz
 mkdir -p /mnt/nvme/lmcache-l2-replay/traces/tensormesh
 tar -xzf /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw.tar.gz \
   -C /mnt/nvme/lmcache-l2-replay/traces/tensormesh
@@ -78,6 +85,25 @@ tar -xzf /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw.tar.gz \
 test -s /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct
 du -h /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct
 ```
+
+Mooncake archive가 업로드된 뒤에는 다음처럼 내려받고 풉니다.
+
+```bash
+bash tools/artifacts/hf_trace_asset.sh download \
+  --repo-id daegyu94/lmcache-storage-traces \
+  --revision main \
+  --path-in-repo mooncake/toolagent.tar.gz \
+  --output-dir /mnt/nvme/lmcache-l2-replay/traces
+mkdir -p /mnt/nvme/lmcache-l2-replay/traces/mooncake
+tar -xzf /mnt/nvme/lmcache-l2-replay/traces/mooncake/toolagent.tar.gz \
+  -C /mnt/nvme/lmcache-l2-replay/traces/mooncake
+test -s /mnt/nvme/lmcache-l2-replay/traces/mooncake/toolagent/l2.lct
+```
+
+`conversation`도 `toolagent`와 같은 방식으로
+`mooncake/conversation.tar.gz`를 다운로드하고 압축 해제합니다. archive 내부
+구조가 예상과 다르면 `tar -tzf ARCHIVE.tar.gz` 출력에서 `l2.lct` 위치를 먼저
+확인한 뒤 `--trace`에 그 경로를 지정합니다.
 
 Dataset file 목록은 다음 명령으로 확인합니다.
 

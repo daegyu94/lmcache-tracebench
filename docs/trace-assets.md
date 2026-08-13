@@ -58,17 +58,48 @@ HF Dataset은 대형 LMCache trace를 workload별 archive로 보관하고 공유
 tensormesh/gaia.tar.gz
 tensormesh/swebench.tar.gz
 tensormesh/wildclaw.tar.gz
+
+# 예정된 Mooncake archive도 같은 main 아래에 추가합니다.
+mooncake/toolagent.tar.gz
+mooncake/conversation.tar.gz
 ```
 
-각 archive 안에는 `<workload>/l2.lct`와 해당 replay에 필요한 recorder 결과가
-들어 있습니다. replay node에서는 archive를 받은 뒤 trace root 아래에 압축을
-풀어 다음 구조를 만듭니다.
+현재 `main`에는 Tensormesh archive만 업로드되어 있습니다. Mooncake archive가
+준비되면 별도 branch를 만들지 않고 동일한 `main` revision의 `mooncake/` 아래에
+추가합니다. 각 archive 안에는 trace 이름 디렉터리와 `l2.lct`, 해당 replay에
+필요한 recorder 결과가 들어가는 형태를 사용합니다.
+
+압축을 풀면 replay node의 trace root는 다음 구조가 됩니다(현재 업로드된 파일과
+향후 Mooncake 파일을 함께 표시했습니다).
 
 ```text
-/mnt/nvme/lmcache-l2-replay/traces/tensormesh/
-├── gaia/l2.lct
-├── swebench/l2.lct
-└── wildclaw/l2.lct
+/mnt/nvme/lmcache-l2-replay/traces/
+├── tensormesh/
+│   ├── gaia/l2.lct
+│   ├── swebench/l2.lct
+│   └── wildclaw/l2.lct
+└── mooncake/
+    ├── toolagent/l2.lct
+    └── conversation/l2.lct
+```
+
+### `tar.gz` 압축 풀기
+
+`tar.gz`는 먼저 내부 파일 목록을 확인한 뒤 원하는 디렉터리에 풀면 됩니다.
+`-C` 뒤의 디렉터리는 미리 만들어야 하며, 현재 디렉터리에 바로 풀지 않는 것이
+안전합니다.
+
+```bash
+# archive 내부 목록만 확인
+tar -tzf /path/to/archive.tar.gz
+
+# 지정한 디렉터리에 압축 해제
+mkdir -p /path/to/trace-root/tensormesh
+tar -xzf /path/to/archive.tar.gz \
+  -C /path/to/trace-root/tensormesh
+
+# trace가 실제로 풀렸는지 확인
+find /path/to/trace-root/tensormesh -maxdepth 3 -type f -name l2.lct -print
 ```
 
 ### Authentication
@@ -110,6 +141,23 @@ mkdir -p /mnt/nvme/lmcache-l2-replay/traces/tensormesh
 tar -xzf /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw.tar.gz \
   -C /mnt/nvme/lmcache-l2-replay/traces/tensormesh
 ```
+
+Mooncake archive가 main에 업로드된 뒤에는 경로의 `tensormesh`와 workload 이름만
+바꾸어 같은 방식으로 받습니다.
+
+```bash
+bash tools/artifacts/hf_trace_asset.sh download \
+  --repo-id daegyu94/lmcache-storage-traces \
+  --revision main \
+  --path-in-repo mooncake/toolagent.tar.gz \
+  --output-dir /mnt/nvme/lmcache-l2-replay/traces
+mkdir -p /mnt/nvme/lmcache-l2-replay/traces/mooncake
+tar -xzf /mnt/nvme/lmcache-l2-replay/traces/mooncake/toolagent.tar.gz \
+  -C /mnt/nvme/lmcache-l2-replay/traces/mooncake
+```
+
+`conversation.tar.gz`도 `--path-in-repo mooncake/conversation.tar.gz`로 같은
+명령을 실행합니다. 다운로드 가능한 archive는 `list` 명령으로 확인할 수 있습니다.
 
 파일 목록은 다음처럼 확인합니다.
 
