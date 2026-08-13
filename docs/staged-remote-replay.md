@@ -69,16 +69,39 @@ Controller node에 다음이 필요합니다.
 - replay node에 passwordless SSH가 되는 key와 `BatchMode` 설정
 - topology에 지정할 replay node의 Python 경로와 package source 정보
 
-Replay node에는 SSH server, topology에서 지정한 Python interpreter, `bash`, `tar`, trace/L2 저장
-공간이 필요합니다. `remote_install` 모드에서는 replay node가 사내 package index 또는
-사전 구성된 pip 설정을 사용해 runtime dependency를 설치하므로 외부망 접근은 필요하지
-않습니다.
+Replay node에는 SSH server, topology에서 지정한 Python interpreter, `bash`, `tar`, `find`,
+`sed`, `git`, trace/L2 저장 공간이 필요합니다. `remote_install` 모드에서는 replay node가
+사내 package index 또는 사전 구성된 pip 설정을 사용해 runtime dependency를 설치하므로
+외부망 접근은 필요하지 않습니다. `uv`는 검사·보고되지만 기본적으로 선택 사항이며,
+Python의 `venv`/`pip` fallback을 사용할 수 있습니다.
 
 SSH를 먼저 확인합니다.
 
 ```bash
 ssh -o BatchMode=yes -p 22 benchmark@replay-node.example.com true
 ```
+
+### Replay node prerequisite 검사
+
+`prepare-replay`에도 같은 검사가 포함되지만, 설치 전에 단독으로 확인할 수 있습니다.
+
+```bash
+bash benchmarks/replayer/staged_remote_replay.sh check-prerequisites \
+  --topology configs/replayer/staged-remote/topology.yaml
+```
+
+검사는 Python `>=3.10`, `venv`/`ensurepip`, `bash`, `tar`, `find`, `sed`, 기본 파일 도구,
+`git`을 확인합니다. `uv`는 topology의 `replay_require_uv: true`일 때만 필수로 취급합니다.
+Ubuntu/Debian 계열에서 기본 도구가 없다면 다음과 같이 준비할 수 있습니다.
+
+```bash
+sudo apt-get install -y bash coreutils findutils sed tar gzip git \
+  python3.12 python3.12-venv
+```
+
+사내 package index에서 native wheel을 제공하지 않아 source build가 필요하면 `build-essential`
+및 해당 backend의 compiler/toolchain도 replay node에 추가해야 합니다. 이 항목은 OS와
+package source에 따라 달라지므로 script가 자동 설치하지 않습니다.
 
 ## 2. Topology 작성
 
@@ -107,6 +130,7 @@ node에 pip 설정이 이미 있으면 생략할 수 있습니다.
 | `replay_runtime_requirements` | replay repository 안의 runtime requirements 파일 |
 | `replay_package_index_url` | 사내 Python package index URL; 생략하면 replay node의 pip 설정 사용 |
 | `replay_extra_index_url` | 추가 package index URL(선택) |
+| `replay_require_uv` | `true`이면 `uv`가 없을 때 prerequisite 검사 실패; 기본 예제는 `false` |
 | `replay_trace_root` | replay node의 압축 해제 trace root |
 | `replay_output_root` | replay node의 run별 결과 상위 경로 |
 | `replay_l2_root` | L2 replay용 disposable base path |

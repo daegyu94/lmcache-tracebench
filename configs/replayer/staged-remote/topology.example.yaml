@@ -21,6 +21,8 @@ runtime_mode: remote_install
 replay_python: /opt/company/python/3.12/bin/python3.12
 replay_runtime_requirements: requirements/replayer.txt
 replay_package_index_url: https://pypi.intra.example.com/simple
+# uv is checked but optional; set true if the site requires uv explicitly.
+replay_require_uv: false
 # replay_extra_index_url: https://pypi-extra.intra.example.com/simple
 # For the copy_venv fallback, add:
 # controller_venv_root: /absolute/path/to/lmcache-tracebench/.venv

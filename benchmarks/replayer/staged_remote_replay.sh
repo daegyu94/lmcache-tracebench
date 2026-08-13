@@ -17,6 +17,7 @@ replay_python=""
 replay_runtime_requirements=""
 replay_package_index_url=""
 replay_extra_index_url=""
+replay_require_uv="false"
 
 declare -A topology_values=()
 
@@ -26,6 +27,8 @@ Usage:
   bash benchmarks/replayer/staged_remote_replay.sh PHASE --topology PATH [OPTIONS]
 
 Phases:
+  check-prerequisites
+                   Check replay-node Python, venv support, and basic system tools.
   prepare-trace    Download one or more HF archives on the controller and transfer
                    and extract them on the isolated replay node.
   prepare-replay   Clone/stage the tracebench repository and prepare the replay
@@ -82,7 +85,7 @@ require_value() {
 
 while (($#)); do
   case "$1" in
-    prepare-trace|prepare-replay|replay|all)
+    check-prerequisites|prepare-trace|prepare-replay|replay|all)
       if [[ -n "$phase" ]]; then
         die "Only one phase may be specified."
       fi
@@ -190,6 +193,7 @@ replay_python="$(topology_get replay_python || true)"
 replay_runtime_requirements="$(topology_get replay_runtime_requirements || true)"
 replay_package_index_url="$(topology_get replay_package_index_url || true)"
 replay_extra_index_url="$(topology_get replay_extra_index_url || true)"
+replay_require_uv="$(topology_get replay_require_uv || printf false)"
 git_repo_url="$(topology_get git_repo_url)"
 git_revision="$(topology_get git_revision)"
 hf_repo_id="$(topology_get hf_repo_id)"
@@ -199,6 +203,10 @@ transfer_method="$(topology_get transfer_method)"
 case "$transfer_method" in
   rsync|scp) ;;
   *) die "transfer_method must be rsync or scp: $transfer_method" ;;
+esac
+case "$replay_require_uv" in
+  true|false) ;;
+  *) die "replay_require_uv must be true or false: $replay_require_uv" ;;
 esac
 case "$runtime_mode" in
   remote_install)
@@ -447,6 +455,41 @@ prepare_repository() {
   transfer_directory "$controller_repo_root" "$replay_repo_root"
 }
 
+check_remote_prerequisites() {
+  local remote_command
+  remote_command="set -euo pipefail"$'\n'
+  remote_command+='required_commands=(bash tar find sed ln mkdir dirname pwd)'$'\n'
+  if [[ "$runtime_mode" == remote_install ]]; then
+    remote_command+='required_commands+=(git)'$'\n'
+  fi
+  remote_command+='missing=()'$'\n'
+  remote_command+='for command_name in "${required_commands[@]}"; do command -v "$command_name" >/dev/null 2>&1 || missing+=("$command_name"); done'$'\n'
+  remote_command+='if ((${#missing[@]})); then echo "Missing replay-node commands: ${missing[*]}" >&2; echo "Install bash, tar, findutils, sed, coreutils, the approved Python runtime, and git for remote_install requirements." >&2; exit 1; fi'$'\n'
+  if [[ "$runtime_mode" == remote_install ]]; then
+    remote_command+="base_python=$(shell_quote "$replay_python")"$'\n'
+    remote_command+='if [[ "$base_python" == /* ]]; then base_python_path="$base_python"; else base_python_path="$(command -v "$base_python" || true)"; fi'$'\n'
+    remote_command+='[[ -x "$base_python_path" ]] || { echo "Replay Python was not found: $base_python" >&2; exit 1; }'$'\n'
+    remote_command+='"$base_python_path" -c '\''import sys; assert sys.version_info >= (3, 10), sys.version; import ensurepip, venv'\'''$'\n'
+  remote_command+='python_version="$($base_python_path -c '\''import sys; print("%d.%d" % sys.version_info[:2])'\'')"'$'\n'
+    remote_command+='echo "Replay Python: $python_version ($base_python_path)"'$'\n'
+  else
+    remote_command+='python_path=""'$'\n'
+    remote_command+='for candidate in python3.12 python3 python; do candidate_path="$(command -v "$candidate" || true)"; if [[ -n "$candidate_path" ]]; then python_path="$candidate_path"; break; fi; done'$'\n'
+    remote_command+='[[ -n "$python_path" ]] || { echo "No Python interpreter was found on the replay node." >&2; exit 1; }'$'\n'
+    remote_command+='"$python_path" -c '\''import sys; assert sys.version_info >= (3, 10), sys.version'\'''$'\n'
+  remote_command+='python_version="$($python_path -c '\''import sys; print("%d.%d" % sys.version_info[:2])'\'')"'$'\n'
+    remote_command+='echo "Replay Python: $python_version ($python_path)"'$'\n'
+  fi
+  if [[ "$replay_require_uv" == true ]]; then
+    remote_command+='command -v uv >/dev/null 2>&1 || { echo "uv is required by replay_require_uv=true but was not found." >&2; exit 1; }'$'\n'
+    remote_command+='echo "uv: $(uv --version)"'$'\n'
+  elif [[ "$runtime_mode" == remote_install ]]; then
+    remote_command+='if command -v uv >/dev/null 2>&1; then echo "uv: $(uv --version)"; else echo "uv: not found (optional; Python venv + pip fallback will be used)"; fi'$'\n'
+  fi
+  remote_command+='echo "Replay-node prerequisites: OK"'$'\n'
+  remote_exec "$remote_command"
+}
+
 ensure_controller_venv() {
   if local_path_exists "$controller_venv_root"; then
     warn "Controller venv already exists; not rebuilding or overwriting: $controller_venv_root"
@@ -545,6 +588,7 @@ repair_remote_venv() {
 
 prepare_replay() {
   prepare_repository
+  check_remote_prerequisites
   case "$runtime_mode" in
     remote_install)
       prepare_remote_runtime
@@ -634,6 +678,9 @@ replay_run() {
 }
 
 case "$phase" in
+  check-prerequisites)
+    check_remote_prerequisites
+    ;;
   prepare-trace)
     ((${#assets[@]} > 0)) || die "prepare-trace requires at least one --asset"
     for asset in "${assets[@]}"; do

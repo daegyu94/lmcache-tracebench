@@ -289,6 +289,7 @@ transfer_method: scp
     )
 
     assert result.returncode == 7
+    assert "Replay-node prerequisites: OK" in result.stdout
     assert "Replay runtime prepared and verified" in result.stdout
     assert "--python python3.12" in (remote_repo / "setup_args").read_text()
     assert "--index-url https://pypi.intra.example.com/simple" in (
