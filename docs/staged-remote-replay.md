@@ -6,7 +6,7 @@
 이 방식을 **staged remote replay**라고 부릅니다.
 
 ```text
-                                 connected / WAN
+                         controller ↔ cluster network
 ┌───────────────────────────────┐
 │ controller node               │
 │                               │
@@ -49,9 +49,11 @@
                 └────────────────────────────────────────
 ```
 
-Controller↔cluster 전송은 WAN이 필요하지만, replay가 시작된 뒤의 L2 I/O와 선택적
-storage profiler SSH는 storage cluster 내부 경로만 사용합니다. `storage-01`부터
-`storage-06`의 host/device/interface 정보는 replay repository의
+Controller와 storage cluster는 서로 네트워크로 연결되어 있어 SSH/`rsync` 또는
+SSH/`scp`로 trace, repository, `.venv`, 결과 파일을 전송합니다. 다만 storage
+cluster 내부에서는 외부망 접근이 차단되는 것을 전제로 하며, replay 실행 중에는
+전달받은 파일과 cluster 내부 경로만 사용합니다. `storage-01`부터 `storage-06`의
+host/device/interface 정보는 replay repository의
 `configs/profiling/storage.yaml` 또는 별도 profiling config에 기록합니다.
 
 이 가이드는 controller node에서
