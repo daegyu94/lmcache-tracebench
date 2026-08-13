@@ -49,16 +49,26 @@ bash tools/artifacts/release_asset.sh download \
 
 ## Hugging Face Dataset
 
-HF Dataset은 대형 LMCache trace를 workload별 경로로 보관하고 공유할 때 사용합니다.
-현재 trace 저장소 이름은 `daegyu94/lmcache-storage-traces`이지만, Tracebench가
-사용하는 asset은 `l2` revision의 `tensormesh/<workload>/l2.lct` 구조입니다.
-저장소 이름의 `storage`는 기존 이름일 뿐 StorageManager-level trace 사용을
-의미하지 않습니다.
+HF Dataset은 대형 LMCache trace를 workload별 archive로 보관하고 공유할 때
+사용합니다. 현재 canonical branch는 `main`이며 저장소는
+`daegyu94/lmcache-storage-traces`입니다.
 
 ```text
-# revision: l2
-tensormesh/gaia/l2.lct
-tensormesh/wildclaw/l2.lct
+# revision: main
+tensormesh/gaia.tar.gz
+tensormesh/swebench.tar.gz
+tensormesh/wildclaw.tar.gz
+```
+
+각 archive 안에는 `<workload>/l2.lct`와 해당 replay에 필요한 recorder 결과가
+들어 있습니다. replay node에서는 archive를 받은 뒤 trace root 아래에 압축을
+풀어 다음 구조를 만듭니다.
+
+```text
+/mnt/nvme/lmcache-l2-replay/traces/tensormesh/
+├── gaia/l2.lct
+├── swebench/l2.lct
+└── wildclaw/l2.lct
 ```
 
 ### Authentication
@@ -80,24 +90,25 @@ HF script는 기존 파일을 덮어쓰지 않습니다. 의도적으로 교체�
 ```bash
 bash tools/artifacts/hf_trace_asset.sh upload \
   --repo-id daegyu94/lmcache-storage-traces \
-  --filepath /path/to/tensormesh-gaia.tar.gz \
-  --path-in-repo tensormesh-20260809/tensormesh-gaia.tar.gz
+  --filepath /path/to/gaia.tar.gz \
+  --path-in-repo tensormesh/gaia.tar.gz
 ```
 
-기존 GitHub Release asset을 이전할 때는 먼저 `gh release download`로 로컬에 받은 뒤
-위 upload command를 사용합니다. HF script는 GitHub Release를 자동으로 읽지 않습니다.
-
-### Download
+### Download on a replay node
 
 `--revision`은 Dataset의 branch, tag, 또는 commit이며 기본값은 `main`입니다.
 재현 가능한 실험에서는 변경하지 않을 tag 또는 commit을 지정하는 것을 권장합니다.
+현재 main의 asset은 archive이므로 다운로드 후 반드시 압축을 풉니다.
 
 ```bash
 bash tools/artifacts/hf_trace_asset.sh download \
   --repo-id daegyu94/lmcache-storage-traces \
-  --revision l2 \
-  --path-in-repo tensormesh/wildclaw/l2.lct \
-  --output-dir /mnt/nvme/lmcache-l2-replay
+  --revision main \
+  --path-in-repo tensormesh/wildclaw.tar.gz \
+  --output-dir /mnt/nvme/lmcache-l2-replay/traces
+mkdir -p /mnt/nvme/lmcache-l2-replay/traces/tensormesh
+tar -xzf /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw.tar.gz \
+  -C /mnt/nvme/lmcache-l2-replay/traces/tensormesh
 ```
 
 파일 목록은 다음처럼 확인합니다.
@@ -105,5 +116,5 @@ bash tools/artifacts/hf_trace_asset.sh download \
 ```bash
 bash tools/artifacts/hf_trace_asset.sh list \
   --repo-id daegyu94/lmcache-storage-traces \
-  --revision l2
+  --revision main
 ```

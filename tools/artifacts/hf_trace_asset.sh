@@ -40,11 +40,11 @@ Authentication:
 Examples:
   bash tools/artifacts/hf_trace_asset.sh upload \
     --repo-id daegyu94/lmcache-storage-traces \
-    --filepath outputs/mooncake/storage.lct \
-    --path-in-repo mooncake-20260807/storage.lct
+    --filepath /path/to/gaia.tar.gz \
+    --path-in-repo tensormesh/gaia.tar.gz
   bash tools/artifacts/hf_trace_asset.sh download \
     --repo-id daegyu94/lmcache-storage-traces \
-    --path-in-repo tensormesh-20260809/tensormesh-gaia.tar.gz \
+    --path-in-repo tensormesh/gaia.tar.gz \
     --output-dir downloads
 EOF
 }

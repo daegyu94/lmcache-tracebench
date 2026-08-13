@@ -146,9 +146,9 @@ float speedup도 지원하므로 `--speedups 1.0,1.5,2.0`처럼 지정할 수 �
 
 ```bash
 bash benchmarks/replayer/replay_workload_sweep.sh \
-  --trace-root /mnt/lmcache-traces/tensormesh-20260809 \
+  --trace-root /mnt/lmcache-traces/tensormesh \
   --config configs/replayer/fs-native.yaml \
-  --workloads tensormesh-wildclaw,tensormesh-other \
+  --workloads wildclaw,gaia,swebench \
   --l2-root /mnt/lmcache-replay \
   --output-root outputs/replay-workload-sweep \
   --speedups 1,2,4,8
@@ -167,7 +167,7 @@ backend별 adapter/config와 L2 경로를 바꿔가며 speedup sweep을 하려�
 
 ```bash
 bash benchmarks/replayer/replay_backend_sweep.sh \
-  --trace /mnt/nvme/lmcache-traces/tensormesh-20260809/tensormesh-wildclaw/l2.lct \
+  --trace /mnt/nvme/lmcache-traces/tensormesh/wildclaw/l2.lct \
   --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
   --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \
   --backend-spec '3fs=configs/replayer/nixl-hf3fs.yaml@/mnt/3fs/lmcache-replay' \

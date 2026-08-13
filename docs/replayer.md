@@ -152,9 +152,9 @@ base path는 실행 시작 시 비어 있어야 합니다. 기존 replay
 
 ```bash
 bash benchmarks/replayer/replay_workload_sweep.sh \
-  --trace-root /mnt/nvme/lmcache-traces/tensormesh-20260809 \
+  --trace-root /mnt/nvme/lmcache-traces/tensormesh \
   --config configs/replayer/fs-native.yaml \
-  --workloads tensormesh-wildclaw,tensormesh-other \
+  --workloads wildclaw,gaia,swebench \
   --l2-root /mnt/nvme/lmcache-trace-replay \
   --output-root outputs/replay-workload-sweep \
   --speedups 1,2,4,8

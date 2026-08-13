@@ -68,9 +68,12 @@ python -m pip check
 ```bash
 bash tools/artifacts/hf_trace_asset.sh download \
   --repo-id daegyu94/lmcache-storage-traces \
-  --revision l2 \
-  --path-in-repo tensormesh/wildclaw/l2.lct \
+  --revision main \
+  --path-in-repo tensormesh/wildclaw.tar.gz \
   --output-dir /mnt/nvme/lmcache-l2-replay/traces
+mkdir -p /mnt/nvme/lmcache-l2-replay/traces/tensormesh
+tar -xzf /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw.tar.gz \
+  -C /mnt/nvme/lmcache-l2-replay/traces/tensormesh
 
 test -s /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct
 du -h /mnt/nvme/lmcache-l2-replay/traces/tensormesh/wildclaw/l2.lct
@@ -81,7 +84,7 @@ Dataset file 목록은 다음 명령으로 확인합니다.
 ```bash
 bash tools/artifacts/hf_trace_asset.sh list \
   --repo-id daegyu94/lmcache-storage-traces \
-  --revision l2
+  --revision main
 ```
 
 ## 4. 단일 replay로 설치 검증
