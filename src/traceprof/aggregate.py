@@ -17,6 +17,8 @@ def aggregate_profiles(
     root = Path(profile_root)
     node_summaries: dict[str, Any] = {}
     disk_totals: dict[str, Any] = {}
+    node_disk_totals: dict[str, dict[str, Any]] = {}
+    cluster_disk_grand_total: dict[str, Any] = {}
     interface_totals: dict[str, Any] = {}
     interface_totals_by_role: dict[str, dict[str, Any]] = {}
     durations: list[float] = []
@@ -28,10 +30,13 @@ def aggregate_profiles(
         duration = float(summary.get("duration_seconds", 0))
         if duration > 0:
             durations.append(duration)
+        node_total = node_disk_totals.setdefault(node_name, {})
         for device, metrics in summary.get("devices", {}).items():
             total = disk_totals.setdefault(device, {})
             for key in ("read_bytes", "write_bytes"):
                 _add_metric(total, metrics, key)
+                _add_metric(node_total, metrics, key)
+                _add_metric(cluster_disk_grand_total, metrics, key)
         for interface, metrics in summary.get("interfaces", {}).items():
             total = interface_totals.setdefault(interface, {})
             role = str(summary.get("role", "storage"))
@@ -55,6 +60,19 @@ def aggregate_profiles(
     for metrics in disk_totals.values():
         metrics["read_mibps_avg"] = metrics["read_bytes"] / divisor / 1024**2
         metrics["write_mibps_avg"] = metrics["write_bytes"] / divisor / 1024**2
+    for node_name, metrics in node_disk_totals.items():
+        if not metrics:
+            continue
+        node_divisor = float(node_summaries[node_name].get("duration_seconds", 0)) or 1.0
+        metrics["read_mibps_avg"] = metrics["read_bytes"] / node_divisor / 1024**2
+        metrics["write_mibps_avg"] = metrics["write_bytes"] / node_divisor / 1024**2
+    if cluster_disk_grand_total:
+        cluster_disk_grand_total["read_mibps_avg"] = (
+            cluster_disk_grand_total["read_bytes"] / divisor / 1024**2
+        )
+        cluster_disk_grand_total["write_mibps_avg"] = (
+            cluster_disk_grand_total["write_bytes"] / divisor / 1024**2
+        )
     for metrics in interface_totals.values():
         metrics["rx_mibps_avg"] = metrics["rx_bytes"] / divisor / 1024**2
         metrics["tx_mibps_avg"] = metrics["tx_bytes"] / divisor / 1024**2
@@ -69,6 +87,8 @@ def aggregate_profiles(
         "duration_seconds": duration,
         "nodes": node_summaries,
         "cluster_disk_totals": disk_totals,
+        "node_disk_totals": node_disk_totals,
+        "cluster_disk_grand_total": cluster_disk_grand_total,
         "cluster_interface_totals": interface_totals,
         "interface_totals_by_role": interface_totals_by_role,
     }

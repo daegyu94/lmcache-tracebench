@@ -52,10 +52,10 @@ class RemoteProfiler:
 
     def _target(self, node: NodeConfig) -> str:
         user = node.user or self.config.ssh_user
-        return f"{user}@{node.host}" if user else node.host
+        return f"{user}@{node.hostname}" if user else node.hostname
 
     def _remote_dir(self, node: NodeConfig) -> str:
-        return f"{self.remote_run_root}/{node.name}"
+        return f"{self.remote_run_root}/{node.hostname}"
 
     def _ssh_command(self, node: NodeConfig, subcommand: str, *args: str) -> list[str]:
         remote_script = f"{self._remote_dir(node)}/.storage_agent.sh"
@@ -144,7 +144,7 @@ class RemoteProfiler:
                 node, stdout, stderr, returncode = future.result()
                 if returncode != 0:
                     deployment_failures.append(
-                        f"{node.name}: shell agent deployment failed ({returncode}): "
+                        f"{node.hostname}: shell agent deployment failed ({returncode}): "
                         f"{stderr.strip() or stdout.strip()}"
                     )
         if deployment_failures:
@@ -163,15 +163,15 @@ class RemoteProfiler:
                 node, stdout, stderr, returncode = future.result()
                 if returncode != 0:
                     failures.append(
-                        f"{node.name}: remote preflight failed ({returncode}): "
+                        f"{node.hostname}: remote preflight failed ({returncode}): "
                         f"{stderr.strip() or stdout.strip()}"
                     )
                     continue
                 try:
-                    results[node.name] = json.loads(stdout.strip().splitlines()[-1])
+                    results[node.hostname] = json.loads(stdout.strip().splitlines()[-1])
                 except json.JSONDecodeError as exc:
                     failures.append(
-                        f"{node.name}: invalid preflight response: {exc}: {stdout!r}"
+                        f"{node.hostname}: invalid preflight response: {exc}: {stdout!r}"
                     )
         if failures:
             raise RuntimeError("profile preflight failed:\n" + "\n".join(failures))
@@ -194,7 +194,7 @@ class RemoteProfiler:
                 "--report-interval",
                 str(self.config.report_interval_seconds),
                 "--node-name",
-                node.name,
+                node.hostname,
                 "--role",
                 node.role,
                 "--run-id",
@@ -207,7 +207,7 @@ class RemoteProfiler:
                 text=True,
                 bufsize=1,
             )
-            self.active[node.name] = _ActiveAgent(node, process)
+            self.active[node.hostname] = _ActiveAgent(node, process)
 
         selector = selectors.DefaultSelector()
         pending = set(self.active)
@@ -291,10 +291,10 @@ class RemoteProfiler:
         """Copy remote temporary results to the replay output directory."""
         self.profile_root.mkdir(parents=True, exist_ok=True)
         for node in self.config.nodes:
-            local_node_dir = self.profile_root / node.name
+            local_node_dir = self.profile_root / node.hostname
             if local_node_dir.exists():
                 raise RuntimeError(
-                    f"local profiler output already exists for {node.name}: "
+                    f"local profiler output already exists for {node.hostname}: "
                     f"{local_node_dir}"
                 )
             result = subprocess.run(
@@ -313,13 +313,13 @@ class RemoteProfiler:
             )
             if result.returncode != 0:
                 raise RuntimeError(
-                    f"failed to collect profiler output from {node.name}: "
+                    f"failed to collect profiler output from {node.hostname}: "
                     f"{result.stderr.strip() or result.stdout.strip()}"
                 )
             summary = local_node_dir / "summary.json"
             if not summary.is_file():
                 raise RuntimeError(
-                    f"profiler summary missing for {node.name}: {summary}"
+                    f"profiler summary missing for {node.hostname}: {summary}"
                 )
             local_agent = local_node_dir / ".storage_agent.sh"
             if local_agent.exists():
@@ -346,6 +346,6 @@ class RemoteProfiler:
                 result = future.result()
                 if result.returncode != 0:
                     raise RuntimeError(
-                        f"failed to clean profiler output on {node.name}: "
+                        f"failed to clean profiler output on {node.hostname}: "
                         f"{result.stderr.strip() or result.stdout.strip()}"
                     )

@@ -192,13 +192,16 @@ remote_tmp_root: /tmp/lmcache-tracebench-profile
 ssh_user: benchmark
 
 nodes:
-  - name: storage_node1
-    host: 10.0.0.11
+  - hostname: 10.0.0.11
     devices:
       - /dev/nvme0n1
     interfaces:
       - bond0
 ```
+
+`hostname`은 SSH target이면서 결과 디렉터리/로그에 쓰이는 label이기도 합니다.
+node가 여러 개일 때 여러 device를 한 번에 적으려면 `/dev/nvme{0..3}n1`처럼
+brace 표현을 쓸 수 있습니다(자세한 문법은 [replayer.md](replayer.md) 참고).
 
 실제 값은 storage node에서 확인합니다.
 
@@ -234,7 +237,7 @@ python -m replayer.main \
 outputs/replay-profile-smoke/wildclaw/
 ├── profile_preflight.json
 ├── profile_summary.json
-└── profile/storage_node1/
+└── profile/10.0.0.11/
     ├── disk.tsv
     ├── network.tsv
     ├── samples.jsonl
@@ -246,7 +249,7 @@ outputs/replay-profile-smoke/wildclaw/
 
 ```bash
 column -ts $'\t' \
-  outputs/replay-profile-smoke/wildclaw/profile/storage_node1/disk.tsv | less -S
+  outputs/replay-profile-smoke/wildclaw/profile/10.0.0.11/disk.tsv | less -S
 python -m json.tool outputs/replay-profile-smoke/wildclaw/profile_summary.json
 ```
 

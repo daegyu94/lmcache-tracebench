@@ -271,14 +271,19 @@ report_interval_seconds: 5
 remote_tmp_root: /tmp/lmcache-tracebench-profile
 
 nodes:
-  - name: storage_node1
-    host: storage_node1
+  - hostname: storage_node1
     devices:
       - /dev/nvme0n1
       - /dev/nvme0n2
     interfaces:
       - bond0
 ```
+
+`devices`와 `interfaces`의 각 항목은 bash brace 표현처럼 `{a..b}` range나
+`{a,b,c}` list를 쓸 수 있습니다. 예를 들어 `/dev/nvme{2..7}n1`은
+`/dev/nvme2n1`부터 `/dev/nvme7n1`까지 여섯 개로, `/dev/nvme{1,2,5}n1`은
+지정한 세 개로만 확장됩니다. 이 확장은 config를 읽을 때 한 번 일어나며,
+`devices`에 괄호가 없는 일반 경로는 그대로 유지됩니다.
 
 `--io-profile` 실행 시 replay host는 SSH preflight 후 shell agent를 각 node의
 `/tmp/lmcache-tracebench-profile/<run-id>/`에 배포합니다. 원격 node에는
@@ -295,6 +300,9 @@ Profiler는 다음 sysfs counter를 report interval별 diff로 계산합니다.
 
 Block sector는 512 byte로 환산하며 마지막의 짧은 구간도 종료 시 flush합니다.
 결과는 `output_dir/profile/<node>/`와 `profile_summary.json`에 저장됩니다.
+`profile_summary.json`의 `cluster_disk_totals`는 device 이름별(여러 node에 걸쳐
+합산), `node_disk_totals`는 node별로 그 node의 모든 device를 합산한 throughput,
+`cluster_disk_grand_total`은 전체 cluster의 device 전부를 합산한 단일 총합입니다.
 
 | 파일 | 내용 |
 | --- | --- |

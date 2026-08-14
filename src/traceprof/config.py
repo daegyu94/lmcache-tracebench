@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,12 +12,51 @@ import yaml
 
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_BRACE_RE = re.compile(r"\{([^{}]*)\}")
+_RANGE_RE = re.compile(r"^(-?\d+)\.\.(-?\d+)$")
+
+
+def expand_brace_pattern(spec: str) -> list[str]:
+    """Expand bash-brace-style {a..b} ranges and {a,b,c} lists in ``spec``.
+
+    A string with no braces is returned unchanged as a single-item list, so
+    plain device/interface entries pass through untouched. Multiple brace
+    groups in one string are expanded as their cartesian product.
+    """
+    matches = list(_BRACE_RE.finditer(spec))
+    if not matches:
+        return [spec]
+
+    options: list[list[str]] = []
+    for match in matches:
+        body = match.group(1)
+        if ".." in body:
+            range_match = _RANGE_RE.match(body)
+            if not range_match:
+                raise ValueError(
+                    f"invalid range expression '{{{body}}}' in spec: {spec}"
+                )
+            start, end = int(range_match.group(1)), int(range_match.group(2))
+            step = 1 if start <= end else -1
+            options.append([str(value) for value in range(start, end + step, step)])
+        else:
+            items = [item.strip() for item in body.split(",")]
+            if not body or any(not item for item in items):
+                raise ValueError(f"empty brace expansion '{{{body}}}' in spec: {spec}")
+            options.append(items)
+
+    expanded: list[str] = []
+    for combination in itertools.product(*options):
+        rendered = spec
+        for match, value in zip(reversed(matches), reversed(combination)):
+            rendered = rendered[: match.start()] + value + rendered[match.end() :]
+        expanded.append(rendered)
+    return expanded
 
 
 @dataclass(frozen=True)
 class NodeConfig:
-    name: str
-    host: str
+    hostname: str
     devices: tuple[str, ...] = ()
     interfaces: tuple[str, ...] = ()
     role: str = "storage"
@@ -24,38 +64,37 @@ class NodeConfig:
     port: int | None = None
 
     def validate(self) -> None:
-        if not self.name or _NAME_RE.fullmatch(self.name) is None:
+        if not self.hostname or _NAME_RE.fullmatch(self.hostname) is None:
             raise ValueError(
-                "profile node name must contain only letters, numbers, "
+                "profile node hostname must contain only letters, numbers, "
                 "underscores, dots, and hyphens"
             )
-        if not self.host:
-            raise ValueError(f"profile node {self.name} host must not be empty")
         if self.role not in {"storage", "replay"}:
             raise ValueError(
-                f"profile node {self.name} role must be 'storage' or 'replay'"
+                f"profile node {self.hostname} role must be 'storage' or 'replay'"
             )
         if not self.devices and not self.interfaces:
             raise ValueError(
-                f"profile node {self.name} must configure a device or interface"
+                f"profile node {self.hostname} must configure a device or interface"
             )
         if len(set(self.devices)) != len(self.devices):
-            raise ValueError(f"profile node {self.name} has duplicate devices")
+            raise ValueError(f"profile node {self.hostname} has duplicate devices")
         if len(set(self.interfaces)) != len(self.interfaces):
-            raise ValueError(f"profile node {self.name} has duplicate interfaces")
+            raise ValueError(f"profile node {self.hostname} has duplicate interfaces")
         for device in self.devices:
             if not device.startswith("/dev/"):
                 raise ValueError(
-                    f"profile node {self.name} device must be an absolute /dev path: "
-                    f"{device}"
+                    f"profile node {self.hostname} device must be an absolute /dev "
+                    f"path: {device}"
                 )
         for interface in self.interfaces:
             if not interface or "/" in interface:
                 raise ValueError(
-                    f"profile node {self.name} interface must be a name: {interface}"
+                    f"profile node {self.hostname} interface must be a name: "
+                    f"{interface}"
                 )
         if self.port is not None and not 1 <= self.port <= 65535:
-            raise ValueError(f"profile node {self.name} port is out of range")
+            raise ValueError(f"profile node {self.hostname} port is out of range")
 
 
 @dataclass(frozen=True)
@@ -75,9 +114,9 @@ class ProfilerConfig:
     def validate(self) -> None:
         if not self.nodes:
             raise ValueError("profile config must contain at least one node")
-        names = [node.name for node in self.nodes]
-        if len(set(names)) != len(names):
-            raise ValueError("profile node names must be unique")
+        hostnames = [node.hostname for node in self.nodes]
+        if len(set(hostnames)) != len(hostnames):
+            raise ValueError("profile node hostnames must be unique")
         for node in self.nodes:
             node.validate()
         if self.sample_interval_seconds <= 0:
@@ -94,12 +133,22 @@ class ProfilerConfig:
             raise ValueError("stop_timeout_seconds must be positive")
 
 
-def _tuple_strings(value: Any, field_name: str) -> tuple[str, ...]:
+def _tuple_strings(
+    value: Any, field_name: str, *, expand_braces: bool = False
+) -> tuple[str, ...]:
     if value is None:
         return ()
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{field_name} must be a list of strings")
-    return tuple(value)
+    if not expand_braces:
+        return tuple(value)
+    expanded: list[str] = []
+    for item in value:
+        try:
+            expanded.extend(expand_brace_pattern(item))
+        except ValueError as exc:
+            raise ValueError(f"{field_name}: {exc}") from exc
+    return tuple(expanded)
 
 
 def load_config(path: str | Path) -> ProfilerConfig:
@@ -126,11 +175,12 @@ def load_config(path: str | Path) -> ProfilerConfig:
         if not isinstance(raw_node, dict):
             raise ValueError(f"profile node at index {index} must be a mapping")
         node = NodeConfig(
-            name=raw_node.get("name", ""),
-            host=raw_node.get("host", ""),
-            devices=_tuple_strings(raw_node.get("devices"), "node.devices"),
+            hostname=raw_node.get("hostname", ""),
+            devices=_tuple_strings(
+                raw_node.get("devices"), "node.devices", expand_braces=True
+            ),
             interfaces=_tuple_strings(
-                raw_node.get("interfaces"), "node.interfaces"
+                raw_node.get("interfaces"), "node.interfaces", expand_braces=True
             ),
             role=raw_node.get("role", "storage"),
             user=raw_node.get("user", default_user),
