@@ -274,8 +274,29 @@ bash benchmarks/replayer/staged_remote_replay.sh all \
   건너뜁니다. 기존 runtime을 자동으로 삭제하거나 덮어쓰지 않습니다.
 - 동일한 `run-name`의 remote 또는 controller output이 이미 있으면 replay를 시작하지
   않습니다. 새 run-name을 사용하세요.
-- 기존 파일을 지우거나 `--clobber`하는 옵션은 staged script에 없습니다.
+- `prepare-trace`/`prepare-replay`/`replay` 자체에는 기존 파일을 지우는 옵션이 없습니다.
+  replay node를 깨끗한 상태로 되돌리려면 별도 `reset` phase를 씁니다(아래).
 - `--dry-run`은 HF/SSH/전송/replay command를 실행하지 않고 계획만 출력합니다.
+
+### Replay node 리셋
+
+`reset` phase는 replay node의 경로를 지워서 다음 `prepare-trace`/`prepare-replay`가
+깨끗한 상태에서 시작하도록 합니다. Controller 쪽은 전혀 건드리지 않습니다.
+`--target`은 반복 지정할 수 있고 `repo`, `trace`, `output`, `l2`, `all` 중 하나입니다.
+
+```bash
+bash benchmarks/replayer/staged_remote_replay.sh reset \
+  --topology configs/replayer/staged-remote/topology.yaml \
+  --target repo --target trace --target output --target l2
+```
+
+`repo`/`trace`/`output`은 디렉터리를 통째로 지우고 다시 만듭니다. `l2`
+(`replay_l2_root`)는 다릅니다 — pNFS나 3FS가 실제로 연결되면 이 경로 자체가 mount
+point가 되므로, 디렉터리를 지우고 다시 만드는 대신 **내용만** 지웁니다(mount된
+디렉터리는 `rmdir`할 수 없어 "Device or resource busy"로 실패하기 때문입니다).
+`repo`를 리셋하면 `copy_venv` 모드의 `.venv`도 함께 사라지므로(`replay_venv_root`가
+`replay_repo_root` 하위이기 때문) 이후 `prepare-replay`를 다시 실행해야 합니다.
+실행 전에 항상 `--dry-run`으로 대상 경로를 먼저 확인하세요.
 
 ```bash
 bash benchmarks/replayer/staged_remote_replay.sh all \

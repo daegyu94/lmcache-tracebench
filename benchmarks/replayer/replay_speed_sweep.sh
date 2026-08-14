@@ -224,11 +224,13 @@ reset_l2_root() {
   if [[ "$path" == "/" ]]; then
     die "$label must not be the filesystem root"
   fi
-  if [[ -d "$path" ]]; then
-    echo "[INFO] Resetting $label: $path"
-    rm -rf --one-file-system -- "$path"
-  fi
+  echo "[INFO] Resetting $label: $path"
   mkdir -p -- "$path"
+  # $path may itself be a mountpoint (a real pNFS/3FS mount, unlike today's
+  # plain fs-native directory), so only its contents are cleared. rm -rf on
+  # the path itself would try to rmdir an active mountpoint and fail with
+  # "Device or resource busy".
+  find "$path" -xdev -mindepth 1 -delete
 }
 
 while IFS= read -r raw_speedup; do

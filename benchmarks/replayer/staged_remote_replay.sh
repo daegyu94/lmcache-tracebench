@@ -11,6 +11,7 @@ dry_run=false
 replace_existing=false
 run_name=""
 assets=()
+reset_targets=()
 command_args=()
 controller_python_version=""
 runtime_mode=""
@@ -37,12 +38,18 @@ Phases:
   replay           Run a supplied replay/sweep command and retrieve its output even
                    when the remote command exits non-zero.
   all              Run prepare-trace, prepare-replay, and replay in order.
+  reset            Wipe replay-node paths so the next prepare-trace/prepare-replay
+                   starts from a clean slate. Never touches the controller side.
 
 Options:
   --topology PATH  Required flat-scalar topology YAML. It has no implicit defaults.
   --asset PATH     HF path such as tensormesh/wildclaw.tar.gz. Repeatable for
                    prepare-trace and all.
   --run-name NAME  Required for replay and all. Must be unique on both nodes.
+  --target NAME    Required for reset. One of repo, trace, output, l2, or all.
+                   Repeatable. repo/trace/output are removed and recreated; l2
+                   only has its contents cleared (replay_l2_root may itself be
+                   a real pNFS/3FS mountpoint, which cannot be rmdir'd).
   --dry-run        Print controller, SSH, and transfer commands without executing.
   --replace-existing  Remove only this run's existing output before replay.
   -h, --help       Show this help.
@@ -87,7 +94,7 @@ require_value() {
 
 while (($#)); do
   case "$1" in
-    check-prerequisites|prepare-trace|prepare-replay|replay|all)
+    check-prerequisites|prepare-trace|prepare-replay|replay|all|reset)
       if [[ -n "$phase" ]]; then
         die "Only one phase may be specified."
       fi
@@ -102,6 +109,11 @@ while (($#)); do
     --asset)
       require_value "$@"
       assets+=("$2")
+      shift 2
+      ;;
+    --target)
+      require_value "$@"
+      reset_targets+=("$2")
       shift 2
       ;;
     --run-name)
@@ -652,6 +664,80 @@ prepare_replay() {
   esac
 }
 
+reset_target_path() {
+  local remote_path="$1"
+  local label="$2"
+  local mode="$3"
+
+  info "Resetting $label on $ssh_target: $remote_path"
+  local remote_command
+  remote_command="set -euo pipefail"$'\n'
+  remote_command+="path=$(shell_quote "$remote_path")"$'\n'
+  remote_command+='if [[ "$path" == / ]]; then echo "reset target must not be /" >&2; exit 1; fi'$'\n'
+  remote_command+='if [[ -L "$path" ]]; then echo "reset target is a symlink; refusing to reset it: $path" >&2; exit 1; fi'$'\n'
+  if [[ "$mode" == clear-contents ]]; then
+    remote_command+='mkdir -p -- "$path"'$'\n'
+    remote_command+='find "$path" -xdev -mindepth 1 -delete'$'\n'
+  else
+    remote_command+='if [[ -e "$path" ]]; then rm -rf --one-file-system -- "$path"; fi'$'\n'
+    remote_command+='mkdir -p -- "$path"'$'\n'
+  fi
+  remote_exec "$remote_command"
+}
+
+reset_replay_node() {
+  ((${#reset_targets[@]} > 0)) || \
+    die "reset requires at least one --target (repo, trace, output, l2, or all)"
+
+  local expanded=()
+  local target
+  for target in "${reset_targets[@]}"; do
+    if [[ "$target" == all ]]; then
+      expanded+=(repo trace output l2)
+    else
+      expanded+=("$target")
+    fi
+  done
+
+  local ordered=()
+  local entry already
+  for target in "${expanded[@]}"; do
+    case "$target" in
+      repo|trace|output|l2) ;;
+      *) die "Unknown reset target: $target (expected repo, trace, output, l2, or all)" ;;
+    esac
+    already=false
+    for entry in ${ordered[@]+"${ordered[@]}"}; do
+      if [[ "$entry" == "$target" ]]; then
+        already=true
+        break
+      fi
+    done
+    [[ "$already" == true ]] || ordered+=("$target")
+  done
+
+  for target in "${ordered[@]}"; do
+    case "$target" in
+      repo)
+        reset_target_path "$replay_repo_root" \
+          "replay repository (and its venv, since replay_venv_root is nested under it)" wipe
+        ;;
+      trace)
+        reset_target_path "$replay_trace_root" "replay trace root" wipe
+        ;;
+      output)
+        reset_target_path "$replay_output_root" "replay output root" wipe
+        ;;
+      l2)
+        # replay_l2_root may itself be an active mount (a real pNFS/3FS mount
+        # once one is wired up), so only its contents are cleared -- removing
+        # and recreating the directory would try to rmdir a busy mountpoint.
+        reset_target_path "$replay_l2_root" "replay L2 root" clear-contents
+        ;;
+    esac
+  done
+}
+
 expand_placeholder() {
   local value="$1"
   value="${value//@REPO_ROOT@/$replay_repo_root}"
@@ -754,5 +840,8 @@ case "$phase" in
     done
     prepare_replay
     replay_run
+    ;;
+  reset)
+    reset_replay_node
     ;;
 esac

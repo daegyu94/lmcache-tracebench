@@ -325,3 +325,201 @@ transfer_method: scp
     assert (
         controller_outputs / "remote-failure/remote_exit_code"
     ).read_text().strip() == "7"
+
+
+def _write_fake_ssh(fake_bin: Path) -> None:
+    fake_bin.mkdir(parents=True, exist_ok=True)
+    _write_executable(
+        fake_bin / "ssh",
+        """#!/usr/bin/env bash
+set -euo pipefail
+while (($#)); do
+  case "$1" in
+    -o|-p) shift 2 ;;
+    *) target="$1"; shift; break ;;
+  esac
+done
+exec bash -lc "$*"
+""",
+    )
+
+
+def _write_reset_topology(tmp_path: Path, remote: Path) -> Path:
+    topology = tmp_path / "topology.yaml"
+    topology.write_text(
+        f"""runtime_mode: copy_venv
+controller_repo_root: {tmp_path / "controller/lmcache-tracebench"}
+controller_venv_root: {tmp_path / "controller/lmcache-tracebench/.venv"}
+controller_trace_root: {tmp_path / "controller/traces"}
+controller_output_root: {tmp_path / "controller/outputs"}
+replay_host: fake-replay
+replay_user: fake
+replay_port: 22
+replay_repo_root: {remote / "lmcache-tracebench"}
+replay_venv_root: {remote / "lmcache-tracebench/.venv"}
+replay_trace_root: {remote / "traces"}
+replay_output_root: {remote / "outputs"}
+replay_l2_root: {remote / "kvcache"}
+git_repo_url: git@github.com:daegyu94/lmcache-tracebench.git
+git_revision: main
+hf_repo_id: daegyu94/lmcache-storage-traces
+hf_revision: main
+transfer_method: rsync
+"""
+    )
+    return topology
+
+
+def test_reset_wipes_repo_trace_and_output(tmp_path):
+    remote = tmp_path / "remote"
+    remote_repo = remote / "lmcache-tracebench"
+    remote_traces = remote / "traces"
+    remote_outputs = remote / "outputs"
+    (remote_repo / ".venv/bin").mkdir(parents=True)
+    (remote_repo / "stale-file.txt").write_text("old")
+    (remote_traces / "tensormesh/wildclaw").mkdir(parents=True)
+    (remote_traces / "tensormesh/wildclaw/l2.lct").write_text("old trace")
+    (remote_outputs / "old-run").mkdir(parents=True)
+
+    fake_bin = tmp_path / "fake-bin"
+    _write_fake_ssh(fake_bin)
+    topology = _write_reset_topology(tmp_path, remote)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "reset",
+            "--topology",
+            str(topology),
+            "--target",
+            "repo",
+            "--target",
+            "trace",
+            "--target",
+            "output",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert "Resetting replay repository" in result.stdout
+    assert "Resetting replay trace root" in result.stdout
+    assert "Resetting replay output root" in result.stdout
+    assert remote_repo.is_dir()
+    assert not (remote_repo / "stale-file.txt").exists()
+    assert not (remote_repo / ".venv").exists()
+    assert remote_traces.is_dir()
+    assert not (remote_traces / "tensormesh").exists()
+    assert remote_outputs.is_dir()
+    assert not (remote_outputs / "old-run").exists()
+
+
+def test_reset_l2_clears_contents_without_recreating_the_mountpoint(tmp_path):
+    remote = tmp_path / "remote"
+    remote_l2 = remote / "kvcache"
+    remote_l2.mkdir(parents=True)
+    (remote_l2 / "stale.data").write_text("old")
+    (remote_l2 / "nested").mkdir()
+    (remote_l2 / "nested/file.data").write_text("old")
+    inode_before = remote_l2.stat().st_ino
+
+    fake_bin = tmp_path / "fake-bin"
+    _write_fake_ssh(fake_bin)
+    topology = _write_reset_topology(tmp_path, remote)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        ["bash", str(SCRIPT), "reset", "--topology", str(topology), "--target", "l2"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert "Resetting replay L2 root" in result.stdout
+    assert remote_l2.stat().st_ino == inode_before
+    assert list(remote_l2.iterdir()) == []
+
+
+def test_reset_target_all_covers_every_target(tmp_path):
+    remote = tmp_path / "remote"
+    (remote / "lmcache-tracebench").mkdir(parents=True)
+    (remote / "traces").mkdir(parents=True)
+    (remote / "outputs").mkdir(parents=True)
+    (remote / "kvcache").mkdir(parents=True)
+
+    fake_bin = tmp_path / "fake-bin"
+    _write_fake_ssh(fake_bin)
+    topology = _write_reset_topology(tmp_path, remote)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        ["bash", str(SCRIPT), "reset", "--topology", str(topology), "--target", "all"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    for label in (
+        "Resetting replay repository",
+        "Resetting replay trace root",
+        "Resetting replay output root",
+        "Resetting replay L2 root",
+    ):
+        assert label in result.stdout
+
+
+def test_reset_requires_at_least_one_target(tmp_path):
+    remote = tmp_path / "remote"
+    fake_bin = tmp_path / "fake-bin"
+    _write_fake_ssh(fake_bin)
+    topology = _write_reset_topology(tmp_path, remote)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        ["bash", str(SCRIPT), "reset", "--topology", str(topology)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "reset requires at least one --target" in result.stderr
+
+
+def test_reset_rejects_unknown_target(tmp_path):
+    remote = tmp_path / "remote"
+    fake_bin = tmp_path / "fake-bin"
+    _write_fake_ssh(fake_bin)
+    topology = _write_reset_topology(tmp_path, remote)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "reset",
+            "--topology",
+            str(topology),
+            "--target",
+            "bogus",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "Unknown reset target: bogus" in result.stderr
