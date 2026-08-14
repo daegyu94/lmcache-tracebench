@@ -13,6 +13,7 @@ output_root=""
 output_root_set=false
 output_root_exact=false
 speedups="1,2,5,10"
+trace_percent="100"
 profile_config=""
 dry_run=false
 keep_l2=false
@@ -33,6 +34,8 @@ Required:
 
 Options:
   --speedups LIST          Comma-separated positive speedups (default: 1,2,5,10)
+  --trace-percent VALUE    Replay the first VALUE percent of trace submissions
+                           (default: 100)
   --output-root PATH       Base path for per-speedup output; appends a UTC
                            timestamp (default: outputs/replay-l2/<trace-name>)
   --io-profile PATH        Optional storage-node I/O profiling configuration
@@ -89,6 +92,11 @@ while (($#)); do
       require_value "$@"
       output_root="$2"
       output_root_set=true
+      shift 2
+      ;;
+    --trace-percent)
+      require_value "$@"
+      trace_percent="$2"
       shift 2
       ;;
     --output-root-exact)
@@ -164,6 +172,7 @@ echo "[INFO] Replay speed sweep started"
 echo "[INFO] Trace: $trace"
 echo "[INFO] Config: $config"
 echo "[INFO] Speedups: $speedups"
+echo "[INFO] Trace percent: $trace_percent"
 echo "[INFO] Sweep log: $sweep_log"
 
 case_count=0
@@ -184,6 +193,9 @@ fi
 
 if [[ -z "$(printf '%s' "$speedups" | tr -d '[:space:],')" ]]; then
   die "--speedups must not be empty"
+fi
+if ! python -c 'import math, sys; value = float(sys.argv[1]); raise SystemExit(0 if math.isfinite(value) and 0 < value <= 100 else 1)' "$trace_percent"; then
+  die "trace percent must be finite and in (0, 100]: $trace_percent"
 fi
 
 ensure_case_path_available() {
@@ -268,6 +280,7 @@ while IFS= read -r raw_speedup; do
     --trace "$trace"
     --config "$config"
     --speedup "$speedup"
+    --trace-percent "$trace_percent"
     --l2-path "$l2_path"
     --output-dir "$output_dir"
   )
@@ -343,12 +356,12 @@ if [[ ! -s "$results_jsonl" ]]; then
   die "No speedup cases were executed. Check --speedups and $sweep_log"
 fi
 
-python - "$results_jsonl" "$summary_path" "$trace" "$config" "$l2_root" "$output_root" "$sweep_log" <<'PY'
+python - "$results_jsonl" "$summary_path" "$trace" "$config" "$l2_root" "$output_root" "$sweep_log" "$trace_percent" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-results_path, summary_path, trace, config, l2_root, output_root, sweep_log = sys.argv[1:]
+results_path, summary_path, trace, config, l2_root, output_root, sweep_log, raw_trace_percent = sys.argv[1:]
 results = [
     json.loads(line)
     for line in Path(results_path).read_text(encoding="utf-8").splitlines()
@@ -360,6 +373,7 @@ summary = {
     "l2_root": l2_root,
     "output_root": output_root,
     "sweep_log": sweep_log,
+    "trace_percent": float(raw_trace_percent),
     "speedups": [item["speedup"] for item in results],
     "results": results,
     "completed": len(results),

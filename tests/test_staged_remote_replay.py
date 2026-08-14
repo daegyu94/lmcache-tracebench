@@ -157,6 +157,29 @@ transfer_method: scp
     assert (
         controller_outputs / "fake-failure/remote_exit_code"
     ).read_text().strip() == "7"
+    retry = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "replay",
+            "--topology",
+            str(topology),
+            "--run-name",
+            "fake-failure",
+            "--replace-existing",
+            "--",
+            "bash",
+            "-c",
+            "mkdir -p @OUTPUT_ROOT@; printf retry-result > @OUTPUT_ROOT@/result.txt",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert retry.returncode == 0
+    assert (remote_outputs / "fake-failure/result.txt").read_text() == "retry-result"
+    assert (controller_outputs / "fake-failure/result.txt").read_text() == "retry-result"
 
 
 

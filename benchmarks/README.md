@@ -11,7 +11,8 @@
 ```text
 benchmarks/
 ├── recorder/   # workload를 실행해 l2.lct 생성
-└── replayer/   # L2 trace를 backend/speedup별로 replay
+├── replayer/   # L2 trace를 backend/speedup별로 replay
+└── report/     # staged remote report matrix와 resume runner
 ```
 
 ## Before running
@@ -244,6 +245,35 @@ speedup sweep은 `sweep-summary.json`, 비교용 `sweep-summary.csv`,
 `workload-summary.json`, `workload-results.jsonl`, `workload-sweep.log`를
 생성합니다. backend sweep은 상위 output root에 backend별 결과와
 `backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log`를 생성합니다.
+
+### 6. Run report experiment matrix on staged remote
+
+report의 그림별 실험은 benchmarks/report/run_report_experiments.sh를 사용합니다.
+이 runner는 staged_remote_replay.sh로 trace/repository를 준비하고, 그래프별
+각 matrix cell을 독립된 remote run-name으로 실행합니다.
+
+    bash benchmarks/report/run_report_experiments.sh \
+      --topology configs/replayer/staged-remote/b300.yaml \
+      --graph speedup \
+      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --backend-spec '3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs.yaml|@L2_ROOT@/3fs' \
+      --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/pnfs' \
+      --trace-percent 10 \
+      --repeats 3
+
+graph preset은 throughput(그림 1–2), speedup(그림 3), latency(그림 4),
+resource(그림 5), nodewise(그림 6), scaling(그림 7)이다. --workloads,
+--speedups, --node-counts로 preset을 좁히거나 확장할 수 있다.
+SWE-bench, mooncake-toolagent, mooncake-conversation은 trace가 크므로
+--trace-percent 또는 동일한 timed subset 조건을 사용하고, 그 값을
+matrix case metadata에 남긴다.
+
+기본 state root는 outputs/report-experiments-staged이며, 성공 case는 재실행 시
+건너뛴다. 중단된 case는 다음 실행에서 runner가 staged_remote_replay.sh의
+--replace-existing를 사용해 remote와 controller의 해당 run directory만 교체하고
+다시 시작한다. 자세한 backend
+template, node scaling, output schema는 [staged remote report guide](report/README.md)를
+참고한다.
 
 ## Interpretation
 

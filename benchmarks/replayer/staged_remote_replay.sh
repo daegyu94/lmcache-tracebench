@@ -8,6 +8,7 @@ project_root="$(cd -- "$script_dir/../.." && pwd -P)"
 topology_file=""
 phase=""
 dry_run=false
+replace_existing=false
 run_name=""
 assets=()
 command_args=()
@@ -43,6 +44,7 @@ Options:
                    prepare-trace and all.
   --run-name NAME  Required for replay and all. Must be unique on both nodes.
   --dry-run        Print controller, SSH, and transfer commands without executing.
+  --replace-existing  Remove only this run's existing output before replay.
   -h, --help       Show this help.
 
 Replay command:
@@ -109,6 +111,10 @@ while (($#)); do
       ;;
     --dry-run)
       dry_run=true
+      shift
+      ;;
+    --replace-existing)
+      replace_existing=true
       shift
       ;;
     --)
@@ -663,13 +669,26 @@ replay_run() {
 
   local remote_output_root="$replay_output_root/$run_name"
   local local_output_root="$controller_output_root/$run_name"
-  if remote_path_exists "$remote_output_root"; then
-    warn "Remote output already exists; refusing to run or overwrite: $remote_output_root"
-    return 1
-  fi
-  if local_path_exists "$local_output_root"; then
-    warn "Controller output already exists; refusing to run or overwrite: $local_output_root"
-    return 1
+  if [[ "$replace_existing" == true && "$dry_run" == false ]]; then
+    if [[ -L "$local_output_root" ]]; then
+      die "Controller output is a symlink; refusing to replace: $local_output_root"
+    fi
+    [[ "$local_output_root" != "/" ]] || die "Controller output must not be /"
+    if remote_path_exists "$remote_output_root"; then
+      remote_exec "if [[ -L $(shell_quote "$remote_output_root") ]]; then echo 'Remote output is a symlink; refusing to replace.' >&2; exit 1; fi; rm -rf --one-file-system -- $(shell_quote "$remote_output_root")"
+    fi
+    if [[ -e "$local_output_root" ]]; then
+      rm -rf --one-file-system -- "$local_output_root"
+    fi
+  else
+    if remote_path_exists "$remote_output_root"; then
+      warn "Remote output already exists; refusing to run or overwrite: $remote_output_root"
+      return 1
+    fi
+    if local_path_exists "$local_output_root"; then
+      warn "Controller output already exists; refusing to run or overwrite: $local_output_root"
+      return 1
+    fi
   fi
 
   local expanded_arg

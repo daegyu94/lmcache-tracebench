@@ -11,6 +11,7 @@
 | `plot_dummy_results.py` | 재현 가능한 더미 데이터와 matplotlib multiplot 생성 |
 | `requirements.txt` | 보고서 그림 생성에만 필요한 Python package |
 | `figures/*.png` | Markdown 본문에 포함되는 사전 렌더링 그림 |
+| `../benchmarks/report/` | staged remote 그래프별 실험 matrix runner |
 
 ## 그림 다시 만들기
 
@@ -27,6 +28,20 @@ python report/plot_dummy_results.py
 ```bash
 python report/plot_dummy_results.py --output-dir /tmp/lmcache-report-figures
 ```
+
+## 실험 matrix 실행
+
+실측 그림을 만들 때는 local replay wrapper를 직접 조합하지 말고
+[staged remote runner](../benchmarks/report/README.md)를 사용합니다.
+
+    bash benchmarks/report/run_report_experiments.sh --help
+
+runner는 그림별 workload/backend/speedup/repeat case를 하나의 staged remote
+run으로 만들고, outputs/report-experiments-staged/matrix-summary.json과
+matrix-results.jsonl에 상태를 기록합니다. 기본 실행은 trace가 큰
+SWE-bench, mooncake-toolagent, mooncake-conversation에 사용할
+--trace-percent를 모든 backend와 speedup에 동일하게 전달합니다. 중단 후 같은
+state root로 다시 실행하면 완료 case는 건너뛰고 미완료 case만 재시작합니다.
 
 ## Markdown과 Quarto 선택
 
