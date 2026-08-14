@@ -1,0 +1,58 @@
+# Staged remote replay topology. Replace every example path, host, runtime
+# setting, and package source; this file intentionally has no implicit
+# runtime defaults.
+
+# controller: path where this repository is cloned/staged on the controller.
+controller_repo_root: /absolute/path/to/lmcache-tracebench
+# controller: path where HF trace archives are downloaded.
+controller_trace_root: /absolute/path/to/staged-replay/traces
+# controller: path where retrieved replay results are stored.
+controller_output_root: /absolute/path/to/staged-replay/outputs
+
+# replay: SSH host of the isolated storage/replay node.
+replay_host: replay-node.example.com
+# replay: account that owns replay_repo_root and runs all replay commands.
+replay_user: benchmark
+# replay: optional jump account when SSH cannot log in as replay_user directly;
+# commands are wrapped in `sudo -n -u $replay_user` after logging in as this user.
+# replay_jump_user: jump-account
+# replay: SSH port for the replay node.
+replay_port: 22
+# replay: path where this repository is copied on the replay node.
+replay_repo_root: /mnt/nvme/lmcache-tracebench
+# replay: path of the replayer virtualenv on the replay node.
+replay_venv_root: /mnt/nvme/lmcache-tracebench/.venv
+
+# runtime: remote_install (recommended) builds .venv on the replay node; copy_venv copies the controller's.
+runtime_mode: remote_install
+# runtime: replay node's approved Python interpreter (remote_install) or verification interpreter (copy_venv).
+replay_python: /opt/company/python/3.12/bin/python3.12
+# runtime: repository-relative path to the replayer runtime requirements file.
+replay_runtime_requirements: requirements/replayer.txt
+# runtime: internal package index URL; omit if the replay node's pip is already configured.
+replay_package_index_url: https://pypi.intra.example.com/simple
+# runtime: optional extra package index URL.
+# replay_extra_index_url: https://pypi-extra.intra.example.com/simple
+# runtime: whether prerequisite checks require uv to be present.
+replay_require_uv: false
+# runtime: copy_venv fallback only; must equal controller_repo_root/.venv.
+# controller_venv_root: /absolute/path/to/lmcache-tracebench/.venv
+
+# data: replay node's base path for extracted traces.
+replay_trace_root: /mnt/nvme/lmcache-l2-replay/traces
+# data: replay node's base path for run outputs (run-name is nested under this).
+replay_output_root: /mnt/nvme/lmcache-l2-replay/outputs
+# data: replay node's base path for disposable L2 storage targets.
+replay_l2_root: /mnt/nvme/lmcache-l2-replay/kvcache
+
+# source: git repository to stage on both controller and replay node.
+git_repo_url: git@git.example.com:example-org/lmcache-tracebench.git
+# source: git branch or tag to check out.
+git_revision: main
+# source: Hugging Face dataset repo id holding trace archives.
+hf_repo_id: example-org/lmcache-storage-traces
+# source: Hugging Face dataset revision to pull traces from.
+hf_revision: main
+
+# transfer: rsync (recommended, incremental) or scp.
+transfer_method: rsync

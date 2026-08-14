@@ -108,7 +108,7 @@ package source에 따라 달라지므로 script가 자동 설치하지 않습니
 기본값이 없는 예제를 복사해 실제 값을 모두 채웁니다.
 
 ```bash
-cp configs/replayer/staged-remote/topology.example.yaml \
+cp configs/replayer/staged-remote/example.yaml \
   configs/replayer/staged-remote/topology.yaml
 ```
 

@@ -8,7 +8,7 @@ workload/backend/speedup/repeat matrix와 원격 run directory만 관리한다.
 ## 준비
 
 1. staged remote topology를 준비한다. 예시는
-   configs/replayer/staged-remote/topology.example.yaml와 b300.yaml이다.
+   configs/replayer/staged-remote/example.yaml와 b300.yaml이다.
 2. topology의 git_revision은 trace-percent 옵션을 포함한 artifacts 커밋 또는
    그 이후 커밋을 가리켜야 한다. 원격 replay repository가 오래된 main을
    가리키면 원격 speed sweep이 --trace-percent를 알지 못한다.
@@ -29,7 +29,7 @@ shell entrypoint를 사용한다.
 실제 SSH나 replay를 시작하지 않고 matrix와 remote command만 확인한다.
 
     bash benchmarks/report/run_report_experiments.sh \
-      --topology configs/replayer/staged-remote/topology.example.yaml \
+      --topology configs/replayer/staged-remote/example.yaml \
       --graph speedup \
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
       --workloads tensormesh-swebench \
