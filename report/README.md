@@ -80,4 +80,4 @@ Dependency, buffer, schedule wait의 aggregate 합계는 서로 겹칠 수 있�
 ## Submission speedup 설정
 
 권장 범위와 H100 × 8 대비 B300 × 8의 근거는
-[`performance-evaluation.md`의 실험 B](performance-evaluation.md#35-실험-b-replay-speedup-영향)를 단일 기준으로 사용합니다.
+[`performance-evaluation.md`의 실험 B](performance-evaluation.md#33-실험-b-replay-speedup-영향)를 단일 기준으로 사용합니다.

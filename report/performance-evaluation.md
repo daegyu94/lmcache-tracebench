@@ -21,7 +21,7 @@ E1과 E2는 5개 workload, 3개 backend, speedup `x1`, `x1.25`, `x1.5`, `x2`를 
 `SWE-bench`(`tensormesh-swebench`), `mooncake-toolagent`, `mooncake-conversation`은 원본 trace가 너무 크므로 대표 subset으로 줄여 테스트한다.
 축소 비율(`trace_percent`) 또는 고정 시간 구간, checksum, operation/byte 수를 기록하고 모든 backend와 speedup에 동일한 축소 trace를 사용한다.
 E3~E5는 대표 workload를 사용하며, node scaling은 `SWE-bench` `x2`에서 `3FS`와 `pNFS`의 storage node 수 `1..6`을 비교한다.
-각 case는 최소 3회, 핵심 case는 5회 반복한다. Speedup 근거는 3.5절에서 정의한다.
+각 case는 최소 3회, 핵심 case는 5회 반복한다. Speedup 근거는 3.3절에서 정의한다.
 
 ### 1.2 주장과 증거의 연결
 
@@ -45,32 +45,41 @@ E3~E5는 대표 workload를 사용하며, node scaling은 `SWE-bench` `x2`에서
 
 ## 2. 배경 설명
 
-### 2.1 LMCache와 L1/L2 cache
+### 2.1 LMCache Tracing
 
-LMCache는 LLM inference에서 생성된 KV cache를 GPU memory 밖의 계층으로 이동하고 재사용할 수 있게 한다.
-본 실험에서 L1은 replay 과정의 임시 staging 영역이고, L2는 실제 비교 대상 storage backend다.
-L1 크기, alignment, eviction policy, store policy가 바뀌면 L2 operation sequence와 pressure가 달라질 수 있으므로 모든 backend에서 동일하게 고정한다.
+LMCache에는 `StorageManager` 수준의 trace record/replay 기능이 있다.
+이 방식은 replay 과정에서 L1 reserve, lock, eviction, store, prefetch lifecycle을 다시 구성하므로, source와 target의 L1 상태나 정책이 다르면 실제 L2 I/O 요청 순서와 양도 달라질 수 있다.
+따라서 동일한 L2 부하를 각 storage backend에 제공해야 하는 본 평가에는 그대로 사용하기 어렵다.
 
-Tracebench의 L2 trace는 실제 adapter task를 기록하며, target backend에서 store, lookup, load 사이의 dependency를 보존해 replay한다.
-이 방식은 서로 다른 backend에 동일한 L2 operation sequence를 제공하기 위한 것이다.
-자세한 contract와 metric 정의는 [L2 tracing guide](../docs/l2-tracing.md)와 [L2 replay metric guide](../docs/l2-replay-metrics.md)를 따른다.
+Tracebench는 이 제약을 피하기 위해 LMCache의 adapter-level L2 tracing으로 기록한 `l2.lct`를 사용한다.
+Record 단계는 실제 L2 adapter task의 submission/completion, timestamp, key, object size와 outcome을 기록하고, replay 단계는 이를 하나의 target L2 adapter에 직접 제출한다.
+Store→lookup과 lookup→load→unlock처럼 source 실행에 필요했던 causal dependency만 보존하며, 독립 task의 동시성과 submission 간격은 유지한다.
+Replay speedup은 이 submission 간격만 축소하고 target adapter의 I/O latency는 변경하지 않는다.
 
-### 2.2 Distributed storage backend
+L2 replay는 source의 L1 상태나 원본 KV payload를 복원하지 않는다.
+Trace 시작 전부터 존재한 read object가 필요하면 같은 key와 byte size의 synthetic object를 측정 전에 준비하며, 준비 I/O는 결과에서 제외한다.
+Source/target outcome 차이는 비교 metric으로 남기고, malformed trace, event drop, dependency 위반 또는 drain 실패는 유효하지 않은 replay로 처리한다.
+Event 범위, dependency 규칙, object 준비와 유효성 contract의 상세 내용은 [L2 tracing guide](../docs/l2-tracing.md), 결과 지표는 [L2 replay metric guide](../docs/l2-replay-metrics.md)를 따른다.
 
-본 보고서의 backend 이름은 다음 구성을 의미한다.
-최종 보고서에는 이름만 쓰지 말고 **adapter + filesystem/storage + mount option**을 함께 기록해야 한다.
+### 2.2 L2 storage backend
 
-| 보고서 표기 | 의도한 구성 | 확인할 항목 |
+본 보고서에서 비교하는 L2 storage backend는 local baseline과 distributed backend로 구분한다.
+최종 실험 설정에는 **adapter + filesystem/storage + mount option**을 함께 기록한다.
+
+| 보고서 표기 | 역할과 예정 구성 | 설정 상태 |
 | --- | --- | --- |
-| `fs-native` | LMCache `fs_native` adapter + replay host의 local/direct-attached filesystem | filesystem 종류, mount option, direct I/O |
-| `3FS` | NIXL/HF3FS adapter + 3FS storage cluster | NIXL/3FS version, storage node 수, striping/replication |
-| `pNFS` | `fs_native` 또는 NIXL `POSIX` adapter + pNFS mount | 실제 adapter, NFS version, mount option, metadata/data-server topology |
+| `fs-native` | LMCache `fs_native` adapter + replay host의 local storage + XFS filesystem. Distributed backend와 비교하기 위한 local baseline이다. | XFS 사용; device, mount option 등 TBD |
+| `3FS` | NIXL/HF3FS adapter로 접근하는 3FS distributed filesystem backend. 여러 storage node에 데이터를 분산하는 구성을 비교한다. | adapter/version, storage node, striping/replication, mount 및 topology TBD |
+| `pNFS` | `fs_native` 또는 NIXL `POSIX` adapter로 접근하는 pNFS distributed storage backend. parallel NFS data path와 metadata/data-server 구성을 비교한다. | adapter/version, NFS/mount option, node 및 topology TBD |
 
-`fs_native`는 adapter 이름이므로 pNFS mount도 이 adapter로 접근할 수 있다.
-이 경우 `fs-native`와 `pNFS`를 구분하는 것은 adapter가 아니라 실제 backing storage다.
-비교 표에는 이 차이를 명시하여 software path 차이와 storage system 차이를 혼동하지 않는다.
+`fs-native`는 local storage baseline이므로 3FS·pNFS와 동일한 durability나 failure model을 제공한다고 해석하지 않는다.
+3FS와 pNFS의 구체적인 adapter, 버전, storage node/device 수, replication·striping 정책, mount option, network topology는 실험 확정 후 TBD 값을 채운다.
 
 ### 2.3 Workload와 replay
+TensorMesh의 `GAIA`와 `WildClaw`는 workload phase와 burst 차이를 비교하기 위한 trace로 사용한다.
+`SWE-bench`는 상대적으로 높은 L2 pressure와 storage-node scale-out을 점검하는 대표 workload다.
+Mooncake의 `ToolAgent`는 tool-interaction 패턴, `Conversation`은 conversational/interactive 패턴을 대표한다.
+이 설명은 workload의 비교 목적을 나타내며, 실제 object size, read/write mix, request/operation 수는 각 trace metadata로 확정한다.
 
 | Suite | Workload | Trace 표기 | 비고 |
 | --- | --- | --- | --- |
@@ -113,7 +122,7 @@ backend가 offered load를 따라가지 못하면 실제 submission window, sche
 | Storage node 수 / device 수 | `[값]` |
 | Device model / capacity | `[값]` |
 | Storage network topology | `[switch, link rate, bonding]` |
-| Local filesystem / mount option | `[값]` |
+| Local filesystem / mount option | `XFS / [mount option TBD]` |
 | pNFS mount option | `[값]` |
 
 #### Replay 및 profiling
@@ -150,73 +159,7 @@ L2 trace -> replay host -> LMCache L2 adapter -> local FS / 3FS / pNFS
                     +-> l2_io_interval.tsv
 ```
 
-#### 변수와 통제 기준
-
-| 종류 | 항목 | 값 또는 정책 |
-| --- | --- | --- |
-| 독립 변수 | Workload | GAIA, WildClaw, SWE-bench, ToolAgent, Conversation |
-| 독립 변수 | L2 backend | fs-native, 3FS, pNFS |
-| 독립 변수 | Storage node count | 1, 2, 3, 4, 5, 6 (E5에서만 sweep) |
-| 독립 변수 | Replay speedup | x1, x1.25, x1.5, x2 |
-| 통제 변수 | Trace | workload별 동일 `.lct`, 동일 축소 비율 또는 시간 구간 |
-| 통제 변수 | Replay | L1 크기, worker 수, direct I/O, alignment, policy 고정 |
-| 통제 변수 | Storage state | case마다 별도 L2 path를 비우고 preparation은 측정에서 제외 |
-| 통제 변수 | Profiler | 동일 node/device/interface와 5초 interval |
-| 반복 | 횟수 | 최소 3회, 핵심 case 5회 |
-| 실행 순서 | 순서 효과 | 반복마다 backend 순서를 무작위화하거나 Latin square 적용 |
-
-공유 cluster의 다른 job, storage compaction/rebalancing, network maintenance가 있으면 run metadata에 기록한다.
-가능한 경우 동일 시간대의 background traffic도 별도 interface counter로 남긴다.
-
-### 3.2 실행 절차
-
-각 workload trace에 대해 다음 절차를 수행한다.
-
-1. Trace checksum, operation 수, read/write byte, `trace_percent` 또는 고정 시간 구간을 manifest에 기록한다.
-2. Target L2 case path가 비어 있고 symlink가 아닌지 확인한다.
-3. Replay preparation으로 load에 필요한 object를 구성한다.
-   Preparation I/O는 측정에서 제외한다.
-4. Node profiler를 시작한 뒤 동일 trace를 target backend에 replay한다.
-5. Replay가 drain된 뒤 profiler를 종료하고 case artifact를 보존한다.
-6. 3.3절의 유효성 조건을 통과한 run만 요약 통계에 포함한다.
-7. 다음 case 전에 L2 path를 초기화하고, 반복 간 backend 실행 순서를 바꾼다.
-
-현재 benchmark wrapper를 사용하는 예시는 다음과 같다.
-실제 mount와 config는 setup 표에 기록한 값으로 바꾼다.
-
-```bash
-bash benchmarks/replayer/replay_backend_sweep.sh \
-  --trace /path/to/workload/l2.lct \
-  --backend-spec 'fs-native=configs/replayer/fs-native.yaml@/mnt/local/lmcache' \
-  --backend-spec '3fs=configs/replayer/nixl-hf3fs.yaml@/mnt/3fs/lmcache' \
-  --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache' \
-  --experiment speedup \
-  --speedups 1,1.25,1.5,2 \
-  --io-profile configs/profiling/storage.yaml
-```
-
-pNFS를 NIXL `POSIX` backend로 시험한다면 해당 config를 별도로 만들고 실제 adapter를 결과 metadata에 남긴다.
-Backend sweep은 순차 실행하되 반복 단위에서는 backend-spec 순서를 바꾸어 시간대 편향을 줄인다.
-
-### 3.3 Run 유효성 기준과 통계 처리
-
-다음 조건을 통과한 case만 성능 집계에 포함한다.
-
-- Replay process가 정상 종료하고 malformed trace, event drop, dispatch error, drain timeout이 없다.
-- `pending == 0`이며 read/write의 submitted와 completed 수가 일치한다.
-- 의도한 trace와 축소 조건, L1 설정, worker 수, direct I/O가 metadata와 일치한다.
-- Target L2 path가 case 시작 전에 정해진 cold-state 정책을 만족한다.
-- `actual_submission_window_seconds`가 target window에서 벗어난 정도를 기록한다.
-- Profiler의 node/device/interface 누락이 없고 network error/drop 증가를 확인한다.
-- 공유 storage의 비실험 traffic이나 장애가 관측된 run은 별도 표시한다.
-
-Outcome mismatch는 source와 target의 backend 상태 및 concurrency 차이를 관찰하는 진단 지표이며, 값이 0이 아니라는 이유만으로 run을 자동 폐기하지 않는다.
-반대로 mismatch의 원인을 설명하지 않은 채 성능값만 채택하지도 않는다.
-
-반복값은 평균보다 중앙값을 기본 대표값으로 사용하고 95% bootstrap confidence interval과 개별 점을 함께 보존한다.
-명백한 외란 run을 제외할 때는 사후적으로 값을 보고 결정하지 말고, 위 유효성 기준에 따라 제외 사유를 기록한다.
-
-### 3.4 실험 A: 시간에 따른 L2 read/write throughput
+### 3.2 실험 A: 시간에 따른 L2 read/write throughput
 
 **목적:** 시간별 throughput 변화를 확인하기 위해 workload burst와 read/write phase가 각 backend에서 어떻게 나타나는지 확인한다.
 
@@ -250,7 +193,7 @@ TensorMesh 3×3과 Mooncake 2×3으로 분리하여 panel 글자 크기를 유�
 Adapter가 interval log를 제공하지 않아 `l2_io_interval.tsv`가 비어 있는 case는 node-level disk/network rate로 대체하지 않는다.
 해당 L2 panel은 `N/A`로 남기고, 물리 자원 시계열은 실험 D에서 별도로 보고한다.
 
-### 3.5 실험 B: Replay speedup 영향
+### 3.3 실험 B: Replay speedup 영향
 
 **목적:** 같은 L2 trace를 더 빠르게 재생했을 때 throughput이 얼마나 늘고, 언제부터 queueing이 시작되는지 확인한다.
 
@@ -358,7 +301,7 @@ Throughput 증가와 함께 actual submission window, p99 latency, schedule lag�
 Write p99도 같은 경향인지 함께 확인한다.
 Read/write 중 하나만 악화된다면 aggregate wall throughput으로 이를 가리지 않고 operation별 결과를 설명한다.
 
-### 3.6 실험 C: Latency breakdown과 queueing 진단
+### 3.4 실험 C: Latency breakdown과 queueing 진단
 
 **목적:** latency 증가 원인을 확인하기 위해 tail latency 증가가 read/write adapter task 자체에서 발생하는지, replay가 dependency 또는 buffer를 기다리는 과정에서 발생하는지 구분한다.
 
@@ -396,7 +339,7 @@ adapter_task_latency = t_complete - t_submit
 target_to_completion = t_complete - t_target
 ```
 
-### 3.7 실험 D: Storage/network utilization
+### 3.5 실험 D: Storage/network utilization
 
 **목적:** storage와 network 병목을 확인하기 위해 throughput plateau의 원인이 storage device인지 network인지 구분한다.
 
@@ -464,7 +407,7 @@ imbalance_cv = std(node_utilization) / mean(node_utilization)
 두 utilization이 모두 낮은데 latency와 schedule lag이 증가하면 adapter queue, metadata server, CPU/NUMA, lock contention, single-thread submission 경로를 추가로 확인한다.
 `io_util_percent` 100%가 cluster 전체 포화와 동의어는 아니며, device 수와 queueing 구조를 함께 해석한다.
 
-### 3.8 실험 E: Storage node 수에 따른 scale-out
+### 3.6 실험 E: Storage node 수에 따른 scale-out
 
 **목적:** storage node 수에 따른 확장성을 확인하기 위해 storage node 수를 늘렸을 때 distributed backend의 aggregate throughput 확장성과 병목 변화를 확인한다.
 
