@@ -7,15 +7,13 @@ workload/backend/speedup/repeat matrix와 원격 run directory만 관리한다.
 
 ## 준비
 
-1. staged remote topology를 준비한다. 예시는
-   configs/replayer/staged-remote/example.yaml와 b300.yaml이다.
-2. topology의 git_revision은 trace-percent 옵션을 포함한 artifacts 커밋 또는
-   그 이후 커밋을 가리켜야 한다. 원격 replay repository가 오래된 main을
-   가리키면 원격 speed sweep이 --trace-percent를 알지 못한다.
-3. trace archive를 staged remote로 올릴 경우 --asset을 지정한다. 이미
+1. staged remote topology를 준비한다. 템플릿은
+   configs/replayer/staged-remote/example.yaml이고, b300 컨트롤러(sia)/replay
+   node(weka01) 쌍의 실제 값은 b300.yaml이다.
+2. trace archive를 staged remote로 올릴 경우 --asset을 지정한다. 이미
    topology의 replay_trace_root에 trace가 있으면 --skip-prepare로 preparation을
    건너뛸 수 있다.
-4. backend spec의 config와 L2 path는 remote command에 전달되는 문자열이다.
+3. backend spec의 config와 L2 path는 remote command에 전달되는 문자열이다.
    topology placeholder가 들어갈 수 있으므로 CONFIG와 L2_ROOT 사이는 |로
    구분한다.
 
@@ -24,7 +22,7 @@ shell entrypoint를 사용한다.
 
     bash benchmarks/report/run_report_experiments.sh --help
 
-## 가장 작은 dry-run
+## 1. 가장 작은 dry-run
 
 실제 SSH나 replay를 시작하지 않고 matrix와 remote command만 확인한다.
 
@@ -39,7 +37,50 @@ shell entrypoint를 사용한다.
       --skip-prepare \
       --dry-run
 
-## 실제 speedup 실험
+## 2. 실제로 돌려보기 (검증됨: b300 / weka01, fs-native)
+
+아래 명령은 b300.yaml topology로 weka01에서 실제로 성공한 명령이다. trace와
+replay repository/venv가 이미 준비돼 있다는 전제로 --skip-prepare를 쓰고,
+가장 빠르게 끝나도록 workload/speedup/repeat을 하나씩만 남겼다. 처음 이 문서를
+보는 사람도 그대로 복사해서 실행하면 실제 replay 결과를 받을 수 있다.
+
+    bash benchmarks/report/run_report_experiments.sh \
+      --topology configs/replayer/staged-remote/b300.yaml \
+      --graph throughput \
+      --workloads tensormesh-wildclaw \
+      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --trace-percent 1 \
+      --repeats 1 \
+      --skip-prepare
+
+성공하면 다음과 같은 출력이 끝에 남는다.
+
+    [INFO] Remote replay completed successfully: report-throughput-tensormesh-wildclaw-fs-native-base-s1-r1
+    [INFO] Replay results retrieved: /home/daegyu94/workspace/b300/staged-replay/outputs/report-throughput-tensormesh-wildclaw-fs-native-base-s1-r1
+
+case 상태와 실제 metric은 다음으로 확인한다.
+
+    cat outputs/report-experiments-staged/matrix-summary.json
+    cat outputs/report-experiments-staged/cases/throughput/tensormesh-wildclaw/fs-native/nbaseline/s1/r1/case.json
+    python -m json.tool \
+      <controller_output_root>/report-throughput-tensormesh-wildclaw-fs-native-base-s1-r1/x1/l2_replay_stats.json
+
+`<controller_output_root>`는 topology의 controller_output_root 값이다(b300.yaml
+기준 `/home/daegyu94/workspace/b300/staged-replay/outputs`). matrix-summary.json의
+`completed: 1, failed: 0`과 case.json의 `"status": "ok"`가 실제 replay 성공을
+뜻한다.
+
+같은 run-name으로는 재실행이 안 되므로(스크립트가 기존 output을 덮어쓰지 않음)
+다시 시도하려면 `--workloads`/`--repeats`로 다른 case를 만들거나
+controller_output_root/run_name과 매칭되는 outputs/report-experiments-staged의
+case 디렉터리를 함께 지운다.
+
+## 3. 여러 backend/speedup을 한 번에 (참고용, b300에서는 fs-native만 검증됨)
+
+아래는 backend 3종과 여러 speedup/repeat을 한 번에 도는 원래 예시다. 형식은
+맞지만 3FS와 pNFS는 지금 b300/weka01에 아직 설정돼 있지 않으므로 그대로
+실행하면 두 backend에서 실패한다. 3FS/pNFS가 실제로 준비된 cluster에서
+참고하거나, `--backend-spec`을 fs-native 하나만 남겨서 사용한다.
 
     bash benchmarks/report/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
@@ -60,7 +101,7 @@ speedup, repeat은 같은 trace-percent를 사용하고, case.json에 선택 비
 기록한다. 원본 trace의 controller-side mirror가 있으면 --local-trace-root를
 추가해 size_bytes와 sha256도 기록할 수 있다.
 
-## 그래프 preset
+## 4. 그래프 preset
 
 | --graph | report 그림 | 기본 workload | 기본 speedup |
 | --- | --- | --- | --- |
@@ -76,7 +117,7 @@ speedup, repeat은 같은 trace-percent를 사용하고, case.json에 선택 비
 --repeats로 변경한다. resource/nodewise/scaling에는 같은 remote profiler
 설정을 --profile로 전달한다.
 
-## Backend와 node scaling
+## 5. Backend와 node scaling
 
 일반 backend spec 형식은 다음과 같다.
 
@@ -98,7 +139,7 @@ config 또는 L2 path에 포함한다.
 확장은 경로만 바꾸므로 실제 3FS/pNFS node activation, mount, striping,
 replication 설정은 topology/config에서 별도로 확정해야 한다.
 
-## Resume와 output
+## 6. Resume와 output
 
 state root는 기본적으로 outputs/report-experiments-staged이며, 같은 명령을
 다시 실행해도 성공한 case.json은 건너뛴다.
@@ -126,7 +167,7 @@ matrix-results.jsonl의 각 case status를 plot 단계의 입력 검증에 사�
 replay가 성공한 case의 실제 metric은 result_dir 아래 x<SPEEDUP>/의
 l2_replay_stats.json, l2_io_interval.tsv, profile 결과에서 읽는다.
 
-## 기존 replayer script와의 관계
+## 7. 기존 replayer script와의 관계
 
 replay_speed_sweep.sh는 하나의 trace와 speedup 목록을 실행하는 공통 primitive로
 남겨 두었다. replay_backend_sweep.sh와 replay_workload_sweep.sh도 report 외
