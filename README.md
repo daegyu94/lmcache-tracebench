@@ -185,6 +185,7 @@ WildClaw에서는 무시됩니다. 자세한 recorder output과 speed sweep은
 - [Recorder guide](docs/recorder.md): Tensormesh V3, Mooncake workload, GPU quota와 Recorder output
 - [Replayer guide](docs/replayer.md): trace 선택, replay backend와 profiling
 - [L2 tracing guide](docs/l2-tracing.md): StorageManager replay의 한계와 L2 causal replay contract
+- [Documentation guidelines](docs/documentation-guidelines.md): 문서 역할, 중복 방지와 실험 기록 규칙
 - [Benchmark guide](benchmarks/README.md): benchmark script와 artifact layout
 - [Trace assets](docs/trace-assets.md): GitHub Release and Hugging Face Dataset upload/download
 - [Staged remote replay](docs/staged-remote-replay.md): controller node에서 격리 replay node를 준비·실행·회수
