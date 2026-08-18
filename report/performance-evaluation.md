@@ -21,7 +21,6 @@ E1과 E2는 5개 workload, 3개 backend, speedup `x1`, `x1.25`, `x1.5`, `x2`를 
 `SWE-bench`(`tensormesh-swebench`), `mooncake-toolagent`, `mooncake-conversation`은 원본 trace가 너무 크므로 대표 subset으로 줄여 테스트한다.
 축소 비율(`trace_percent`) 또는 고정 시간 구간, checksum, operation/byte 수를 기록하고 모든 backend와 speedup에 동일한 축소 trace를 사용한다.
 E3~E5는 대표 workload를 사용하며, node scaling은 `SWE-bench` `x2`에서 `3FS`와 `pNFS`의 storage node 수 `1..6`을 비교한다.
-각 case는 최소 3회, 핵심 case는 5회 반복한다. Speedup 근거는 3.3절에서 정의한다.
 
 ### 1.2 주장과 증거의 연결
 
