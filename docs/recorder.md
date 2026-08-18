@@ -92,8 +92,7 @@ python -m recorder.main \
   --output-dir outputs/swebench-10pct
 ```
 
-`--dataset-percent`는 Tensormesh의 SWE-bench에 적용되며, GAIA와 WildClaw에서는
-무시됩니다. 결과의 `dataset_percent_applied`가 실제 적용 여부를 나타냅니다.
+결과의 `dataset_percent_applied`가 실제 적용 여부를 나타냅니다.
 
 ```bash
 bash benchmarks/recorder/record_source_traces.sh \

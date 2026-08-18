@@ -1,13 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Generate workload preflight tables and trace-percent presets.
+"""Generate workload preflight data and workload presets.
 
 The generator reads the same L2 ``.lct`` files used by the replay runner and
-calls :func:`replayer.preflight.analyze_l2_trace`.  The resulting Markdown is
-intended to answer two questions before a remote run starts:
-
-* how many operations and how much logical KV payload are selected at a fixed
-  ``trace_percent``; and
-* which conservative ``trace_percent`` is suitable for a logical KV target.
+calls :func:`replayer.preflight.analyze_l2_trace`.  The resulting Markdown lists workload presets and conservative ``trace_percent`` values
+before a remote run starts.
 
 The target values use decimal units (1 TB = 1,000 GB), matching the preflight
 GB calculation.  A generated preset is tied to the trace checksums recorded in
@@ -251,16 +247,14 @@ def _markdown(
     *,
     source_revision: str,
     generated_at: str,
-    records: dict[str, dict[str, Any]],
-    targets: tuple[Target, ...],
     presets: dict[str, dict[str, Any]],
 ) -> str:
     lines = [
         "# Workload preflight estimates",
         "",
         (
-            "이 문서는 현재 `l2.lct`를 `trace_percent` prefix로 선택했을 때의 "
-            "operation 수와 logical KV payload를 사전에 확인하기 위한 자료다."
+            "이 문서는 workload별 replay preset과 `trace_percent`, source window, logical KV "
+            "peak를 사전에 확인하기 위한 자료다."
         ),
         (
             "실제 replay 전의 용량 계획에 사용하며, filesystem allocation이나 backend "
@@ -272,7 +266,7 @@ def _markdown(
         "- Unit: decimal GB/TB (`1 TB = 1,000 GB`)",
         "- Capacity column: prefix replay의 `peak_gb`",
         "- Assumption: selected store가 성공하고 submission 순서대로 overwrite/delete가 반영됨",
-        "- Preset target mapping: fixed-percent preflight row interpolation with five percent headroom",
+        "- Preset target mapping: conservative trace-prefix selection with five percent headroom",
         "- Duration estimate: source first-to-last submission window divided by replay speedup; schedule lower bound only",
         (
             "- `source window s` is the raw timestamp difference between the first and "
@@ -280,43 +274,11 @@ def _markdown(
             "`source window / S`"
         ),
         (
-            "- Target preset windows are interpolated from fixed-percent rows unless "
+            "- Target preset windows are interpolated from preflight analysis unless "
             "`--validate-targets` is used"
         ),
         "",
-        "## Fixed trace-percent estimates",
-        "",
     ]
-    for workload in WORKLOADS:
-        record = records[workload]
-        lines.extend(
-            [
-                f"### `{workload}`",
-                "",
-                "| trace_percent | selected operations | store | lookup | load | unlock | delete | source window s | peak GB | final GB |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-            ]
-        )
-        for row in record["percentages"]:
-            counts = row["operations_selected_by_type"]
-            estimate = row["logical_kv_estimate"]
-            lines.append(
-                "| {percent:g}% | {selected:,} | {store:,} | {lookup:,} | {load:,} | "
-                "{unlock:,} | {delete:,} | {window} | {peak} | {final} |".format(
-                    percent=float(row["trace_percent"]),
-                    selected=int(row["operations_selected"]),
-                    store=int(counts["store"]),
-                    lookup=int(counts["lookup_task"]),
-                    load=int(counts["load_task"]),
-                    unlock=int(counts["unlock"]),
-                    delete=int(counts["delete"]),
-                    window=_fmt(float(row["source_submission_window_seconds"])),
-                    peak=_fmt(float(estimate["peak_gb"])),
-                    final=_fmt(float(estimate["final_gb"])),
-                )
-            )
-        lines.extend(["", f"Trace SHA-256: `{record['sha256']}`", ""])
-
     lines.extend(
         [
             "## Presets",
@@ -491,8 +453,6 @@ def generate(args: argparse.Namespace) -> None:
     document = _markdown(
         source_revision=source_revision,
         generated_at=generated_at,
-        records=records,
-        targets=targets,
         presets=presets,
     )
     payload = {
@@ -548,7 +508,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--percentages",
         default="20,40,60,80,100",
-        help="fixed table percentages (default: 20,40,60,80,100)",
+        help="preflight analysis percentages (default: 20,40,60,80,100)",
     )
     parser.add_argument(
         "--target",
@@ -558,7 +518,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--input-json",
-        help="reuse fixed-percent workload rows from an earlier generator JSON output",
+        help="reuse preflight workload rows from an earlier generator JSON output",
     )
     parser.add_argument(
         "--validate-targets",

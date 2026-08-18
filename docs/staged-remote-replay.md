@@ -184,24 +184,15 @@ bash benchmarks/replayer/staged_remote_replay.sh prepare-trace \
   --asset tensormesh/wildclaw.tar.gz
 ```
 
-Mooncake archive가 main에 추가된 뒤에는 같은 명령에 다음 경로를 사용합니다.
-
-```bash
-bash benchmarks/replayer/staged_remote_replay.sh prepare-trace \
-  --topology configs/replayer/staged-remote/topology.yaml \
-  --asset mooncake/toolagent.tar.gz \
-  --asset mooncake/conversation.tar.gz
-```
-
-스크립트는 archive를 `tar --keep-old-files`로 풀어 기존 파일을 덮어쓰지 않습니다.
-상세한 archive 구조와 수동 `tar.gz` 명령은 [Trace assets guide](trace-assets.md)를
-참고하세요.
+`--asset`을 반복 지정하면 여러 archive를 함께 준비할 수 있습니다. Archive layout과
+수동 압축 해제 방법은 [Trace assets guide](trace-assets.md)를 기준으로 하며, staged
+script는 기존 파일을 덮어쓰지 않도록 archive를 풉니다.
 
 ### 3.2 Replay 준비
 
-Repository를 controller에 clone한 뒤 replay node로 전송합니다. replay node에서
-`setup_runtime.sh --profile replayer-cpu --python ...`을 실행해 지정된 Python으로 `.venv`를 만들고,
-runtime requirements와 사내 package source를 사용해 설치한 뒤 import/pip 검사를 수행합니다.
+Repository를 controller에 clone한 뒤 replay node로 전송합니다. `prepare-replay`는
+위 Runtime 설치 절차에 따라 `.venv`와 runtime requirements를 준비하고 import/pip
+검사를 수행합니다.
 
 ```bash
 bash benchmarks/replayer/staged_remote_replay.sh prepare-replay \

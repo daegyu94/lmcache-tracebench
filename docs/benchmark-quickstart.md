@@ -98,20 +98,14 @@ Dry-run의 경로와 command가 맞으면 `--dry-run`을 제거합니다. 성공
 [Documentation guidelines](documentation-guidelines.md#tracereplay-실험-기록)의
 실험 기록 목록을 따릅니다.
 
-## 6. 결과 확인
+## 6. 결과 확인과 실패 진단
 
-Launcher별 summary와 case artifact 이름은
-[Benchmark guide](../benchmarks/README.md#artifact-layout), 각 JSON/TSV field의
-정의와 비교 순서는 [L2 replay metric guide](l2-replay-metrics.md)를 사용합니다.
-Report figure와 artifact의 연결은
-[Performance report](../report/performance-evaluation.md)의 각 실험 절에서 관리합니다.
+결과는 launcher별 summary와 case artifact에서 확인합니다. 공통 artifact layout은
+[Benchmark guide](../benchmarks/README.md#artifact-layout), JSON/TSV field와 유효성 기준은
+[L2 replay metric guide](l2-replay-metrics.md), report figure와 artifact 연결은
+[Performance report](../report/performance-evaluation.md)을 따릅니다.
 
-## 실패 시 확인 순서
-
-1. 선택한 runtime profile의 `--check`를 다시 실행합니다.
-2. Trace가 존재하고 크기가 0보다 큰지 확인합니다.
-3. `--dry-run`에서 config, L2 path와 output path를 확인합니다.
-4. Case의 `lmcache-prepare.log`와 `lmcache-replay.log`를 확인합니다.
-5. 상위 launcher summary와 log에서 실패 case를 찾습니다.
-6. Trace validity 오류는 [L2 tracing guide](l2-tracing.md), backend/profile 오류는
-   [Replayer guide](replayer.md)를 확인합니다.
+실패하면 선택한 runtime profile의 `--check`와 replay `--dry-run`을 다시 실행한 뒤,
+case의 `lmcache-prepare.log`, `lmcache-replay.log`와 상위 launcher summary를 확인합니다.
+Trace validity 문제는 [L2 tracing guide](l2-tracing.md), backend/profile 문제는
+[Replayer guide](replayer.md)를 참고합니다.

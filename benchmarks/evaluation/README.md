@@ -35,9 +35,9 @@ shell entrypoint를 사용한다.
 
 ## 2. Workload preset과 preflight estimate
 
-[`preflight-estimates.md`](preflight-estimates.md)에는 각 workload의
-`trace_percent=20,40,60,80,100`에 대한 operation 분포와 logical KV `peak_gb`가
-정리되어 있다. `workload-presets.json`은 이 preflight 표에서 계산한
+[`preflight-estimates.md`](preflight-estimates.md)에는 workload별 preset의
+`trace_percent`, source window, estimated peak가 정리되어 있다.
+`workload-presets.json`은 이 preflight 분석에서 계산한
 `full`과 `0.5tb`, `1tb`, `2tb`, `4tb` strict target preset을 제공한다.
 
 `full`은 모든 workload를 full trace로 사용한다. 모든 workload를 target 안에 넣으려면
@@ -76,15 +76,14 @@ interpolate한다. 대용량 trace를 target별로 다시 읽어 검증하려면
 
 먼저 단일 case로 topology와 backend를 검증한 뒤, 여러 workload/backend/speedup을 한 번에 실행한다.
 
-### 단일 실행 (검증됨: b300 / weka01, fs-native)
+### 단일 실행
 
-아래 명령은 b300.yaml topology로 weka01에서 실제로 성공한 명령이다. trace와
-replay repository/venv가 이미 준비돼 있다는 전제로 --skip-prepare를 쓰고,
-가장 빠르게 끝나도록 workload/speedup/repeat을 하나씩만 남겼다. 처음 이 문서를
-보는 사람도 그대로 복사해서 실행하면 실제 replay 결과를 받을 수 있다.
+trace와 replay repository가 replay node에 이미 준비된 환경에서 단일 workload,
+backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. 준비가 끝나지 않은
+환경에서는 `--skip-prepare`를 제거한다.
 
     bash benchmarks/evaluation/run_report_experiments.sh \
-      --topology configs/replayer/staged-remote/b300.yaml \
+      --topology <topology.yaml> \
       --graph throughput \
       --workloads tensormesh-wildclaw \
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
@@ -92,22 +91,17 @@ replay repository/venv가 이미 준비돼 있다는 전제로 --skip-prepare를
       --repeats 1 \
       --skip-prepare
 
-성공하면 다음과 같은 출력이 끝에 남는다.
+실행이 완료되면 controller의 state root와 topology의 `controller_output_root`에서
+상태와 결과를 확인한다.
 
-    [INFO] Remote replay completed successfully: report-throughput-tensormesh-wildclaw-fs-native-base-s1-r1
-    [INFO] Replay results retrieved: /home/daegyu94/workspace/b300/staged-replay/outputs/report-throughput-tensormesh-wildclaw-fs-native-base-s1-r1
-
-case 상태와 실제 metric은 다음으로 확인한다.
-
-    cat outputs/report-experiments-staged/matrix-summary.json
-    cat outputs/report-experiments-staged/cases/throughput/tensormesh-wildclaw/fs-native/nbaseline/s1/r1/case.json
+    cat <state_root>/matrix-summary.json
+    cat <state_root>/cases/throughput/tensormesh-wildclaw/fs-native/nbaseline/s1/r1/case.json
     python -m json.tool \
-      <controller_output_root>/report-throughput-tensormesh-wildclaw-fs-native-base-s1-r1/x1/l2_replay_stats.json
+      <controller_output_root>/<run-name>/x1/l2_replay_stats.json
 
-`<controller_output_root>`는 topology의 controller_output_root 값이다(b300.yaml
-기준 `/home/daegyu94/workspace/b300/staged-replay/outputs`). matrix-summary.json의
-`completed: 1, failed: 0`과 case.json의 `"status": "ok"`가 실제 replay 성공을
-뜻한다.
+`<state_root>`는 `--state-root` 값이며 기본값은 `outputs/report-experiments-staged`다.
+`matrix-summary.json`의 `completed: 1`, `failed: 0`과 case.json의 `"status": "ok"`를
+확인하면 단일 replay case가 정상적으로 완료된 것이다.
 
 
 ### 여러 backend/speedup 실행
