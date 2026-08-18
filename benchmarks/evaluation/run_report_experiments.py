@@ -749,7 +749,7 @@ def prepare_case(
     marker = read_marker(case)
     had_marker = marker is not None
     fingerprint = marker_fingerprint(case, args)
-    if marker is not None:
+    if marker is not None and not args.overwrite:
         successful = (
             marker.get("status") in {"ok", "dry_run"}
             and marker.get("returncode") == 0
@@ -763,6 +763,7 @@ def prepare_case(
             and marker.get("status") not in {"ok", "dry_run"}
         ):
             return marker, True, had_marker
+    if marker is not None:
         if state_dir.is_symlink():
             raise RunnerError(f"case state directory is a symlink: {state_dir}")
         shutil.rmtree(state_dir)
@@ -1142,6 +1143,15 @@ successful cases and retries incomplete cases.
         action=argparse.BooleanOptionalAction,
         default=True,
         help="retry failed/interrupted cases by replacing their run directory",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help=(
+            "re-execute every case regardless of prior status and replace the "
+            "remote run directory; default preserves successful cases and "
+            "only overwrites failed/interrupted ones"
+        ),
     )
     parser.add_argument(
         "--fail-fast",

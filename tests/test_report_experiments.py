@@ -69,6 +69,36 @@ def test_report_runner_dry_run_resumes_completed_cases(tmp_path):
     assert second_summary["resume_skipped"] == 2
 
 
+def test_report_runner_overwrite_re_runs_successful_cases(tmp_path):
+    state_root = tmp_path / "overwrite-state"
+
+    first = subprocess.run(
+        _command(state_root),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "Case speedup/tensormesh-swebench/fs-native/baseline/1/r1" in first.stdout
+
+    summary_path = state_root / "matrix-summary.json"
+    first_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert first_summary["planned"] == 2
+    assert first_summary["completed"] == 2
+    assert first_summary["resume_skipped"] == 0
+
+    overwrite_command = [*_command(state_root), "--overwrite"]
+    second = subprocess.run(
+        overwrite_command,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "Case speedup/tensormesh-swebench/fs-native/baseline/1/r1" in second.stdout
+    second_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert second_summary["completed"] == 2
+    assert second_summary["resume_skipped"] == 0
+
+
 def test_report_runner_full_preset_resolves_full_trace(tmp_path):
     state_root = tmp_path / "full-preset-state"
     command = [
