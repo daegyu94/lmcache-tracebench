@@ -99,7 +99,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         trace_level = read_trace_level(trace_path)
         if trace_level == "l2":
-            run_l2_preflight(trace_path, config.trace_percent)
+            run_l2_preflight(
+                trace_path,
+                config.trace_percent,
+                speedup=config.speedup,
+            )
         else:
             print(
                 "[INFO] L2 preflight skipped: "

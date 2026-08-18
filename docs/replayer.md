@@ -83,6 +83,8 @@ python -m replayer.main \
 실행 전 명령만 확인하려면 `--dry-run`을 추가합니다. 지정한 trace가 현재
 host에서 읽을 수 있는 L2 trace이면 target을 변경하지 않고 선택된 op 수와
 prepare/peak/final logical KV payload estimate를 GB 단위로 함께 출력합니다.
+첫/마지막 submission timestamp 차이와 `speedup`으로 계산한 replay schedule 최소
+하한도 출력하지만, preparation/backend startup·mount·drain 시간은 포함하지 않습니다.
 Trace가 없거나 유효한 L2 trace가 아니면 command는 계속 표시하고 preflight를
 건너뛴 이유를 warning으로 출력합니다.
 실행 중에는 터미널에 record 진행률을 표시하며, LMCache 원문 로그는

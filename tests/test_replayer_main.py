@@ -142,8 +142,8 @@ def test_l2_dry_run_prints_preflight_estimate(capsys, monkeypatch, tmp_path):
     monkeypatch.setattr(
         main_module,
         "run_l2_preflight",
-        lambda trace_path, trace_percent: calls.append(
-            (trace_path, trace_percent)
+        lambda trace_path, trace_percent, *, speedup=None: calls.append(
+            (trace_path, trace_percent, speedup)
         ),
     )
 
@@ -162,7 +162,7 @@ def test_l2_dry_run_prints_preflight_estimate(capsys, monkeypatch, tmp_path):
         == 0
     )
 
-    assert calls == [(trace, 10.0)]
+    assert calls == [(trace, 10.0, 1.0)]
     assert "--trace-percent 10.0" in capsys.readouterr().out
 
 

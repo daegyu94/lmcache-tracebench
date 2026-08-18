@@ -28,7 +28,7 @@ direct I/O, replay host와 storage 상태를 고정해야 합니다.
 | JSON field | 단위 | 의미 |
 | --- | --- | --- |
 | `speedup` | 배수 | source submission 간격을 나눈 배수 |
-| `source_submission_window_seconds` | s | 선택한 첫 operation부터 마지막 operation까지의 source timestamp 범위를 speedup으로 나눈 목표 제출 구간. 기존 field 이름에 `source`가 있지만 값은 scaled target 구간임 |
+| `source_submission_window_seconds` | s | `l2_replay_stats.json`에서는 speedup을 적용한 target 제출 구간. `l2_preflight.json`에서는 선택한 첫/마지막 operation의 raw source timestamp 차이이며, preflight의 schedule 하한은 이 값을 speedup으로 나눈 값 |
 | `actual_submission_window_seconds` | s | target에서 첫 operation과 마지막 operation이 실제 제출된 시각 차이 |
 | `total_replay_seconds` | s | replay loop 시작부터 모든 store/lookup/load task가 완료될 때까지의 wall-clock 시간 |
 | `drain_seconds` | s | 마지막 operation 제출부터 모든 비동기 task 완료까지의 wall-clock 시간 |
@@ -119,7 +119,11 @@ dispatch 오류와 drain timeout은 replay 실패입니다.
 ## Replay 전 logical KV estimate
 
 `l2_preflight.json`은 target을 변경하기 전에 선택된 `trace_percent` prefix를
-분석한 결과입니다. `--dry-run`에서도 trace가 현재 host에 있으면 같은 내용을
+분석한 결과입니다. `source_submission_window_seconds`는 선택된 첫/마지막
+submission의 raw source timestamp 차이입니다. `estimated_schedule_speedup`과
+`estimated_schedule_seconds`가 있으면 `source window / speedup`으로 계산한 replay
+schedule 최소 하한이며, preparation/backend startup·mount·async drain과 schedule lag는
+포함하지 않습니다. `--dry-run`에서도 trace가 현재 host에 있으면 같은 내용을
 터미널에 출력하되 파일은 생성하지 않습니다.
 
 | JSON field | 의미 |
@@ -170,7 +174,7 @@ distributed storage replication과 storage node의 physical usage를 의미하�
 
 - `l2_replay_stats.json`: 모든 원본 field를 보존한 기계 처리용 결과
 - `l2_replay_summary.md`: 주요 값과 주의사항을 담은 사람용 요약
-- `l2_preflight.json`: target preparation 전의 op 분포와 logical KV estimate
+- `l2_preflight.json`: target preparation 전의 op 분포, logical KV estimate와 source schedule estimate
 - `l2_io_interval.tsv`: adapter가 interval log를 지원할 때의 시간 구간별 I/O
 - `l2_prepare_manifest.json`: 측정 전에 준비한 object와 byte
 - `l2_usage.json`: prepare/replay 뒤의 client-visible L2 namespace 크기

@@ -342,6 +342,7 @@ def run_command(
         run_l2_preflight(
             trace,
             config.trace_percent,
+            speedup=config.speedup,
             output_dir=output_dir,
         )
         namespace_path = _l2_namespace_path(config)

@@ -27,7 +27,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STAGED_REMOTE_SCRIPT = PROJECT_ROOT / "benchmarks/replayer/staged_remote_replay.sh"
-RUNNER_VERSION = 2
+RUNNER_VERSION = 3
 PRESETS_PATH = Path(__file__).with_name("workload-presets.json")
 _TEMPLATE_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -91,6 +91,7 @@ class Case:
     speedup: float
     repeat: int
     trace_percent: float
+    source_submission_window_seconds: float | None
     trace: str
     config: str
     l2_path: str
@@ -110,6 +111,20 @@ class Case:
             "speedup": self.speedup,
             "repeat": self.repeat,
             "trace_percent": self.trace_percent,
+            "source_submission_window_seconds": self.source_submission_window_seconds,
+            "duration_estimate": (
+                {
+                    "basis": "source first-to-last submission window / speedup",
+                    "scope": "minimum scheduled replay interval; excludes preparation, backend, SSH, drain and schedule lag",
+                    "source_submission_window_seconds": self.source_submission_window_seconds,
+                    "speedup": self.speedup,
+                    "schedule_seconds": (
+                        self.source_submission_window_seconds / self.speedup
+                    ),
+                }
+                if self.source_submission_window_seconds is not None
+                else None
+            ),
             "trace": self.trace,
             "config": self.config,
             "l2_path": self.l2_path,
@@ -133,6 +148,20 @@ def format_number(value: float) -> str:
     if value.is_integer():
         return str(int(value))
     return format(value, ".12g")
+
+
+def format_duration(seconds: float) -> str:
+    """Format a schedule lower bound for human-readable dry-run output."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, remaining_seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{int(minutes)}m {int(remaining_seconds)}s"
+    hours, remaining_minutes = divmod(minutes, 60)
+    if hours < 24:
+        return f"{int(hours)}h {int(remaining_minutes)}m"
+    days, remaining_hours = divmod(hours, 24)
+    return f"{int(days)}d {int(remaining_hours)}h {int(remaining_minutes)}m"
 
 
 def safe_label(value: str) -> str:
@@ -233,11 +262,16 @@ def local_trace_metadata(
     workload: str,
     trace_name: str,
     trace_percent: float,
+    source_submission_window_seconds: float | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "remote_trace": f"@TRACE_ROOT@/{trace_relative_dir(workload)}/{trace_name}",
         "trace_percent": trace_percent,
     }
+    if source_submission_window_seconds is not None:
+        metadata["source_submission_window_seconds"] = (
+            source_submission_window_seconds
+        )
     if local_trace_root is None:
         return metadata
     local_path = local_trace_root / trace_relative_dir(workload) / trace_name
@@ -273,7 +307,7 @@ def load_workload_presets(path: Path = PRESETS_PATH) -> dict[str, Any]:
 def resolve_trace_percents(
     args: argparse.Namespace,
     workloads: Iterable[str],
-) -> tuple[dict[str, float], str | None]:
+) -> tuple[dict[str, float], dict[str, float | None], str | None]:
     if args.workload_preset:
         payload = load_workload_presets()
         presets = payload["presets"]
@@ -289,6 +323,7 @@ def resolve_trace_percents(
                 f"preset {args.workload_preset!r} has no workload mapping"
             )
         values: dict[str, float] = {}
+        windows: dict[str, float | None] = {}
         for workload in workloads:
             item = entries.get(workload)
             if not isinstance(item, dict) or "trace_percent" not in item:
@@ -301,14 +336,31 @@ def resolve_trace_percents(
                     f"preset {args.workload_preset!r} has invalid trace_percent "
                     f"for {workload}: {percent}"
                 )
+            raw_window = item.get("source_submission_window_seconds")
+            if raw_window is None:
+                raise RunnerError(
+                    f"preset {args.workload_preset!r} has no source timestamp window "
+                    f"for {workload}; regenerate workload-presets.json"
+                )
+            window = float(raw_window)
+            if not math.isfinite(window) or window < 0:
+                raise RunnerError(
+                    f"preset {args.workload_preset!r} has invalid source timestamp "
+                    f"window for {workload}: {window}"
+                )
             values[workload] = percent
+            windows[workload] = window
         source = payload.get("source_revision")
-        return values, str(source) if source else None
+        return values, windows, str(source) if source else None
 
     raw_percent = 100.0 if args.trace_percent is None else float(args.trace_percent)
     if not math.isfinite(raw_percent) or not 0 < raw_percent <= 100:
         raise RunnerError("--trace-percent must be finite and in (0, 100]")
-    return {workload: raw_percent for workload in workloads}, None
+    return (
+        {workload: raw_percent for workload in workloads},
+        {workload: None for workload in workloads},
+        None,
+    )
 
 
 def expand_graphs(requested: Iterable[str]) -> tuple[str, ...]:
@@ -375,11 +427,12 @@ def build_cases(
             for workload in (workloads_override or GRAPH_SPECS[graph].workloads)
         )
     )
-    trace_percents, preset_source = resolve_trace_percents(
+    trace_percents, source_windows, preset_source = resolve_trace_percents(
         args,
         selected_workloads,
     )
     args.resolved_trace_percents = trace_percents
+    args.resolved_trace_windows = source_windows
     args.preset_source = preset_source
     speedups_override = (
         parse_float_list(args.speedups, "--speedups") if args.speedups else None
@@ -396,6 +449,7 @@ def build_cases(
             workload,
             args.trace_name,
             trace_percents[workload],
+            source_windows[workload],
         )
         for graph in graphs
         for workload in (workloads_override or GRAPH_SPECS[graph].workloads)
@@ -515,6 +569,7 @@ def build_cases(
                                     speedup=speedup,
                                     repeat=repeat,
                                     trace_percent=trace_percents[workload],
+                                    source_submission_window_seconds=source_windows[workload],
                                     trace=trace,
                                     config=config,
                                     l2_path=l2_path,
@@ -581,6 +636,81 @@ def write_results(
         "results": str(results_path),
     }
     write_json(state_root / "matrix-summary.json", summary)
+
+
+def build_duration_estimate(cases: list[Case]) -> dict[str, Any] | None:
+    """Build a schedule lower bound from preset source timestamp windows."""
+    groups: dict[tuple[str, float], dict[str, Any]] = {}
+    total_seconds = 0.0
+    estimated_case_count = 0
+    for case in cases:
+        if case.source_submission_window_seconds is None:
+            continue
+        schedule_seconds = case.source_submission_window_seconds / case.speedup
+        key = (case.workload, case.speedup)
+        group = groups.setdefault(
+            key,
+            {
+                "workload": case.workload,
+                "speedup": case.speedup,
+                "one_case_schedule_seconds": schedule_seconds,
+                "case_count": 0,
+                "aggregate_schedule_seconds": 0.0,
+            },
+        )
+        group["case_count"] += 1
+        group["aggregate_schedule_seconds"] += schedule_seconds
+        total_seconds += schedule_seconds
+        estimated_case_count += 1
+    if estimated_case_count == 0:
+        return None
+    return {
+        "basis": "raw source first-to-last submission timestamp window / replay speedup",
+        "lower_bound": True,
+        "case_count": len(cases),
+        "estimated_case_count": estimated_case_count,
+        "minimum_sequential_schedule_seconds": total_seconds,
+        "groups": sorted(
+            groups.values(),
+            key=lambda item: (str(item["workload"]), float(item["speedup"])),
+        ),
+        "excluded_overhead": [
+            "L2 preparation and cleanup",
+            "backend startup, mount and filesystem metadata work",
+            "SSH, trace staging and result transfer",
+            "async drain time and schedule lag",
+        ],
+    }
+
+
+def print_duration_estimate(summary: dict[str, Any]) -> None:
+    """Print the per-case and sequential matrix schedule lower bounds."""
+    print(
+        "[INFO] Replay schedule estimate (preset source window / speedup; "
+        "minimum lower bound):",
+        flush=True,
+    )
+    for group in summary["groups"]:
+        print(
+            "[INFO]   "
+            f"workload={group['workload']} "
+            f"speedup=x{format_number(float(group['speedup']))} "
+            f"one_case_min={format_duration(float(group['one_case_schedule_seconds']))} "
+            f"cases={int(group['case_count'])} "
+            f"aggregate={format_duration(float(group['aggregate_schedule_seconds']))}",
+            flush=True,
+        )
+    total = float(summary["minimum_sequential_schedule_seconds"])
+    print(
+        "[INFO] Minimum sequential replay schedule: "
+        f"{format_duration(total)} ({total:.1f}s)",
+        flush=True,
+    )
+    print(
+        "[INFO] This is a lower bound; preparation, backend startup/mount, "
+        "SSH/transfer, async drain and schedule lag are excluded.",
+        flush=True,
+    )
 
 
 def marker_fingerprint(case: Case, args: argparse.Namespace) -> str:
@@ -818,6 +948,15 @@ def run_matrix(args: argparse.Namespace) -> int:
     state_root = state_root.resolve()
     args.state_root = str(state_root)
     cases = build_cases(args, topology)
+    duration_estimate = build_duration_estimate(cases)
+    if duration_estimate is not None:
+        print_duration_estimate(duration_estimate)
+    elif args.dry_run:
+        print(
+            "[INFO] Replay schedule estimate unavailable: direct "
+            "--trace-percent has no preset source timestamp metadata.",
+            flush=True,
+        )
     state_root.mkdir(parents=True, exist_ok=True)
     invocation = {
         "runner_version": RUNNER_VERSION,
@@ -826,6 +965,7 @@ def run_matrix(args: argparse.Namespace) -> int:
         "state_root": str(state_root),
         "arguments": vars(args),
         "cases": len(cases),
+        "duration_estimate": duration_estimate,
     }
     write_json(state_root / "run-config.json", invocation)
     write_json(

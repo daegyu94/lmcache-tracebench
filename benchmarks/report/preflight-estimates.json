@@ -16,6 +16,7 @@
           "estimated_peak_gb": 472.8612089999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 991.2765215274756,
           "target_gb": 500.0,
           "trace_percent": 1.66,
           "within_target": true
@@ -24,6 +25,7 @@
           "estimated_peak_gb": 472.62151199999994,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1109.6309406065902,
           "target_gb": 500.0,
           "trace_percent": 1.76,
           "within_target": true
@@ -32,6 +34,7 @@
           "estimated_peak_gb": 480.22462799999994,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1060.1531608590153,
           "target_gb": 500.0,
           "trace_percent": 77.96,
           "within_target": true
@@ -40,6 +43,7 @@
           "estimated_peak_gb": 474.58710450000007,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2060.151594791105,
           "target_gb": 500.0,
           "trace_percent": 9.63,
           "within_target": true
@@ -47,6 +51,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 500.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -61,6 +66,7 @@
           "estimated_peak_gb": 948.5709795,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1988.5245883653579,
           "target_gb": 1000.0,
           "trace_percent": 3.33,
           "within_target": true
@@ -69,6 +75,7 @@
           "estimated_peak_gb": 947.9283734999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2225.566602466627,
           "target_gb": 1000.0,
           "trace_percent": 3.53,
           "within_target": true
@@ -76,6 +83,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 1000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -84,6 +92,7 @@
           "estimated_peak_gb": 948.6813875,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4118.163883668615,
           "target_gb": 1000.0,
           "trace_percent": 19.25,
           "within_target": true
@@ -91,6 +100,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 1000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -105,6 +115,7 @@
           "estimated_peak_gb": 1899.9905205,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 3983.0207220411226,
           "target_gb": 2000.0,
           "trace_percent": 6.67,
           "within_target": true
@@ -113,6 +124,7 @@
           "estimated_peak_gb": 1898.5420965,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4457.437926186702,
           "target_gb": 2000.0,
           "trace_percent": 7.07,
           "within_target": true
@@ -120,6 +132,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 2000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -128,6 +141,7 @@
           "estimated_peak_gb": 1895.7489099999998,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 7771.684740293882,
           "target_gb": 2000.0,
           "trace_percent": 37.15,
           "within_target": true
@@ -135,6 +149,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 2000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -149,6 +164,7 @@
           "estimated_peak_gb": 3799.981041,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 7966.041444082245,
           "target_gb": 4000.0,
           "trace_percent": 13.34,
           "within_target": true
@@ -157,6 +173,7 @@
           "estimated_peak_gb": 3799.7695424999997,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 8921.180573626849,
           "target_gb": 4000.0,
           "trace_percent": 14.15,
           "within_target": true
@@ -164,6 +181,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 4000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -172,6 +190,7 @@
           "estimated_peak_gb": 3778.917436,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 15179.6108744812,
           "target_gb": 4000.0,
           "trace_percent": 71.43,
           "within_target": true
@@ -179,6 +198,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 4000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -191,6 +211,7 @@
         "mooncake-conversation": {
           "estimated_peak_gb": 24831.687,
           "selection": "full trace",
+          "source_submission_window_seconds": 51799.581343194935,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -198,6 +219,7 @@
         "mooncake-toolagent": {
           "estimated_peak_gb": 23763.755,
           "selection": "full trace",
+          "source_submission_window_seconds": 52621.880661497125,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -205,6 +227,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -212,6 +235,7 @@
         "tensormesh-swebench": {
           "estimated_peak_gb": 5361.638,
           "selection": "full trace",
+          "source_submission_window_seconds": 22883.429553247057,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -219,6 +243,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -234,6 +259,7 @@
           "estimated_peak_gb": 948.5709795,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1988.5245883653579,
           "target_gb": 1000.0,
           "trace_percent": 3.33,
           "within_target": true
@@ -242,6 +268,7 @@
           "estimated_peak_gb": 947.9283734999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2225.566602466627,
           "target_gb": 1000.0,
           "trace_percent": 3.53,
           "within_target": true
@@ -249,6 +276,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -257,6 +285,7 @@
           "estimated_peak_gb": 948.6813875,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4118.163883668615,
           "target_gb": 1000.0,
           "trace_percent": 19.25,
           "within_target": true
@@ -264,6 +293,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -279,6 +309,7 @@
           "estimated_peak_gb": 472.8612089999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 991.2765215274756,
           "target_gb": 500.0,
           "trace_percent": 1.66,
           "within_target": true
@@ -287,6 +318,7 @@
           "estimated_peak_gb": 472.62151199999994,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1109.6309406065902,
           "target_gb": 500.0,
           "trace_percent": 1.76,
           "within_target": true
@@ -294,6 +326,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -302,6 +335,7 @@
           "estimated_peak_gb": 474.58710450000007,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2060.151594791105,
           "target_gb": 500.0,
           "trace_percent": 9.63,
           "within_target": true
@@ -309,6 +343,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -324,6 +359,7 @@
           "estimated_peak_gb": 948.5709795,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1988.5245883653579,
           "target_gb": 1000.0,
           "trace_percent": 3.33,
           "within_target": true
@@ -332,6 +368,7 @@
           "estimated_peak_gb": 947.9283734999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2225.566602466627,
           "target_gb": 1000.0,
           "trace_percent": 3.53,
           "within_target": true
@@ -339,6 +376,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -347,6 +385,7 @@
           "estimated_peak_gb": 948.6813875,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4118.163883668615,
           "target_gb": 1000.0,
           "trace_percent": 19.25,
           "within_target": true
@@ -354,6 +393,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -369,6 +409,7 @@
           "estimated_peak_gb": 1899.9905205,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 3983.0207220411226,
           "target_gb": 2000.0,
           "trace_percent": 6.67,
           "within_target": true
@@ -377,6 +418,7 @@
           "estimated_peak_gb": 1898.5420965,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4457.437926186702,
           "target_gb": 2000.0,
           "trace_percent": 7.07,
           "within_target": true
@@ -384,6 +426,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -392,6 +435,7 @@
           "estimated_peak_gb": 1895.7489099999998,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 7771.684740293882,
           "target_gb": 2000.0,
           "trace_percent": 37.15,
           "within_target": true
@@ -399,6 +443,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -414,6 +459,7 @@
           "estimated_peak_gb": 3799.981041,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 7966.041444082245,
           "target_gb": 4000.0,
           "trace_percent": 13.34,
           "within_target": true
@@ -422,6 +468,7 @@
           "estimated_peak_gb": 3799.7695424999997,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 8921.180573626849,
           "target_gb": 4000.0,
           "trace_percent": 14.15,
           "within_target": true
@@ -429,6 +476,7 @@
         "tensormesh-gaia": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -437,6 +485,7 @@
           "estimated_peak_gb": 3778.917436,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 15179.6108744812,
           "target_gb": 4000.0,
           "trace_percent": 71.43,
           "within_target": true
@@ -444,6 +493,7 @@
         "tensormesh-wildclaw": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": null,
           "trace_percent": 100.0,
           "within_target": true
@@ -626,6 +676,7 @@
           "estimated_peak_gb": 472.8612089999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 991.2765215274756,
           "target_gb": 500.0,
           "trace_percent": 1.66,
           "within_target": true
@@ -634,6 +685,7 @@
           "estimated_peak_gb": 948.5709795,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1988.5245883653579,
           "target_gb": 1000.0,
           "trace_percent": 3.33,
           "within_target": true
@@ -642,6 +694,7 @@
           "estimated_peak_gb": 1899.9905205,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 3983.0207220411226,
           "target_gb": 2000.0,
           "trace_percent": 6.67,
           "within_target": true
@@ -650,6 +703,7 @@
           "estimated_peak_gb": 3799.981041,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 7966.041444082245,
           "target_gb": 4000.0,
           "trace_percent": 13.34,
           "within_target": true
@@ -822,6 +876,7 @@
           "estimated_peak_gb": 472.62151199999994,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1109.6309406065902,
           "target_gb": 500.0,
           "trace_percent": 1.76,
           "within_target": true
@@ -830,6 +885,7 @@
           "estimated_peak_gb": 947.9283734999999,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2225.566602466627,
           "target_gb": 1000.0,
           "trace_percent": 3.53,
           "within_target": true
@@ -838,6 +894,7 @@
           "estimated_peak_gb": 1898.5420965,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4457.437926186702,
           "target_gb": 2000.0,
           "trace_percent": 7.07,
           "within_target": true
@@ -846,6 +903,7 @@
           "estimated_peak_gb": 3799.7695424999997,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 8921.180573626849,
           "target_gb": 4000.0,
           "trace_percent": 14.15,
           "within_target": true
@@ -1018,6 +1076,7 @@
           "estimated_peak_gb": 480.22462799999994,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 1060.1531608590153,
           "target_gb": 500.0,
           "trace_percent": 77.96,
           "within_target": true
@@ -1025,6 +1084,7 @@
         "1tb": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 1000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -1032,6 +1092,7 @@
         "2tb": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 2000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -1039,6 +1100,7 @@
         "4tb": {
           "estimated_peak_gb": 580.685,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 4000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -1211,6 +1273,7 @@
           "estimated_peak_gb": 474.58710450000007,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 2060.151594791105,
           "target_gb": 500.0,
           "trace_percent": 9.63,
           "within_target": true
@@ -1219,6 +1282,7 @@
           "estimated_peak_gb": 948.6813875,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 4118.163883668615,
           "target_gb": 1000.0,
           "trace_percent": 19.25,
           "within_target": true
@@ -1227,6 +1291,7 @@
           "estimated_peak_gb": 1895.7489099999998,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 7771.684740293882,
           "target_gb": 2000.0,
           "trace_percent": 37.15,
           "within_target": true
@@ -1235,6 +1300,7 @@
           "estimated_peak_gb": 3778.917436,
           "operations_selected": null,
           "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 15179.6108744812,
           "target_gb": 4000.0,
           "trace_percent": 71.43,
           "within_target": true
@@ -1406,6 +1472,7 @@
         "0.5tb": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 500.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -1413,6 +1480,7 @@
         "1tb": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 1000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -1420,6 +1488,7 @@
         "2tb": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 2000.0,
           "trace_percent": 100.0,
           "within_target": true
@@ -1427,6 +1496,7 @@
         "4tb": {
           "estimated_peak_gb": 59.681,
           "selection": "full trace is already within target",
+          "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 4000.0,
           "trace_percent": 100.0,
           "within_target": true

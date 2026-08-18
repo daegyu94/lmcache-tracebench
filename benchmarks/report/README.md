@@ -53,8 +53,19 @@ shell entrypoint를 사용한다.
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native'
 
 Preset을 쓰면 workload마다 서로 다른 `--trace-percent`가 replay command와
-`case.json`에 기록된다. Trace archive가 바뀌면 replay node 또는 controller에
-같은 trace root를 준비하고 다음 generator를 다시 실행한다.
+`case.json`에 기록된다. `--dry-run`은 preset에 기록된 첫/마지막 submission
+timestamp 차이를 이용해 다음을 함께 출력한다.
+
+- `one_case_min`: 한 backend/repeat/speedup case가 source schedule만 재생할 때의 최소 시간
+- `Minimum sequential replay schedule`: 현재 matrix의 모든 case를 순차 실행한다고 가정한 최소 시간
+
+계산식은 `source_submission_window_seconds / speedup`이다. 따라서 L2 preparation,
+backend startup/mount와 filesystem metadata 작업, SSH/trace 전송, async drain과
+schedule lag는 포함하지 않는 하한(lower bound)이다. 이 값은
+`run-config.json`, `matrix-plan.json`, 각 `case.json`에도 기록된다. Target preset의
+window는 fixed-percent preflight row에서 보간한 값이므로 실제 trace를 target prefix로
+재분석하지 않은 경우에는 대략적인 계획값이다. Trace archive가 바뀌면 replay node
+또는 controller에 같은 trace root를 준비하고 다음 generator를 다시 실행한다.
 
     python benchmarks/report/generate_preflight_estimates.py \
       --trace-root /path/to/trace-root \

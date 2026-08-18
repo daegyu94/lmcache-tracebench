@@ -94,6 +94,8 @@ def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
     result = subprocess.run(command, check=True, capture_output=True, text=True)
     assert "--trace-percent 100" in result.stdout
     assert "--trace-percent 3.53" in result.stdout
+    assert "Replay schedule estimate" in result.stdout
+    assert "Minimum sequential replay schedule" in result.stdout
 
     plan = json.loads(
         (state_root / "matrix-plan.json").read_text(encoding="utf-8")
@@ -105,3 +107,14 @@ def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
         "tensormesh-gaia": 100.0,
         "mooncake-toolagent": 3.53,
     }
+    for case in plan["cases"]:
+        assert case["source_submission_window_seconds"] > 0
+        assert (
+            case["duration_estimate"]["schedule_seconds"]
+            == case["source_submission_window_seconds"] / case["speedup"]
+        )
+
+    run_config = json.loads(
+        (state_root / "run-config.json").read_text(encoding="utf-8")
+    )
+    assert run_config["duration_estimate"]["estimated_case_count"] == 2

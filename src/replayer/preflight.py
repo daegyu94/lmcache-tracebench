@@ -117,8 +117,12 @@ def analyze_l2_trace(
     return summarize_l2_plan(plan, trace_path=trace_path)
 
 
-def print_l2_preflight(summary: dict[str, object]) -> None:
-    """Print the selected operation mix and logical capacity estimate in GB."""
+def print_l2_preflight(
+    summary: dict[str, object],
+    *,
+    speedup: float | None = None,
+) -> None:
+    """Print operation mix, capacity and optional schedule lower bound."""
     counts = summary["operations_selected_by_type"]
     estimate = summary["logical_kv_estimate"]
     assert isinstance(counts, dict)
@@ -141,17 +145,38 @@ def print_l2_preflight(summary: dict[str, object]) -> None:
         f"unique_candidate={estimate['unique_candidate_gb']:.3f} GB "
         f"store_submission={estimate['store_submission_gb']:.3f} GB"
     )
+    source_window = float(summary["source_submission_window_seconds"])
+    print(f"[INFO] Source submission window: {source_window:.3f} s")
+    if speedup is not None:
+        if speedup <= 0:
+            raise ValueError("speedup must be positive for schedule estimate")
+        schedule_seconds = source_window / speedup
+        print(
+            "[INFO] Estimated replay schedule (lower bound): "
+            f"speedup=x{speedup:g} source_window={source_window:.3f} s "
+            f"schedule={schedule_seconds:.3f} s; "
+            "preparation/backend/drain overhead excluded"
+        )
 
 
 def run_l2_preflight(
     trace_path: str | Path,
     trace_percent: float,
     *,
+    speedup: float | None = None,
     output_dir: Path | None = None,
 ) -> dict[str, object]:
     """Analyze and print an L2 prefix, optionally persisting its JSON artifact."""
     summary = analyze_l2_trace(trace_path, trace_percent)
-    print_l2_preflight(summary)
+    if speedup is not None:
+        if speedup <= 0:
+            raise ValueError("speedup must be positive for schedule estimate")
+        summary = dict(summary)
+        summary["estimated_schedule_speedup"] = float(speedup)
+        summary["estimated_schedule_seconds"] = (
+            float(summary["source_submission_window_seconds"]) / speedup
+        )
+    print_l2_preflight(summary, speedup=speedup)
     if output_dir is not None:
         output_path = output_dir / "l2_preflight.json"
         temporary_path = output_path.with_suffix(".json.tmp")

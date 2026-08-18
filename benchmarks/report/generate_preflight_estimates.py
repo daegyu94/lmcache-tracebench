@@ -163,6 +163,26 @@ def _interpolated_peak(
     return points[-1][1]
 
 
+def _interpolated_value(
+    rows: list[dict[str, Any]],
+    percent: float,
+    field: str,
+) -> float:
+    """Interpolate a scalar preflight field at a selected prefix."""
+    points = [(0.0, 0.0)] + [
+        (float(row["trace_percent"]), float(row[field])) for row in rows
+    ]
+    for (left_percent, left_value), (right_percent, right_value) in itertools.pairwise(
+        points
+    ):
+        if percent <= right_percent:
+            if right_percent <= left_percent:
+                return left_value
+            fraction = (percent - left_percent) / (right_percent - left_percent)
+            return left_value + fraction * (right_value - left_value)
+    return points[-1][1]
+
+
 def _select_target(
     trace_path: Path,
     rows: list[dict[str, Any]],
@@ -177,12 +197,18 @@ def _select_target(
             "target_gb": target.gb,
             "trace_percent": 100.0,
             "estimated_peak_gb": _peak(full),
+            "source_submission_window_seconds": float(
+                full["source_submission_window_seconds"]
+            ),
             "within_target": True,
             "selection": "full trace is already within target",
         }
 
     percent = _interpolated_percent(rows, target.gb)
     estimated_peak = _interpolated_peak(rows, percent)
+    source_window = _interpolated_value(
+        rows, percent, "source_submission_window_seconds"
+    )
     measured_peak = None
     operations_selected = None
     if validate:
@@ -191,11 +217,13 @@ def _select_target(
         summary = cache[percent]
         measured_peak = _peak(summary)
         estimated_peak = measured_peak
+        source_window = float(summary["source_submission_window_seconds"])
         operations_selected = summary["operations_selected"]
     return {
         "target_gb": target.gb,
         "trace_percent": percent,
         "estimated_peak_gb": estimated_peak,
+        "source_submission_window_seconds": source_window,
         "within_target": estimated_peak <= target.gb,
         "selection": (
             "measured prefix with interpolation headroom"
@@ -247,6 +275,16 @@ def _markdown(
         "- Capacity column: prefix replay의 `peak_gb`",
         "- Assumption: selected store가 성공하고 submission 순서대로 overwrite/delete가 반영됨",
         "- Preset target mapping: fixed-percent preflight row interpolation with five percent headroom",
+        "- Duration estimate: source first-to-last submission window divided by replay speedup; schedule lower bound only",
+        (
+            "- `source window s` is the raw timestamp difference between the first and "
+            "last selected submission; for speedup S, the schedule lower bound is "
+            "`source window / S`"
+        ),
+        (
+            "- Target preset windows are interpolated from fixed-percent rows unless "
+            "`--validate-targets` is used"
+        ),
         "",
         "## Fixed trace-percent estimates",
         "",
@@ -257,8 +295,8 @@ def _markdown(
             [
                 f"### `{workload}`",
                 "",
-                "| trace_percent | selected operations | store | lookup | load | unlock | delete | peak GB | final GB |",
-                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| trace_percent | selected operations | store | lookup | load | unlock | delete | source window s | peak GB | final GB |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in record["percentages"]:
@@ -266,7 +304,7 @@ def _markdown(
             estimate = row["logical_kv_estimate"]
             lines.append(
                 "| {percent:g}% | {selected:,} | {store:,} | {lookup:,} | {load:,} | "
-                "{unlock:,} | {delete:,} | {peak} | {final} |".format(
+                "{unlock:,} | {delete:,} | {window} | {peak} | {final} |".format(
                     percent=float(row["trace_percent"]),
                     selected=int(row["operations_selected"]),
                     store=int(counts["store"]),
@@ -274,6 +312,7 @@ def _markdown(
                     load=int(counts["load_task"]),
                     unlock=int(counts["unlock"]),
                     delete=int(counts["delete"]),
+                    window=_fmt(float(row["source_submission_window_seconds"])),
                     peak=_fmt(float(estimate["peak_gb"])),
                     final=_fmt(float(estimate["final_gb"])),
                 )
@@ -294,8 +333,8 @@ def _markdown(
                 "`4tb` preset을 사용한다."
             ),
             "",
-            "| preset | workload | target GB | trace_percent | estimated peak GB |",
-            "| --- | --- | ---: | ---: | ---: |",
+            "| preset | workload | target GB | trace_percent | source window s | estimated peak GB |",
+            "| --- | --- | ---: | ---: | ---: | ---: |",
         ]
     )
     for preset_name, preset in presets.items():
@@ -303,11 +342,12 @@ def _markdown(
             item = preset["workloads"][workload]
             target = item.get("target_gb")
             lines.append(
-                "| `{preset}` | `{workload}` | {target} | {percent:g}% | {peak} |".format(
+                "| `{preset}` | `{workload}` | {target} | {percent:g}% | {window} | {peak} |".format(
                     preset=preset_name,
                     workload=workload,
                     target="full" if target is None else _fmt(float(target)),
                     percent=float(item["trace_percent"]),
+                    window=_fmt(float(item["source_submission_window_seconds"])),
                     peak=_fmt(float(item["estimated_peak_gb"])),
                 )
             )
@@ -428,6 +468,9 @@ def generate(args: argparse.Namespace) -> None:
             "target_gb": None,
             "trace_percent": 100.0,
             "estimated_peak_gb": _peak(full),
+            "source_submission_window_seconds": float(
+                full["source_submission_window_seconds"]
+            ),
             "within_target": True,
             "selection": "full trace",
         }

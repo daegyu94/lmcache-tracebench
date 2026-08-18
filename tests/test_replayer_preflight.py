@@ -55,11 +55,19 @@ def test_run_l2_preflight_prints_gb_and_optionally_writes_json(
 ):
     monkeypatch.setattr(preflight_module, "_load_l2_plan", lambda *_: _plan())
 
-    summary = run_l2_preflight("trace.lct", 10.0, output_dir=tmp_path)
+    summary = run_l2_preflight(
+        "trace.lct",
+        10.0,
+        speedup=2.0,
+        output_dir=tmp_path,
+    )
 
     output = capsys.readouterr().out
     assert "peak=65.000 GB" in output
     assert "final=45.000 GB" in output
+    assert "Source submission window: 2.000 s" in output
+    assert "schedule=1.000 s" in output
     assert "bytes" not in output
     assert (tmp_path / "l2_preflight.json").is_file()
     assert summary["logical_kv_estimate"]["unit"] == "GB"
+    assert summary["estimated_schedule_seconds"] == 1.0
