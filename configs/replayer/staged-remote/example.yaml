@@ -23,9 +23,7 @@ replay_repo_root: /mnt/nvme/lmcache-tracebench
 # replay: path of the replayer virtualenv on the replay node.
 replay_venv_root: /mnt/nvme/lmcache-tracebench/.venv
 
-# runtime: remote_install (recommended) builds .venv on the replay node; copy_venv copies the controller's.
-runtime_mode: remote_install
-# runtime: replay node's approved Python interpreter (remote_install) or verification interpreter (copy_venv).
+# runtime: replay node's approved Python interpreter used to build its .venv.
 replay_python: /opt/company/python/3.12/bin/python3.12
 # runtime: repository-relative path to the replayer runtime requirements file.
 replay_runtime_requirements: requirements/replayer.txt
@@ -35,8 +33,6 @@ replay_package_index_url: https://pypi.intra.example.com/simple
 # replay_extra_index_url: https://pypi-extra.intra.example.com/simple
 # runtime: whether prerequisite checks require uv to be present.
 replay_require_uv: false
-# runtime: copy_venv fallback only; must equal controller_repo_root/.venv.
-# controller_venv_root: /absolute/path/to/lmcache-tracebench/.venv
 
 # data: replay node's base path for extracted traces.
 replay_trace_root: /mnt/nvme/lmcache-l2-replay/traces

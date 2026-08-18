@@ -70,7 +70,7 @@ Controller node에 다음이 필요합니다.
 - topology에 지정할 replay node의 Python 경로와 package source 정보
 
 Replay node에는 SSH server, topology에서 지정한 Python interpreter, `bash`, `tar`, `find`,
-`sed`, `git`, trace/L2 저장 공간이 필요합니다. `remote_install` 모드에서는 replay node가
+`sed`, `git`, trace/L2 저장 공간이 필요합니다. Replay node가
 사내 package index 또는 사전 구성된 pip 설정을 사용해 runtime dependency를 설치하므로
 외부망 접근은 필요하지 않습니다. `uv`는 검사·보고되지만 기본적으로 선택 사항이며,
 Python의 `venv`/`pip` fallback을 사용할 수 있습니다.
@@ -132,21 +132,18 @@ cp configs/replayer/staged-remote/example.yaml \
   configs/replayer/staged-remote/topology.yaml
 ```
 
-`topology.yaml`은 단순한 top-level scalar YAML입니다. 기본 항목은 모두 채워야 하며,
-`runtime_mode`에 따라 필요한 runtime 항목이 달라집니다. package index URL은 replay
-node에 pip 설정이 이미 있으면 생략할 수 있습니다.
+`topology.yaml`은 단순한 top-level scalar YAML입니다. 기본 항목은 모두 채워야 합니다.
+Package index URL은 replay node에 pip 설정이 이미 있으면 생략할 수 있습니다.
 
 | 항목 | 의미 |
 | --- | --- |
-| `runtime_mode` | `remote_install`(권장) 또는 `copy_venv` fallback |
 | `controller_repo_root` | controller에서 clone/stage할 tracebench 경로 |
-| `controller_venv_root` | `copy_venv`에서만 필요하며 `controller_repo_root/.venv`여야 함 |
 | `controller_trace_root` | controller가 HF archive를 저장할 경로 |
 | `controller_output_root` | 회수한 replay 결과를 저장할 경로 |
 | `replay_host`, `replay_user`, `replay_port` | SSH 접속 정보 |
 | `replay_repo_root` | replay node의 tracebench 경로 |
 | `replay_venv_root` | replay node가 만들 venv 경로 (`replay_repo_root/.venv`여야 함) |
-| `replay_python` | `remote_install`에서 사용할 replay node의 승인된 Python |
+| `replay_python` | replay node의 venv를 만들 때 사용할 승인된 Python |
 | `replay_runtime_requirements` | replay repository 안의 runtime requirements 파일 |
 | `replay_package_index_url` | 사내 Python package index URL; 생략하면 replay node의 pip 설정 사용 |
 | `replay_extra_index_url` | 추가 package index URL(선택) |
@@ -161,25 +158,18 @@ node에 pip 설정이 이미 있으면 생략할 수 있습니다.
 모든 경로는 혼동을 피하기 위해 absolute path를 사용합니다. `replay_l2_root`는
 mount root나 다른 실험과 공유하지 않는 benchmark 전용 경로로 지정합니다.
 
-### Runtime 설치 모드
+### Runtime 설치
 
-`remote_install`이 기본 권장 모드입니다. Repository를 replay node로 전송한 뒤 replay
-node에서 다음을 수행합니다.
+Repository를 replay node로 전송한 뒤 replay node에서 다음을 수행합니다.
 
 - `replay_python`으로 `replay_repo_root/.venv`를 생성합니다.
 - `replay_runtime_requirements`를 설치하고, 설정된 사내 package index를 사용합니다.
 - `pip check`와 LMCache/replayer import 검사를 수행합니다.
 
-이 방식은 replay node의 OS, CPU architecture, Python 및 native wheel 환경을 그대로
-사용하므로 controller의 venv를 복사하고 경로를 보정할 필요가 없습니다. `requirements`
-파일에 Git VCS URL이 남아 있고 replay cluster에서 GitHub가 차단되어 있으면, 내부 mirror를
-가리키는 별도 requirements 파일을 repository에 넣고 `replay_runtime_requirements`로
-지정해야 합니다.
-
-`copy_venv`는 package index를 사용할 수 없을 때의 fallback입니다. 이 모드에서만
-`controller_venv_root`를 전송하며, console script shebang, editable package의 `.pth`,
-`pyvenv.cfg` 경로를 replay node에 맞춰 보정합니다. OS, CPU architecture, Python minor
-version 또는 native library가 다르면 이 모드를 사용하지 마세요.
+Replay node의 OS, CPU architecture, Python 및 native wheel 환경을 그대로 사용합니다.
+`requirements` 파일에 Git VCS URL이 남아 있고 replay cluster에서 GitHub가 차단되어 있으면,
+내부 mirror를 가리키는 별도 requirements 파일을 repository에 넣고
+`replay_runtime_requirements`로 지정해야 합니다.
 
 ## 3. 단계별 실행
 
@@ -209,20 +199,17 @@ bash benchmarks/replayer/staged_remote_replay.sh prepare-trace \
 
 ### 3.2 Replay 준비
 
-Repository를 controller에 clone한 뒤 replay node로 전송합니다. 기본 `remote_install`
-모드에서는 replay node에서 `setup_runtime.sh --profile replayer-cpu --python ...`을 실행해
-지정된 Python으로 `.venv`를 만들고, runtime requirements와 사내 package source를
-사용해 설치한 뒤 import/pip 검사를 수행합니다.
+Repository를 controller에 clone한 뒤 replay node로 전송합니다. replay node에서
+`setup_runtime.sh --profile replayer-cpu --python ...`을 실행해 지정된 Python으로 `.venv`를 만들고,
+runtime requirements와 사내 package source를 사용해 설치한 뒤 import/pip 검사를 수행합니다.
 
 ```bash
 bash benchmarks/replayer/staged_remote_replay.sh prepare-replay \
   --topology configs/replayer/staged-remote/topology.yaml
 ```
 
-`remote_install`에서 replay node에 `.venv`가 이미 있으면 경고하고 재설치하지 않습니다.
-기존 venv가 지정된 Python과 맞지 않거나 import/pip 검증에 실패하면 중단합니다.
-`copy_venv`에서는 controller에 이미 `.venv`가 있으면 재설치하지 않고, replay node에
-같은 repository나 venv가 있으면 전송하지 않고 기존 환경을 검증합니다.
+Replay node에 `.venv`가 이미 있으면 경고하고 재설치하지 않습니다. 기존 venv가 지정된
+Python과 맞지 않거나 import/pip 검증에 실패하면 중단합니다.
 
 ### 3.3 Replay 또는 원하는 sweep 실행
 
@@ -306,8 +293,8 @@ bash benchmarks/replayer/staged_remote_replay.sh reset \
 (`replay_l2_root`)는 다릅니다 — pNFS나 3FS가 실제로 연결되면 이 경로 자체가 mount
 point가 되므로, 디렉터리를 지우고 다시 만드는 대신 **내용만** 지웁니다(mount된
 디렉터리는 `rmdir`할 수 없어 "Device or resource busy"로 실패하기 때문입니다).
-`repo`를 리셋하면 `copy_venv` 모드의 `.venv`도 함께 사라지므로(`replay_venv_root`가
-`replay_repo_root` 하위이기 때문) 이후 `prepare-replay`를 다시 실행해야 합니다.
+`repo`를 리셋하면 `replay_venv_root`가 `replay_repo_root` 하위이므로 `.venv`도 함께 사라집니다.
+이후 `prepare-replay`를 다시 실행해야 합니다.
 실행 전에 항상 `--dry-run`으로 대상 경로를 먼저 확인하세요.
 
 ```bash

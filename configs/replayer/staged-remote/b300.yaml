@@ -9,10 +9,8 @@ replay_user: daegyu
 replay_repo_root: /home/daegyu/lmcache-tracebench
 replay_venv_root: /home/daegyu/lmcache-tracebench/.venv
 
-runtime_mode: copy_venv
 replay_python: /usr/bin/python3.12
 replay_runtime_requirements: requirements/replayer.txt
-controller_venv_root: /home/daegyu94/workspace/b300/lmcache-tracebench/.venv
 
 replay_trace_root: /mnt/replayer/traces
 replay_output_root: /mnt/replayer/outputs
