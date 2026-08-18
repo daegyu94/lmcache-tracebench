@@ -3,6 +3,7 @@
 기록한 LMCache trace를 GitHub Release asset 또는 Hugging Face Dataset으로 공유하거나 내려받는 방법입니다.
 `tools/artifacts/release_asset.sh`는 GitHub Release 생성, trace upload, download를 제공합니다.
 `--help`를 제외한 모든 command는 `gh` CLI 설치와 GitHub 인증이 필요합니다.
+관련 helper의 역할과 dependency는 [Tools index](../tools/README.md)를 참고하세요.
 
 ```bash
 gh auth login

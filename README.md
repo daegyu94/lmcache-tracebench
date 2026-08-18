@@ -28,6 +28,22 @@ Runtime source는 `src/recorder`, `src/replayer`, `src/traceprof`에 있습니�
 반복 실행 launcher는 [Benchmark guide](benchmarks/README.md), 보고서 실험 matrix는
 [Staged remote report runner](benchmarks/report/README.md)를 참고하세요.
 
+## Repository layout
+
+| 경로 | 역할 |
+| --- | --- |
+| `src/` | 설치 가능한 recorder, replayer와 profiling package |
+| `benchmarks/` | 반복 실험 launcher와 중단 재개 state 관리 |
+| `configs/` | recorder, replayer와 profiling 설정 ([index](configs/README.md)) |
+| `docs/` | 동작 contract와 운영 guide |
+| `report/` | 보고서 본문, 정규화 dataset, renderer와 figure |
+| `tools/` | trace asset과 외부 binary 관리 도구 ([index](tools/README.md)) |
+| `tests/` | package와 workflow test |
+
+실행 가능한 제품 코드는 `src/`에, 실험 orchestration은 `benchmarks/`에 둡니다.
+`report/`의 Python module은 보고서 data와 figure를 함께 관리하는 저장소 전용
+도구이므로 설치 package와 분리합니다.
+
 ## Repository setup
 
 Recorder는 `third_party/Tensormesh-Benchmark` submodule을 사용합니다. 이미 기록된

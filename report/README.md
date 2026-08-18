@@ -4,6 +4,10 @@
 renderer를 관리합니다. 실험 matrix 실행과 원격 artifact 회수는
 [Report runner](../benchmarks/report/README.md)가 담당합니다.
 
+Report module은 versioned data와 figure에 종속된 저장소 전용 도구입니다. 따라서
+`src/`의 설치 package에 포함하지 않고 이 디렉터리에 함께 두며, 아래 명령은
+저장소 root에서 실행합니다.
+
 현재 `report/figures/*.png`는 더미 데이터로 만든 placeholder이며 실측 근거로
 사용할 수 없습니다. 실험 조건과 주장-증거 연결은
 [성능 평가 보고서](performance-evaluation.md)를 기준으로 합니다.
@@ -12,6 +16,7 @@ renderer를 관리합니다. 실험 matrix 실행과 원격 artifact 회수는
 
 ```text
 report/
+├── __init__.py                  # explicit repository-local Python package
 ├── performance-evaluation.md    # 실험 설계와 보고서 본문
 ├── data/
 │   ├── README.md                # 공통 dataset contract
