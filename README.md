@@ -5,9 +5,8 @@ LMCache Tracebench는 vLLM + LMCache MP workload에서 실제 L2 adapter task를
 Recorder는 TensorMesh V3 또는 Mooncake FAST'25 workload로 `l2.lct`를 만들고,
 Replayer는 이를 `fs_native`, pNFS, NIXL/HF3FS 등의 target에 replay합니다.
 
-기존 StorageManager-level trace가 backend 비교용 고정 L2 workload가 아닌 이유와
-adapter-level replay contract는 [L2 tracing guide](docs/l2-tracing.md)를 기준으로
-합니다.
+StorageManager-level trace와 adapter-level trace의 차이, 그리고 replay가
+보장하는 범위는 [L2 tracing guide](docs/l2-tracing.md)에서 설명합니다.
 
 ## Overview
 
