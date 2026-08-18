@@ -61,7 +61,7 @@ GRAPH_SPECS: dict[str, GraphSpec] = {
         ("tensormesh-swebench", "mooncake-conversation"),
         (1.0, 2.0),
     ),
-    "resource": GraphSpec(("tensormesh-swebench",), (1.0,)),
+    "resource": GraphSpec(ALL_WORKLOADS, (1.0,)),
     "nodewise": GraphSpec(("tensormesh-swebench",), (1.0, 2.0)),
     "scaling": GraphSpec(("tensormesh-swebench",), (2.0,), scaling=True),
 }
@@ -172,10 +172,7 @@ def parse_positive_int_list(raw: str, option: str) -> tuple[int, ...]:
 
 def parse_backend_spec(raw: str) -> BackendSpec:
     if "=" not in raw:
-        raise RunnerError(
-            "backend spec must be NAME=CONFIG|L2_ROOT "
-            f"(received: {raw})"
-        )
+        raise RunnerError(f"backend spec must be NAME=CONFIG|L2_ROOT (received: {raw})")
     name, value = raw.split("=", 1)
     if not name or not _NAME_RE.fullmatch(name):
         raise RunnerError(f"backend name contains unsupported characters: {name}")
@@ -186,10 +183,7 @@ def parse_backend_spec(raw: str) -> BackendSpec:
         # contain @PLACEHOLDER@ should use the unambiguous | separator.
         config, l2_path = value.rsplit("@", 1)
     else:
-        raise RunnerError(
-            "backend spec must be NAME=CONFIG|L2_ROOT "
-            f"(received: {raw})"
-        )
+        raise RunnerError(f"backend spec must be NAME=CONFIG|L2_ROOT (received: {raw})")
     if not config or not l2_path:
         raise RunnerError(f"backend spec has an empty config or L2 path: {raw}")
     return BackendSpec(name, config, l2_path, raw)
@@ -334,9 +328,7 @@ def build_cases(
             trace_percent,
         )
         for graph in graphs
-        for workload in (
-            workloads_override or GRAPH_SPECS[graph].workloads
-        )
+        for workload in (workloads_override or GRAPH_SPECS[graph].workloads)
     }
     cases: list[Case] = []
     case_ids: set[str] = set()
@@ -438,9 +430,7 @@ def build_cases(
                                 / f"s{safe_label(speedup_label)}"
                                 / f"r{repeat}"
                             )
-                            result_dir = str(
-                                Path(controller_output_root) / run_name
-                            )
+                            result_dir = str(Path(controller_output_root) / run_name)
                             trace = (
                                 f"{args.trace_root.rstrip('/')}/"
                                 f"{trace_relative_dir(workload)}/{args.trace_name}"
@@ -511,16 +501,12 @@ def write_results(
         "runner_version": RUNNER_VERSION,
         "updated_at_utc": utc_now(),
         "planned": len(records),
-        "completed": sum(
-            status in {"ok", "dry_run"} for status in statuses
-        ),
+        "completed": sum(status in {"ok", "dry_run"} for status in statuses),
         "failed": sum(status == "failed" for status in statuses),
         "interrupted": sum(status == "interrupted" for status in statuses),
         "running": sum(status == "running" for status in statuses),
         "pending": sum(status == "pending" for status in statuses),
-        "resume_skipped": sum(
-            bool(item.get("resume_skipped")) for item in records
-        ),
+        "resume_skipped": sum(bool(item.get("resume_skipped")) for item in records),
         "results": str(results_path),
     }
     write_json(state_root / "matrix-summary.json", summary)
@@ -569,9 +555,11 @@ def prepare_case(
         )
         if args.resume and successful:
             return marker, True, had_marker
-        if args.resume and not args.retry_incomplete and marker.get(
-            "status"
-        ) not in {"ok", "dry_run"}:
+        if (
+            args.resume
+            and not args.retry_incomplete
+            and marker.get("status") not in {"ok", "dry_run"}
+        ):
             return marker, True, had_marker
         if state_dir.is_symlink():
             raise RunnerError(f"case state directory is a symlink: {state_dir}")
@@ -676,8 +664,10 @@ def execute_case(
         )
         write_json(Path(case.state_dir) / "case.json", marker)
         return marker
-    status = "dry_run" if args.dry_run and returncode == 0 else (
-        "ok" if returncode == 0 else "failed"
+    status = (
+        "dry_run"
+        if args.dry_run and returncode == 0
+        else ("ok" if returncode == 0 else "failed")
     )
     marker.update(
         {
@@ -722,8 +712,10 @@ def prepare_staged_remote(args: argparse.Namespace, state_root: Path) -> None:
             previous = {}
     if args.asset and previous.get("trace_status") != "ok":
         status = run_stage_command("prepare-trace", args)
-        previous["trace_status"] = "dry_run" if args.dry_run and status == 0 else (
-            "ok" if status == 0 else "failed"
+        previous["trace_status"] = (
+            "dry_run"
+            if args.dry_run and status == 0
+            else ("ok" if status == 0 else "failed")
         )
         previous["trace_assets"] = list(args.asset)
         write_json(marker_path, previous)
@@ -732,8 +724,10 @@ def prepare_staged_remote(args: argparse.Namespace, state_root: Path) -> None:
     if previous.get("replay_status") == "ok" and not args.dry_run:
         return
     status = run_stage_command("prepare-replay", args)
-    previous["replay_status"] = "dry_run" if args.dry_run and status == 0 else (
-        "ok" if status == 0 else "failed"
+    previous["replay_status"] = (
+        "dry_run"
+        if args.dry_run and status == 0
+        else ("ok" if status == 0 else "failed")
     )
     previous["updated_at_utc"] = utc_now()
     write_json(marker_path, previous)
@@ -798,9 +792,7 @@ def run_matrix(args: argparse.Namespace) -> int:
     write_results(state_root, cases, skipped_ids=resumed_ids)
     if interrupted:
         return 130
-    statuses = [
-        (read_marker(case) or {}).get("status", "pending") for case in cases
-    ]
+    statuses = [(read_marker(case) or {}).get("status", "pending") for case in cases]
     return 1 if any(status in {"failed", "interrupted"} for status in statuses) else 0
 
 

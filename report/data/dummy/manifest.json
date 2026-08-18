@@ -1,0 +1,10 @@
+{
+  "kind": "dummy",
+  "metrics_file": "metrics.csv",
+  "record_count": 3438,
+  "schema_version": 1,
+  "source": {
+    "generator": "report/generate_dummy_data.py",
+    "note": "Synthetic values for layout validation only."
+  }
+}

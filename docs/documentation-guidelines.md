@@ -17,7 +17,8 @@
 | Trace asset과 workload archive | [trace-assets.md](trace-assets.md) | asset 이름과 다운로드 방법 |
 | Metric 정의와 유효성 판정 | [l2-replay-metrics.md](l2-replay-metrics.md) | 사용할 metric과 결과 파일 |
 | Report matrix runner와 state | [benchmarks/report/README.md](../benchmarks/report/README.md) | graph preset, backend template, 재실행 방법 |
-| Figure 생성과 입력 연결 | [report/README.md](../report/README.md) | plot 생성 명령과 layout 확인 기준 |
+| Figure workflow와 layout | [report/README.md](../report/README.md) | dataset 선택, plot 생성과 검토 기준 |
+| Figure input schema와 artifact 변환 | [report/data/README.md](../report/data/README.md) | column/metric 추가와 변환 규칙 |
 | 실험 matrix와 보고서 주장 | [../report/performance-evaluation.md](../report/performance-evaluation.md) | 실험 조건과 증거 |
 
 README류 문서는 범위와 다음 문서로 가는 진입점만 제공한다. 상세 contract,

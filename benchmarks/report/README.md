@@ -98,7 +98,7 @@ Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
 | throughput | 그림 1–2 | 5개 전체 | x1 |
 | speedup | 그림 3 | 5개 전체 | x1, x1.25, x1.5, x2 |
 | latency | 그림 4 | SWE-bench, Conversation | x1, x2 |
-| resource | 그림 5 | SWE-bench | x1 |
+| resource | 그림 5 | 5개 전체 | x1 |
 | nodewise | 그림 6 | SWE-bench | x1, x2 |
 | scaling | 그림 7 | SWE-bench | x2, node-count sweep |
 
@@ -156,6 +156,8 @@ matrix-summary.json의 completed, failed, interrupted, pending, resume_skipped�
 matrix-results.jsonl의 각 case status를 plot 단계의 입력 검증에 사용한다.
 replay가 성공한 case의 실제 metric은 result_dir 아래 x<SPEEDUP>/의
 l2_replay_stats.json, l2_io_interval.tsv, profile 결과에서 읽는다.
+Artifact를 figure 입력으로 정규화하는 명령과 schema는
+[Report data contract](../../report/data/README.md)를 따른다.
 
 ## 7. 기존 replayer script와의 관계
 

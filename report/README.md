@@ -1,68 +1,99 @@
 # 성능 평가 리포트 작업 안내
 
-이 디렉터리는 LMCache L2 backend 성능 평가 본문과 figure 생성 코드를
-관리합니다. 현재 figure 값은 모두 더미 데이터이며 성능 주장의 근거로 사용할 수
-없습니다. 실험 조건, figure 정의와 주장-증거 연결은
-[성능 평가 보고서](performance-evaluation.md)를 단일 기준으로 사용합니다.
+이 디렉터리는 LMCache L2 backend 성능 평가의 본문, 정규화된 figure 입력과
+renderer를 관리합니다. 실험 matrix 실행과 원격 artifact 회수는
+[Report runner](../benchmarks/report/README.md)가 담당합니다.
 
-## 파일 구성
+현재 `report/figures/*.png`는 더미 데이터로 만든 placeholder이며 실측 근거로
+사용할 수 없습니다. 실험 조건과 주장-증거 연결은
+[성능 평가 보고서](performance-evaluation.md)를 기준으로 합니다.
 
-| 파일 | 역할 |
-| --- | --- |
-| `performance-evaluation.md` | 실험 설계와 보고서 본문 |
-| `plot_dummy_results.py` | 재현 가능한 더미 데이터와 multiplot 생성 |
-| `requirements.txt` | Figure 생성용 Python package |
-| `figures/*.png` | Markdown에 포함되는 렌더링 결과 |
-| `../benchmarks/report/` | Staged remote figure별 experiment runner |
+## 디렉터리 구조
 
-## Figure 다시 만들기
+```text
+report/
+├── performance-evaluation.md    # 실험 설계와 보고서 본문
+├── data/
+│   ├── README.md                # 공통 dataset contract
+│   ├── dummy/                   # versioned placeholder metrics
+│   └── measured/                # artifact import 결과; gitignore
+├── generate_dummy_data.py       # deterministic dummy dataset 생성
+├── import_artifacts.py          # matrix artifact -> 공통 dataset
+├── report_data.py               # schema, validation과 query
+├── plot_results.py              # dummy/measured 공통 renderer
+└── figures/
+    ├── *.png                    # 본문 placeholder
+    └── measured/                # 실측 검토용 output; gitignore
+```
 
-프로젝트 virtual environment에서 report dependency를 설치하고 plot을 생성합니다.
+`plot_dummy_results.py`는 기존 command 호환용 wrapper입니다. 새 작업은
+`plot_results.py`만 사용합니다. Column과 metric 이름은
+[Report data contract](data/README.md)에 한 번만 정의합니다.
+
+## 더미 figure 재현
+
+프로젝트 virtual environment에서 report dependency를 설치한 뒤 versioned dummy
+CSV와 figure를 재생성합니다.
 
 ```bash
 source .venv/bin/activate
 python -m pip install -r report/requirements.txt
-python report/plot_dummy_results.py
+python -m report.generate_dummy_data
+python -m report.plot_results
 ```
 
-다른 출력 디렉터리는 `--output-dir`로 지정합니다.
+기존 workload/backend/case matrix를 유지할 때는
+`report/data/dummy/metrics.csv`의 `value`만 바꾼 뒤 renderer를 다시 실행하면
+됩니다. `manifest.json`의 `kind: dummy`인 dataset에는 모든 figure에
+`DUMMY DATA` watermark가 자동으로 들어갑니다.
+
+## 실측 artifact로 교체
+
+Report runner가 만든 `matrix-results.jsonl`을 공통 dataset으로 변환합니다.
 
 ```bash
-python report/plot_dummy_results.py --output-dir /tmp/lmcache-report-figures
+python -m report.import_artifacts \
+  --state-root outputs/report-experiments-staged \
+  --network-link-gbps fs-native=100 \
+  --network-link-gbps 3FS=100 \
+  --network-link-gbps pNFS=100
+
+python -m report.plot_results \
+  --data-dir report/data/measured
 ```
 
-## 실험 matrix
+첫 명령은 각 완료 case의 `result_dir`에서 replay stats, interval I/O와 profiler
+TSV를 읽어 `report/data/measured/`에 정규화합니다. 두 번째 명령은 원본
+placeholder를 건드리지 않고 `report/figures/measured/`에 실측 figure를 만듭니다.
 
-Figure별 workload/backend/speedup/repeat case는
-[Report runner](../benchmarks/report/README.md)를 사용합니다.
+Coverage, provenance와 layout을 검토한 뒤에만 다음처럼 본문 figure를 명시적으로
+교체합니다.
 
 ```bash
-bash benchmarks/report/run_report_experiments.sh --help
+python -m report.plot_results \
+  --data-dir report/data/measured \
+  --output-dir report/figures
 ```
 
-Runner의 graph preset, backend template, trace subset, resume state와 output
-schema는 runner 문서에서 관리합니다. 각 figure가 읽는 artifact와 metric은
-[성능 평가 보고서](performance-evaluation.md)의 해당 실험 절과
-[L2 replay metric guide](../docs/l2-replay-metrics.md)를 따릅니다.
+특정 figure만 갱신하려면 `--figure throughput`, `--figure speedup`처럼
+`--figure`를 사용합니다. 입력이 없는 조합은 다른 metric으로 대체하지 않고
+`N/A`로 표시합니다.
 
 ## Plot 검토 기준
 
-- 관련 panel은 하나의 figure로 렌더링하고, panel이 많아 text가 작아지면
-  workload나 분석 목적별로 figure를 분리합니다.
-- Axis label, tick, annotation과 legend가 graph box 또는 서로 겹치지 않는지
-  실제 PNG 크기에서 확인합니다.
-- 같은 비교의 단위, 색상, backend 순서와 axis 범위를 일관되게 유지합니다.
-- 반복 결과는 보고서에서 정한 aggregation과 confidence interval을 사용합니다.
-- Adapter interval data가 없는 case를 node-level physical I/O로 대체하지 않고
-  `N/A`로 표시합니다.
-- 더미 figure와 실측 figure를 파일명과 caption에서 명확하게 구분합니다.
-
-실측 입력의 field, 단위와 계산식은 README에 다시 정의하지 않습니다. Figure별
-입력을 바꿀 때는 성능 평가 보고서를, metric 의미를 바꿀 때는 L2 replay metric
-guide를 수정합니다.
+- 실제 PNG 크기에서 title, axis label, tick, annotation과 legend가 graph box 또는
+  서로 겹치지 않는지 확인합니다. Renderer도 figure-level overlap과 clipping을
+  검사하고 문제가 있으면 실패합니다.
+- 같은 비교의 단위, 색상, backend 순서와 axis 범위를 유지합니다.
+- 반복 결과는 중앙값과 deterministic 95% bootstrap confidence interval로
+  표시합니다.
+- Adapter interval data가 없는 case를 node-level physical I/O로 대체하지 않습니다.
+- `manifest.json`의 source, warning과 row count를 figure와 함께 보관합니다.
+- Placeholder를 실측으로 교체할 때 본문의 draft/dummy 문구와 caption도 함께
+  갱신합니다.
 
 ## 문서 형식
 
-현재는 GitHub에서 바로 읽을 수 있고 plot layout을 Python에서 통제할 수 있는
-Markdown + matplotlib PNG를 사용합니다. 자동 numbering, cross-reference,
-bibliography 또는 HTML/PDF 동시 배포가 필요해질 때 Quarto 전환을 검토합니다.
+현재는 GitHub에서 바로 읽을 수 있고 layout을 Python에서 통제할 수 있는 Markdown +
+matplotlib PNG를 사용합니다. 자동 numbering, cross-reference, bibliography 또는
+HTML/PDF 동시 배포가 필요해질 때 Quarto 전환을 검토합니다.
