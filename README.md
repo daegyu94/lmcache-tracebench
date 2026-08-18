@@ -82,10 +82,13 @@ bash scripts/setup_runtime.sh --profile replayer-gpu
 bash scripts/setup_runtime.sh --help
 ```
 
-Recorder에는 CUDA GPU가 필요하지만, `fs_native` L2 replay는 GPU·vLLM·모델 없이
-실행할 수 있습니다. Recorder의 mount와 dataset 설정은
+Recorder에는 CUDA GPU가 필요합니다. 반면 이미 생성된 L2 trace replay는 Recorder의
+vLLM·모델·dataset과 독립적입니다. `fs_native`/pNFS는 `replayer-cpu`로 GPU 없이
+실행할 수 있으며, NIXL/HF3FS 등은 backend별 client/runtime와 필요 시 CUDA 환경을
+replay host에 준비해야 합니다. Recorder의 mount와 dataset 설정은
 [Recorder guide](docs/recorder.md), replay host 설치부터 결과 확인까지의 최소 순서는
-[L2 benchmark quickstart](docs/benchmark-quickstart.md)를 참고하세요.
+[L2 benchmark quickstart](docs/benchmark-quickstart.md), backend별 조건은
+[Replayer guide](docs/replayer.md#backend-configuration)를 참고하세요.
 
 ## Start here
 
