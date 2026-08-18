@@ -116,6 +116,29 @@ timing 차이 등을 관찰하는 진단 지표입니다. Mismatch가 0이 아�
 실패를 뜻하지 않습니다. 반면 malformed trace, missing/duplicate end marker,
 dispatch 오류와 drain timeout은 replay 실패입니다.
 
+## L2 namespace 사용량
+
+`l2_usage.json`은 replay client에서 접근하는 L2 directory를 `du -sb`로 측정한
+apparent byte를 기록합니다. `fs_native`의 `base_path`와 file-based NIXL
+adapter의 `backend_params.file_path`를 대상으로 하며, 다음 snapshot을 포함합니다.
+
+| JSON field | 의미 |
+| --- | --- |
+| `scope` | 항상 `client_visible_namespace` |
+| `adapter_type`, `path` | 측정한 adapter와 client path |
+| `measurement_method` | 현재 `du -sb` |
+| `after_prepare` | L2 preparation process가 종료된 직후의 namespace 크기 |
+| `after_replay` | measured replay process가 종료된 직후의 namespace 크기 |
+| `bytes`, `gb`, `gib` | snapshot 시점의 apparent size |
+| `measurement_status` | `ok`, `missing`, `unsupported_adapter` 또는 `measurement_failed` |
+| `command_exit_code` | 해당 snapshot 직전 prepare/replay process의 exit code |
+
+이 값은 client namespace에서 보이는 논리적 크기입니다. Filesystem allocation,
+distributed storage replication과 storage node의 physical usage를 의미하지
+않습니다. 측정 실패는 replay exit code를 변경하지 않으며 status와 error를
+`l2_usage.json`에 남깁니다. 원격 filesystem의 namespace scan이 300초를 넘으면
+`measurement_failed`로 기록합니다.
+
 ## 보조 field와 생성 결과
 
 - `schema_version`: stats JSON schema version
@@ -129,6 +152,7 @@ dispatch 오류와 drain timeout은 replay 실패입니다.
 - `l2_replay_summary.md`: 주요 값과 주의사항을 담은 사람용 요약
 - `l2_io_interval.tsv`: adapter가 interval log를 지원할 때의 시간 구간별 I/O
 - `l2_prepare_manifest.json`: 측정 전에 준비한 object와 byte
+- `l2_usage.json`: prepare/replay 뒤의 client-visible L2 namespace 크기
 
 Speedup sweep은 성공한 case의 핵심 field를 한 행씩 펼친
 `sweep-summary.csv`를 추가합니다. 실패하거나 stats JSON이 없는 case는 CSV에서

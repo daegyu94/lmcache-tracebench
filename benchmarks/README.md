@@ -95,6 +95,7 @@ report runner 또는 backend/workload launcher
 ├── l2_prepare_manifest.json
 ├── l2_replay_stats.json
 ├── l2_replay_summary.md
+├── l2_usage.json
 ├── lmcache-prepare.log
 ├── lmcache-replay.log
 └── profile/                    # --io-profile 사용 시

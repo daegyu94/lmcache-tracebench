@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,6 +46,112 @@ _L2_IO_INTERVAL_COLUMNS = (
 )
 _GB_BYTES = 1_000_000_000
 _GIB_TO_GB = 1024**3 / _GB_BYTES
+_L2_USAGE_TIMEOUT_SECONDS = 300
+
+
+def _l2_namespace_path(config: ReplayerConfig) -> Path | None:
+    """Return the client-visible directory used by a filesystem L2 adapter."""
+    adapter = config.l2_adapter
+    adapter_type = adapter.get("type")
+    raw_path: object | None = None
+    if adapter_type in {"fs", "fs_native"}:
+        raw_path = adapter.get("base_path")
+    elif adapter_type in {"nixl_store", "nixl_store_dynamic"}:
+        backend_params = adapter.get("backend_params")
+        if isinstance(backend_params, dict):
+            raw_path = backend_params.get("file_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        return None
+    return Path(raw_path).expanduser()
+
+
+def _measure_l2_namespace_usage(path: Path | None) -> dict[str, object]:
+    """Measure apparent bytes in a client-visible L2 namespace with GNU du."""
+    measured_at = datetime.now(timezone.utc).isoformat()
+    if path is None:
+        return {
+            "bytes": None,
+            "measurement_status": "unsupported_adapter",
+            "measured_at_utc": measured_at,
+        }
+    if not path.is_dir():
+        return {
+            "bytes": None,
+            "measurement_status": "missing",
+            "measured_at_utc": measured_at,
+        }
+    try:
+        result = subprocess.run(
+            ["du", "-sb", "--", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_L2_USAGE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "bytes": None,
+            "measurement_status": "measurement_failed",
+            "error": str(exc),
+            "measured_at_utc": measured_at,
+        }
+    if result.returncode != 0:
+        return {
+            "bytes": None,
+            "measurement_status": "measurement_failed",
+            "error": result.stderr.strip() or f"du exited with {result.returncode}",
+            "measured_at_utc": measured_at,
+        }
+    try:
+        bytes_used = int(result.stdout.split(maxsplit=1)[0])
+    except (IndexError, ValueError):
+        return {
+            "bytes": None,
+            "measurement_status": "measurement_failed",
+            "error": f"unexpected du output: {result.stdout.strip()!r}",
+            "measured_at_utc": measured_at,
+        }
+    return {
+        "bytes": bytes_used,
+        "gb": round(bytes_used / _GB_BYTES, 3),
+        "gib": round(bytes_used / (1024**3), 3),
+        "measurement_status": "ok",
+        "measured_at_utc": measured_at,
+    }
+
+
+def _record_l2_namespace_usage(
+    output_dir: Path,
+    payload: dict[str, object],
+    stage: str,
+    *,
+    command_exit_code: int | None,
+) -> None:
+    path_value = payload.get("path")
+    namespace_path = Path(path_value) if isinstance(path_value, str) else None
+    snapshot = _measure_l2_namespace_usage(namespace_path)
+    snapshot["command_exit_code"] = command_exit_code
+    payload[stage] = snapshot
+    usage_path = output_dir / "l2_usage.json"
+    temporary_path = usage_path.with_suffix(".json.tmp")
+    temporary_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temporary_path.replace(usage_path)
+    if snapshot["measurement_status"] == "ok":
+        print(
+            f"[INFO] L2 namespace usage {stage}: "
+            f"{snapshot['gb']} GB ({snapshot['bytes']} bytes). "
+            f"Artifact: {usage_path}",
+            flush=True,
+        )
+    else:
+        print(
+            f"[WARN] L2 namespace usage {stage}: "
+            f"{snapshot['measurement_status']}. Artifact: {usage_path}",
+            flush=True,
+        )
 
 
 def _progress_from_log_line(line: str) -> tuple[int, int] | None:
@@ -233,12 +340,27 @@ def run_command(
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / "lmcache-replay.log"
     trace_level = _read_trace_level(trace)
+    l2_usage: dict[str, object] | None = None
     io_interval_path = (
         output_dir / "l2_io_interval.tsv" if trace_level == "l2" else None
     )
     if trace_level == "l2":
+        namespace_path = _l2_namespace_path(config)
+        l2_usage = {
+            "schema_version": 1,
+            "scope": "client_visible_namespace",
+            "adapter_type": config.l2_adapter.get("type"),
+            "path": str(namespace_path) if namespace_path is not None else None,
+            "measurement_method": "du -sb",
+        }
         print("[INFO] Preparing L2 replay target", flush=True)
         prepare_code = _run_prepare(config, trace, output_dir)
+        _record_l2_namespace_usage(
+            output_dir,
+            l2_usage,
+            "after_prepare",
+            command_exit_code=prepare_code,
+        )
         if prepare_code != 0:
             print(
                 "[ERROR] L2 prepare failed with exit code "
@@ -359,6 +481,14 @@ def run_command(
 
     if progress_seen:
         print()
+    if trace_level == "l2":
+        assert l2_usage is not None
+        _record_l2_namespace_usage(
+            output_dir,
+            l2_usage,
+            "after_replay",
+            command_exit_code=return_code,
+        )
     if return_code == 0 and trace_level == "l2":
         stats_path = output_dir / "l2_replay_stats.json"
         if stats_path.is_file():

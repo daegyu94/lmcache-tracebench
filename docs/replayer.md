@@ -86,6 +86,9 @@ python -m replayer.main \
 `l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
 `--output-dir`는 L2 prepare manifest, replay 통계와 로그를 저장할 디렉터리를
 덮어씁니다.
+Prepare와 replay 종료 뒤의 client-visible L2 namespace 크기는
+`l2_usage.json`에 기록하며, field 의미는
+[L2 replay metric guide](l2-replay-metrics.md#l2-namespace-사용량)를 따릅니다.
 
 ## Replay speedup sweep
 

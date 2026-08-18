@@ -1,9 +1,13 @@
+import json
+
 import replayer.runner as runner_module
 from replayer.config import apply_overrides, load_config
 from replayer.main import main
 from replayer.runner import (
     _l2_io_interval_from_log_line,
+    _l2_namespace_path,
     _l2_progress_from_log_line,
+    _measure_l2_namespace_usage,
     _progress_from_log_line,
     build_command,
 )
@@ -55,6 +59,34 @@ def test_path_overrides_are_reflected_in_dry_run(capsys, tmp_path):
     output = capsys.readouterr().out
     assert f'"base_path":"{base_path}"' in output
     assert f"--output-dir {output_dir}" in output
+
+
+def test_l2_namespace_usage_uses_configured_client_path(tmp_path):
+    l2_path = tmp_path / "l2"
+    l2_path.mkdir()
+    (l2_path / "object").write_bytes(b"payload")
+    config = apply_overrides(
+        load_config("configs/replayer/smoke.yaml"),
+        l2_path=str(l2_path),
+    )
+
+    assert _l2_namespace_path(config) == l2_path
+    usage = _measure_l2_namespace_usage(l2_path)
+    assert usage["measurement_status"] == "ok"
+    assert usage["bytes"] >= len(b"payload")
+
+
+def test_l2_namespace_usage_reports_missing_path(tmp_path):
+    usage = _measure_l2_namespace_usage(tmp_path / "missing")
+
+    assert usage["measurement_status"] == "missing"
+    assert usage["bytes"] is None
+
+
+def test_l2_namespace_path_uses_nixl_file_path():
+    config = load_config("configs/replayer/nixl-hf3fs.yaml")
+
+    assert str(_l2_namespace_path(config)) == "/mnt/3fs/lmcache-trace-replay"
 
 
 def test_speedup_override_is_reflected_in_dry_run(capsys, tmp_path):
@@ -260,12 +292,26 @@ def test_l2_replay_reports_start_and_submission_progress(capsys, monkeypatch, tm
     trace = tmp_path / "l2.lct"
     trace.touch()
     output_dir = tmp_path / "output"
+    l2_path = tmp_path / "l2"
+    l2_path.mkdir()
     config = apply_overrides(
         load_config("configs/replayer/smoke.yaml"),
+        l2_path=str(l2_path),
         output_dir=str(output_dir),
     )
     monkeypatch.setattr(runner_module, "_read_trace_level", lambda _: "l2")
     monkeypatch.setattr(runner_module, "_run_prepare", lambda *_: 0)
+    monkeypatch.setattr(
+        runner_module,
+        "_measure_l2_namespace_usage",
+        lambda _: {
+            "bytes": 7,
+            "gb": 0.0,
+            "gib": 0.0,
+            "measurement_status": "ok",
+            "measured_at_utc": "2026-08-18T00:00:00+00:00",
+        },
+    )
     monkeypatch.setattr(
         runner_module.subprocess,
         "Popen",
@@ -282,11 +328,14 @@ def test_l2_replay_reports_start_and_submission_progress(capsys, monkeypatch, tm
     assert "L2 submitted=100/100 (100.0%)" in output
     assert output.count("\r[progress]") == 2
     progress_output = output[output.index("\r[progress]") :]
-    progress_output = progress_output[
-        : progress_output.index("\n[INFO] Replay complete.")
-    ]
+    progress_output = progress_output[: progress_output.index("\n")]
     assert "\n" not in progress_output
     assert "[INFO] Replay complete." in output
+    usage = json.loads((output_dir / "l2_usage.json").read_text())
+    assert usage["scope"] == "client_visible_namespace"
+    assert usage["path"] == str(l2_path)
+    assert usage["after_prepare"]["measurement_status"] == "ok"
+    assert usage["after_replay"]["measurement_status"] == "ok"
 
 
 def test_l2_replay_writes_interval_io_tsv(monkeypatch, tmp_path):
