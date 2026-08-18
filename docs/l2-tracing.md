@@ -42,37 +42,28 @@ target L2 adapter  --->  l2_replay_stats.json
 - **Completion:** store/lookup/load task의 완료와 결과가 기록된 시점입니다.
 - **Dependency:** 앞선 task가 끝나야 다음 task를 제출할 수 있는 causal 관계입니다.
 
-### 빠른 시작
+### 실행 가이드
 
-1. 기록할 때 L2 trace level과 출력 파일을 지정합니다.
-
-   ```bash
-   lmcache server --trace-level l2 --trace-output l2.lct
-   ```
-
-2. target adapter를 설정하고, source에만 존재한 read object가 있다면 함께
-   준비하면서 trace를 재생합니다.
-
-   ```bash
-   lmcache trace replay l2.lct --prepare-l2 --l2-adapter '{...}' --speedup 4
-   ```
-
-옵션은 다음처럼 이해하면 됩니다.
-
-- `--speedup 4`: trace의 timestamp 간격을 4배 빠르게 재생합니다.
-- `--trace-percent 10`: 전체 L2 submission 중 앞의 10%만 재생합니다.
-- `--prepare-l2`: source에만 존재하던 read object를 synthetic object로 측정 전에 준비합니다. 필요하지 않다면 생략할 수 있습니다.
-- `--prepare-only`: target 준비와 manifest 기록만 수행하고 측정 replay는 실행하지 않습니다.
-
-이후의 세부 섹션은 trace event, dependency, 초기 object 준비, outcome metric의 정확한 동작을 설명합니다.
+Trace 생성 명령과 output은 [Recorder guide](recorder.md), target adapter와 replay
+옵션은 [Replayer guide](replayer.md)를 사용합니다. 이 문서는 실행 절차를 반복하지
+않고 event, dependency, initial object preparation과 validity contract만
+정의합니다.
 
 ## 문제와 목적
 
-Tracebench는 처음에 LMCache의 기존 StorageManager-level record/replay를 사용하려 했습니다.
-이 방식은 replay 환경에서 L1 reserve, lock, eviction, store, prefetch lifecycle을 재구성하므로, 기록 환경과 replay 환경의 L1 상태가 다르면 실제 L2 I/O 요청도 달라질 수 있습니다.
+StorageManager-level trace는 `StorageManager`의 상위 lifecycle event를
+재생합니다. L1과 L2의 전체 상태나 실제 L2 adapter operation을 고정해 저장하는
+trace가 아닙니다.
 
-이 동작은 `StorageManager`와 L1 semantics를 평가할 때는 유용하지만, 각 backend에 기록 당시와 동일한 L2 adapter operation sequence를 전달해야 하는 통제된 비교 목적은 충족하지 못했습니다.
-따라서 LMCache `priv/dg/l2-tracing` branch에 adapter-level record/replay를 패치하고, Tracebench는 이 branch에서 생성한 `l2.lct`를 사용합니다.
+Replay에서는 L1 object reserve, lock, eviction, store와 prefetch 결정을 현재
+cache 상태에서 다시 계산합니다. L2 backend latency가 async completion과 lock
+해제 시점을 바꾸면 후속 lookup/load/store의 제출 여부와 순서도 달라질 수 있습니다.
+따라서 같은 StorageManager trace라도 target별 L2 operation 수, byte와 순서를
+동일하게 보장하기 어렵습니다.
+
+이 방식은 StorageManager와 L1 semantics를 평가할 때는 유용하지만, backend에
+동일한 L2 workload를 제공하는 통제 실험에는 맞지 않습니다. Tracebench는
+LMCache `priv/dg/l2-tracing` branch에서 실제 adapter task를 `l2.lct`에 기록합니다.
 
 ## 구현 범위
 
@@ -86,7 +77,8 @@ vLLM -> StorageManager/L1 -> async controller -> L2 adapter -> backend
                                              ^ record/replay boundary
 ```
 
-trace level 선택과 기본 실행 명령은 위의 `빠른 시작`을 참고합니다.
+Trace level 선택과 실행 명령은 [Recorder guide](recorder.md)와
+[Replayer guide](replayer.md)를 참고합니다.
 
 ### Event 및 metadata
 
@@ -237,19 +229,10 @@ Store dependency는 target store의 성공 여부가 아니라 completion 여부
 Target lookup의 hit/miss는 제출 전에 알 수 없으므로 dependency 파생과 prepare 판단에는 source trace의 `hit_indices`를 사용합니다.
 Overlap을 유지한 결과 target lookup이 miss가 되더라도 outcome 차이로 기록하며 replay 실패로 처리하지 않습니다.
 
-선택된 첫 submission을 replay의 시간 원점(`t=0`)으로 정규화합니다.
-따라서 trace 시작부터 첫 submission까지의 선행 idle gap은 재생하지 않고, submission 사이의 간격만 `speedup`에 따라 축소하여 보존합니다.
-각 task에 대해 다음과 같이 계산합니다.
-
-```text
-schedule_origin  = first_selected_op.t_mono
-record_offset    = op.t_mono - schedule_origin
-timestamp_target = replay_start + record_offset / speedup
-earliest_submit  = max(timestamp_target, dependency_completion_time)
-```
-
-Target adapter의 I/O latency는 배율에 따라 조정하지 않습니다.
-Backend가 가속된 arrival rate를 따라가지 못하면 actual submission, dependency wait, buffer wait 및 final drain 시간이 자연스럽게 증가해야 합니다.
+Timestamp normalization과 `speedup` 목표 시각 계산은
+[Replayer guide의 timestamp scaling](replayer.md#how-timestamp-scaling-works)을
+기준으로 합니다. 이 절의 causal dependency는 timestamp target보다 늦게
+operation을 제출하게 만들 수 있지만, 관계없는 task에 global barrier를 만들지 않습니다.
 
 ### Replay 정확성, outcome 및 출력
 
@@ -276,24 +259,6 @@ Source와 target의 상세 per-object 결과를 별도 출력하지 않습니다
 
 `outcome_matches_source`는 비교 결과 요약이며, mismatch가 있어도 replay를 무효화하지 않습니다.
 
-L2 replay stats JSON에는 다음 항목이 포함됩니다.
-
-- **Input:** `speedup`, `trace_percent`, source operation total 및 selected count
-- **Timing:** source/actual submission window, total replay, drain, schedule lag,
-  dependency wait 및 replay-buffer wait
-- **Workload:** operation별 제출 수, store/load task의 전송 byte 및 throughput
-- **L2 latency:** target adapter별 store/load task의 제출·완료 수, latency percentile 및 task latency 기준 aggregate throughput
-- **Outcome metrics:** `outcome_matches_source`, `outcome_comparisons`, mismatch count/counts/rate/samples 및 unlock/delete 제출 count
-
-`--prepare-l2` 또는 `--prepare-only`를 사용하면 측정 replay와 별도로 `l2_prepare_manifest.json`에 prepared object/byte 수, prepare store 성공 task 수,
-prepare elapsed time을 기록합니다.
-
-Top-level `throughput_bytes_per_second`는 측정 replay 전체 elapsed time을 분모로 하며, preparation byte와 lookup/unlock/delete는 포함하지 않습니다.
-
-이 값들은 다음 두 질문을 구분합니다.
-
-1. 선택된 L2 operation이 causal order와 timestamp schedule에 따라 제출되고 drain되었는가?
-2. Target backend의 store/lookup/load outcome은 source와 어떻게 달랐는가?
-
-`--trace-percent 10`은 전체 L2 submission 중 앞의 `ceil(N * 10 / 100)`개를 선택합니다.
-선택된 submission에 대응하는 completion만 dependency, prepare 및 outcome 비교에 사용하며, unlock/delete에는 completion record가 없습니다.
+Replay stats와 prepare manifest의 field, 처리량 계산과 `trace_percent` 선택 수는
+[L2 replay metric guide](l2-replay-metrics.md)를 기준으로 합니다. 이 specification은
+trace validity, dependency와 outcome comparison contract만 정의합니다.

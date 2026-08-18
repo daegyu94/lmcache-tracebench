@@ -3,11 +3,9 @@
 설치 profile과 공통 경로 표기는 [README](../README.md)의
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
-Tracebench의 record/replay 실험은 `--trace-kind l2`로 실제 adapter task를
-`l2.lct`에 기록합니다. 기존 StorageManager-level 방식은 replay 환경의 L1 상태에
-따라 L2 operation sequence가 달라져 backend 비교 목적을 충족하지 못했습니다.
-패치한 `priv/dg/l2-tracing` branch의 event, `cache_salt`, end marker와 replay
-의미론은 [L2 tracing guide](l2-tracing.md)를 authoritative reference로 사용합니다.
+Recorder는 `--trace-kind l2`로 실제 adapter task를 `l2.lct`에 기록합니다.
+Trace level 선택 이유, event schema와 completeness contract는
+[L2 tracing guide](l2-tracing.md)를 기준으로 합니다.
 
 Recorder는 LMCache MP와 vLLM을 시작하고 OpenAI-compatible endpoint로 workload를
 전송합니다. 예제 config의 `lmcache.l2.reset_on_start: true`는 실행 전에
@@ -316,5 +314,4 @@ LMCache chunk, metadata, reuse와 실행 성공 여부에 따라 달라집니다
 
 Mooncake는 `vllm_benchmark.json`도 생성합니다. 문제가 발생하면
 `manifest.json`을 확인한 뒤 각 process 로그를 살펴보세요.
-L2 trace는 graceful shutdown 시 end marker를 기록하며, replay는 marker 누락·중복이나
-recorder/EventBus drop을 불완전한 trace로 거부합니다.
+`l2.lct`의 유효성 판정은 [L2 tracing guide](l2-tracing.md)를 따릅니다.

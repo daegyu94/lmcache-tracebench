@@ -1,47 +1,37 @@
 # LMCache Tracebench
 
-vLLM + LMCache MP 환경에서 Tensormesh-Benchmark V3 또는 Mooncake FAST'25
-workload를 실행하고 LMCache L2 trace를 기록하고 재생하는 도구입니다.
-기존 StorageManager-level record/replay는 replay 환경의 L1 상태에 따라 실제 L2
-요청이 달라져 backend 비교에 필요한 동일 operation sequence를 보장하지 못합니다.
-따라서 LMCache `priv/dg/l2-tracing` branch에서 실제 adapter task를 기록한
-`l2.lct`를 사용합니다.
+LMCache Tracebench는 vLLM + LMCache MP workload에서 실제 L2 adapter task를
+기록하고, 같은 operation stream을 storage backend에 재생하는 도구입니다.
+Recorder는 TensorMesh V3 또는 Mooncake FAST'25 workload로 `l2.lct`를 만들고,
+Replayer는 이를 `fs_native`, pNFS, NIXL/HF3FS 등의 target에 replay합니다.
+
+기존 StorageManager-level trace가 backend 비교용 고정 L2 workload가 아닌 이유와
+adapter-level replay contract는 [L2 tracing guide](docs/l2-tracing.md)를 기준으로
+합니다.
 
 ## Overview
 
 ```text
-Tensormesh V3 / Mooncake timed trace
-                  ↓
-Recorder → vLLM API server → LMCache MP → L2 storage
-                                      ↓
-                                  l2.lct
-                                      ↓
-                                  Replayer
+TensorMesh V3 / Mooncake timed trace
+                  |
+                  v
+Recorder -> vLLM -> LMCache MP -> L2 adapter
+                                  |
+                                  v
+                               l2.lct
+                                  |
+                                  v
+Replayer --------------------> target L2 backend
 ```
 
-Record 단계는 workload를 실행하고 로컬 SSD의 `fs_native` L2에 KV object를
-저장하면서 실제 adapter task를 `l2.lct`에 기록합니다. Replayer는 이 task를 target
-backend에 직접 causal replay하므로 backend latency, throughput과 resource 사용량을
-비교할 수 있습니다. Record와 replay의 L2 backend는 같을 필요가 없습니다.
-자세한 contract는 [L2 tracing guide](docs/l2-tracing.md)를 참고하세요.
-한 노드에서 동일 trace를 여러 instance로 복제하는 replay는
-[Parallel replicated replay](docs/replayer.md#parallel-replicated-replay)를
-참고하세요.
+Runtime source는 `src/recorder`, `src/replayer`, `src/traceprof`에 있습니다.
+반복 실행 launcher는 [Benchmark guide](benchmarks/README.md), 보고서 실험 matrix는
+[Staged remote report runner](benchmarks/report/README.md)를 참고하세요.
 
 ## Repository setup
 
-Python runtime source는 `src/` 아래의 `recorder`, `replayer`, `traceprof` package로
-구성되며, project 설치 후 기존 `python -m recorder.main`과
-`python -m replayer.main` module 경로를 그대로 사용합니다.
-
-Tensormesh-Benchmark는 `third_party/Tensormesh-Benchmark` Git submodule로
-사용합니다. submodule은 `tracebench` branch를 가리키며 상위 저장소의 commit으로
-고정됩니다.
-
-Mooncake backend는 third-party source를 포함하지 않습니다. 프로젝트 내부 adapter가
-[Mooncake FAST'25](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release)의
-익명화된 JSONL trace를 데이터 캐시로 내려받고, 설치된 vLLM의 `timed_trace` client로
-재생합니다.
+Recorder는 `third_party/Tensormesh-Benchmark` submodule을 사용합니다. 이미 기록된
+L2 trace만 replay할 때는 submodule이 필요하지 않습니다.
 
 ```bash
 git clone <this-repository>
@@ -49,198 +39,69 @@ cd lmcache-tracebench
 git submodule update --init --recursive
 ```
 
+Mooncake workload는 third-party source를 포함하지 않으며,
+[Mooncake FAST'25](https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release)의
+timed trace를 사용합니다.
+
 ## Prerequisites
 
-현재 저장소는 Ubuntu 24.04와 Python 3.12 환경에서 검증했습니다. Recorder는 CUDA가
-연결된 NVIDIA GPU가 필요하지만, Replayer는 `fs_native` 기준
-GPU·vLLM·모델 없이 실행할 수 있습니다. 모든 profile은 같은 프로젝트 `.venv`를
-사용합니다.
+검증 환경은 Ubuntu 24.04와 Python 3.12입니다. 모든 profile은 프로젝트의
+`.venv`를 공유합니다.
 
-Recorder config의 `lmcache.l2.subpath`와 workload의 상대 경로는 실행 시
-`--mountpoint /MNTPNT` 아래에 배치됩니다. `/MNTPNT`는 실제 storage mount
-경로로 바꿔 사용합니다.
-
-설치 profile은 실행 역할에 따라 두 개로 나뉩니다.
-
-| Profile | 설치 내용 | 실행 환경 |
-| --- | --- | --- |
-| `recorder` | LMCache tracebench fork, PyTorch, vLLM, dataset, OpenAI/TensorMesh package | GPU에서 trace 생성; 기본 profile |
-| `replayer` | LMCache tracebench fork, PyTorch, NIXL package | `fs_native`, NIXL/HF3FS trace replay |
-
-Recorder 설치:
+| Profile | 용도 |
+| --- | --- |
+| `recorder` | GPU에서 vLLM/LMCache workload를 실행하고 trace 생성 |
+| `replayer-cpu` | CPU torch 기반 L2 replay |
+| `replayer-gpu` | CUDA torch가 필요한 replay node의 L2 replay |
 
 ```bash
 bash scripts/setup_runtime.sh --profile recorder
+bash scripts/setup_runtime.sh --profile replayer-cpu
+bash scripts/setup_runtime.sh --profile replayer-gpu
 ```
 
-Replayer 설치(`fs_native`와 NIXL/HF3FS 모두 지원):
+현재 환경만 검사하려면 선택한 명령에 `--check`를 추가합니다. Profile을 생략하면
+`recorder`가 선택됩니다. 설치 동작과 추가 옵션은 다음 명령을 기준으로 합니다.
 
 ```bash
-bash scripts/setup_runtime.sh --profile replayer
+bash scripts/setup_runtime.sh --help
 ```
 
-`bash scripts/setup_runtime.sh`처럼 profile을 생략하면 기존 동작과 호환되도록
-`recorder`가 선택됩니다. 현재 환경만 검사하려면 각 명령에 `--check`를 추가합니다.
-의존성 정의는 `requirements/common.txt`, `requirements/recorder.txt`,
-`requirements/replayer.txt`에 분리되어 있으며, 기존
-`requirements/runtime.txt`는 Recorder용 호환 profile입니다. 일반 실행은 pip의
-기본 보정 동작으로 선택한 runtime requirements를 처리하므로, 누락되었거나 버전
-조건을 만족하지 않는 패키지만 설치·교체하고 이미 조건을 만족하는 패키지는
-유지합니다. 프로필 전환이나 LMCache source를 확실히 초기화해야 할 때만
-`--force-reinstall`을 추가합니다.
+Recorder에는 CUDA GPU가 필요하지만, `fs_native` L2 replay는 GPU·vLLM·모델 없이
+실행할 수 있습니다. Recorder의 mount와 dataset 설정은
+[Recorder guide](docs/recorder.md), replay host 설치부터 결과 확인까지의 최소 순서는
+[L2 benchmark quickstart](docs/benchmark-quickstart.md)를 참고하세요.
 
-다른 버전을 시험하려면 해당 profile 파일을 복사해 지정합니다.
+## Start here
 
-```bash
-cp requirements/common.txt requirements/common.local.txt
-cp requirements/recorder.txt requirements/recorder.local.txt
-# requirements/common.local.txt에서 lmcache version을 수정하고,
-# requirements/recorder.local.txt의 -r common.txt를 -r common.local.txt로 바꿉니다.
-bash scripts/setup_runtime.sh \
-  --profile recorder \
-  --runtime-requirements requirements/recorder.local.txt
-```
+- Trace 생성: [Recorder guide](docs/recorder.md)
+- 단일 replay, speedup, backend, profiling: [Replayer guide](docs/replayer.md)
+- 격리 replay node 준비와 결과 회수: [Staged remote replay](docs/staged-remote-replay.md)
+- Report figure별 matrix 실행: [Staged remote report runner](benchmarks/report/README.md)
+- Trace archive 다운로드와 업로드: [Trace assets](docs/trace-assets.md)
 
-`--runtime-requirements`는 `--check`와 함께도 사용할 수 있습니다. 버전을 바꾼 뒤에는
-스크립트가 실행하는 `pip check`와 아래 smoke test를 반드시 통과시키세요.
-
-### LMCache tracebench fork
-
-두 profile은 모두 L2 operation profiling과 replay latency 통계
-(`--l2-stats-out`)가 포함된 LMCache `priv/dg/l2-tracing` branch를 사용합니다.
-`setup_runtime.sh`는 기본적으로 requirements와 현재 환경을 비교해 필요한
-패키지만 보정합니다. 기존 PyPI LMCache나 다른 fork를 확실히 교체해야 하면
-`--force-reinstall`을 사용하세요. 별도의 LMCache source checkout이나 patch
-적용은 필요하지 않습니다. 설치는 현재 virtual environment의 PyTorch/CUDA로
-native extension을 빌드합니다.
-
-```bash
-# recorder 또는 replayer profile을 선택합니다.
-bash scripts/setup_runtime.sh --profile recorder
-
-# 기존 runtime을 의도적으로 모두 다시 설치해야 할 때만 사용합니다.
-bash scripts/setup_runtime.sh --profile recorder --force-reinstall
-```
-
-설치 후에는 다음 명령으로 확인합니다.
-
-```bash
-python -c "import lmcache, lmcache.c_ops; print('LMCache import: OK')"
-lmcache trace replay --help | rg -- '--l2-stats-out'
-python -m pip check
-```
-
-`setuptools-scm` 설정상 하이픈이 포함된 태그의 package metadata가 `0.1.dev...`로
-표시될 수 있지만, 설치된 소스는 `priv/dg/l2-tracing` branch의 커밋입니다. 설치 출처를
-확인하려면 다음을 실행합니다.
-
-```bash
-python -c "import importlib.metadata as m; print(m.distribution('lmcache').read_text('direct_url.json'))"
-```
-
-실행 전 확인:
-
-```bash
-source .venv/bin/activate
-python -c "import lmcache, lmcache.c_ops, vllm, openai, datasets; print('runtime imports: OK')"
-```
-
-`No module named 'lmcache'` 또는 `vllm` 오류는 다른 virtual environment를
-활성화했거나 package 설치가 빠진 경우입니다.
-
-## Dataset percentage recording
-
-SWE-bench의 전체 dataset 중 일부만 기록하려면 `--dataset-percent`를 사용합니다.
-전체 session을 기준으로 timestamp 순서를 유지한 prefix를 선택하며, GAIA와
-WildClaw는 이 옵션을 무시하고 전체 dataset을 사용합니다. 실제 전체·선택 session과
-request(turn) 수는 결과의 `workload.json`과 `manifest.json`에서 확인할 수 있습니다.
-
-```bash
-python -m recorder.main \
-  --config configs/recorder/qwen3-coder-480b-tp8-swebench.yaml \
-  --mountpoint /MNTPNT \
-  --trace-kind l2 \
-  --dataset-percent 10 \
-  --output-dir outputs/swebench-10pct
-```
-
-Mooncake은 같은 옵션으로 전체 timed trace의 request 비율을 선택합니다.
-
-```bash
-bash benchmarks/recorder/record_speed_sweep.sh \
-  --backend mooncake \
-  --mountpoint /MNTPNT \
-  --trace-kind l2 \
-  --speedups 1,5,10 \
-  --dataset-percent 10
-```
-
-`--dataset-percent`는 Tensormesh SWE-bench와 Mooncake에 적용되며, GAIA와
-WildClaw에서는 무시됩니다. 자세한 recorder output과 speed sweep은
-[Recorder guide](docs/recorder.md)를 참고하세요.
+각 command는 실행 전에 해당 script의 `--help`와 `--dry-run`으로 경로를
+확인하세요. 특히 sweep의 L2 target은 기존 데이터나 mount root가 아닌 benchmark
+전용 disposable directory여야 합니다.
 
 ## Guides
 
-- [L2 benchmark quickstart](docs/benchmark-quickstart.md): 새 replay host에서 설치, trace 다운로드, sweep과 결과 확인
-- [Recorder guide](docs/recorder.md): Tensormesh V3, Mooncake workload, GPU quota와 Recorder output
-- [Replayer guide](docs/replayer.md): trace 선택, replay backend와 profiling
-- [L2 tracing guide](docs/l2-tracing.md): StorageManager replay의 한계와 L2 causal replay contract
-- [Documentation guidelines](docs/documentation-guidelines.md): 문서 역할, 중복 방지와 실험 기록 규칙
-- [Benchmark guide](benchmarks/README.md): benchmark script와 artifact layout
-- [Trace assets](docs/trace-assets.md): GitHub Release and Hugging Face Dataset upload/download
-- [Staged remote replay](docs/staged-remote-replay.md): controller node에서 격리 replay node를 준비·실행·회수
-
-## Smoke test
-
-`configs/recorder/smoke.yaml`은 1 GPU, 작은 Qwen 모델, V3 세션 10개·각 2 turn(최대
-20개 request)으로 실제 L2 adapter trace를 만드는 최소 설정입니다. 첫 turn의 write와
-두 번째 turn의 prefix reuse/prefetch 경로를 함께 확인합니다. V3 dataset은
-`workload.hf_cache_dir`에 지정한 경로에 cache합니다. 실행 전에 이 값을
-`/MNTPNT/hf-datasets`와 같은 실제 경로로 바꾸세요. 최초 실행에는 Hugging
-Face dataset 접근 권한, 네트워크, 약 2.4 GB의 cache 공간이 필요하고, 이후 실행은
-해당 cache를 재사용합니다.
-
-```bash
-source .venv/bin/activate
-
-python -m recorder.main \
-  --config configs/recorder/smoke.yaml \
-  --mountpoint /MNTPNT \
-  --trace-kind l2 \
-  --output-dir outputs/smoke
-```
-
-성공하면 `outputs/smoke/l2.lct`와 `outputs/smoke/manifest.json`이 생성됩니다.
-문제가 생기면 `outputs/smoke/lmcache.log`와 `outputs/smoke/vllm.log`를 먼저 확인합니다.
-
-방금 기록한 L2 trace를 target adapter에 replay하려면 다음을 실행합니다. Replay는
-vLLM이나 GPU server를 다시 시작하지 않으며, `configs/replayer/smoke.yaml`의 별도 L2
-경로를 사용합니다.
-
-```bash
-python -m replayer.main \
-  --trace outputs/smoke/l2.lct \
-  --config configs/replayer/smoke.yaml
-```
-
-Replay 중 storage node의 NVMe와 network counter를 수집하려면 `--io-profile`을
-추가합니다.
-
-```bash
-python -m replayer.main \
-  --trace outputs/smoke/l2.lct \
-  --config configs/replayer/smoke.yaml \
-  --io-profile configs/profiling/storage.yaml
-```
-
-설정, 결과 파일과 counter 해석은 [Replay profiling](docs/replayer.md#profiling)을
-참고하세요. L2 준비 결과와 측정 통계는 각각
-`outputs/smoke-replay/l2_prepare_manifest.json`과
-`outputs/smoke-replay/l2_replay_stats.json`에 저장됩니다. 먼저 실행 명령만 보려면
-끝에 `--dry-run`을 추가합니다. 동일 trace의 L2 submission arrival-rate 실험은
-`--speedup 5`처럼 실행합니다.
+| 문서 | 기준 범위 |
+| --- | --- |
+| [Documentation guidelines](docs/documentation-guidelines.md) | 문서 역할과 중복 방지 규칙 |
+| [L2 tracing guide](docs/l2-tracing.md) | L2 event, dependency, preparation, trace validity |
+| [Recorder guide](docs/recorder.md) | Workload, recorder CLI와 output |
+| [Replayer guide](docs/replayer.md) | Replay CLI, speedup, backend와 profiling |
+| [L2 replay metric guide](docs/l2-replay-metrics.md) | Replay metric 정의 |
+| [L2 benchmark quickstart](docs/benchmark-quickstart.md) | 새 replay host의 최소 실행 순서 |
+| [Benchmark guide](benchmarks/README.md) | Launcher와 artifact layout |
+| [Trace assets](docs/trace-assets.md) | GitHub/Hugging Face trace archive |
+| [Staged remote replay](docs/staged-remote-replay.md) | Controller/replay node workflow |
+| [Performance report](report/performance-evaluation.md) | 실험 설계와 주장-증거 연결 |
 
 ## Tests
+
+프로젝트 환경을 활성화한 뒤 전체 test를 실행합니다.
 
 ```bash
 source .venv/bin/activate

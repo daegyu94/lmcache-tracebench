@@ -7,15 +7,11 @@ workload/backend/speedup/repeat matrix와 원격 run directory만 관리한다.
 
 ## 준비
 
-1. staged remote topology를 준비한다. 템플릿은
-   configs/replayer/staged-remote/example.yaml이고, b300 컨트롤러(sia)/replay
-   node(weka01) 쌍의 실제 값은 b300.yaml이다.
-2. trace archive를 staged remote로 올릴 경우 --asset을 지정한다. 이미
-   topology의 replay_trace_root에 trace가 있으면 --skip-prepare로 preparation을
-   건너뛸 수 있다.
-3. backend spec의 config와 L2 path는 remote command에 전달되는 문자열이다.
-   topology placeholder가 들어갈 수 있으므로 CONFIG와 L2_ROOT 사이는 |로
-   구분한다.
+Topology 작성, trace/repository 준비와 결과 회수 방식은
+[Staged remote replay guide](../../docs/staged-remote-replay.md)를 따른다.
+Runner는 기본적으로 필요한 preparation을 호출하며, 이미 준비된 환경에서만
+`--skip-prepare`를 사용한다. Backend spec은 remote config와 L2 path를 전달하므로
+placeholder가 포함된 `CONFIG`와 `L2_ROOT` 사이를 `|`로 구분한다.
 
 기본적으로 controller의 project virtual environment를 자동으로 활성화하는
 shell entrypoint를 사용한다.
@@ -70,10 +66,6 @@ case 상태와 실제 metric은 다음으로 확인한다.
 `completed: 1, failed: 0`과 case.json의 `"status": "ok"`가 실제 replay 성공을
 뜻한다.
 
-같은 run-name으로는 재실행이 안 되므로(스크립트가 기존 output을 덮어쓰지 않음)
-다시 시도하려면 `--workloads`/`--repeats`로 다른 case를 만들거나
-controller_output_root/run_name과 매칭되는 outputs/report-experiments-staged의
-case 디렉터리를 함께 지운다.
 
 ## 3. 여러 backend/speedup을 한 번에 (참고용, b300에서는 fs-native만 검증됨)
 
@@ -92,14 +84,12 @@ case 디렉터리를 함께 지운다.
       --trace-percent 10 \
       --repeats 3
 
-report workload label tensormesh-swebench는 staged archive의
-tensormesh/swebench/l2.lct로, mooncake-toolagent와 mooncake-conversation은
-각각 mooncake/toolagent/l2.lct와 mooncake/conversation/l2.lct로 매핑된다.
-SWE-bench, mooncake-toolagent, mooncake-conversation처럼 원본 trace가 큰
-workload는 --trace-percent로 동일한 prefix subset을 선택한다. 모든 backend,
-speedup, repeat은 같은 trace-percent를 사용하고, case.json에 선택 비율을
-기록한다. 원본 trace의 controller-side mirror가 있으면 --local-trace-root를
-추가해 size_bytes와 sha256도 기록할 수 있다.
+Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
+매핑한다. `--trace-percent`는 모든 backend, speedup과 repeat에 동일하게 전달되어
+`case.json`에 기록된다. `--local-trace-root`를 지정하면 size와 checksum도
+남긴다. Subset 선택 원칙은
+[Documentation guidelines](../../docs/documentation-guidelines.md#tracereplay-실험-기록)를
+따른다.
 
 ## 4. 그래프 preset
 

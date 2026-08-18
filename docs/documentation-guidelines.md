@@ -8,15 +8,21 @@
 
 | 주제 | 기준 문서 | 이 문서에 기록할 내용 |
 | --- | --- | --- |
+| 설치 profile과 문서 진입점 | [README.md](../README.md) | 프로젝트 개요와 다음 문서 링크 |
+| Benchmark script와 artifact 구조 | [benchmarks/README.md](../benchmarks/README.md) | script 목적과 상세 가이드 링크 |
 | L2 event, dependency, object preparation, trace validity | [l2-tracing.md](l2-tracing.md) | event contract의 요약과 링크 |
+| Recorder CLI와 output | [recorder.md](recorder.md) | 기록 목적과 대표 명령 |
 | Replay CLI, speedup, profiling, output | [replayer.md](replayer.md) | 실행 목적과 대표 명령 |
 | Staged remote topology와 준비/회수 | [staged-remote-replay.md](staged-remote-replay.md) | 실행 순서와 topology 링크 |
 | Trace asset과 workload archive | [trace-assets.md](trace-assets.md) | asset 이름과 다운로드 방법 |
 | Metric 정의와 유효성 판정 | [l2-replay-metrics.md](l2-replay-metrics.md) | 사용할 metric과 결과 파일 |
+| Report matrix runner와 state | [benchmarks/report/README.md](../benchmarks/report/README.md) | graph preset, backend template, 재실행 방법 |
+| Figure 생성과 입력 연결 | [report/README.md](../report/README.md) | plot 생성 명령과 layout 확인 기준 |
 | 실험 matrix와 보고서 주장 | [../report/performance-evaluation.md](../report/performance-evaluation.md) | 실험 조건과 증거 |
 
-README와 benchmark README는 빠른 진입점이다. 상세한 contract나 설정값을
-여러 문서에 반복해서 쓰지 말고 기준 문서에 한 번만 기록한다.
+README류 문서는 범위와 다음 문서로 가는 진입점만 제공한다. 상세 contract,
+설정값, 명령 또는 metric 정의를 반복하지 말고 위 표의 기준 문서에 한 번만
+기록한다.
 
 ## 작성 원칙
 

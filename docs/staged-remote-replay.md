@@ -232,19 +232,9 @@ bash benchmarks/replayer/staged_remote_replay.sh replay \
     --speedups 1,2,4,8
 ```
 
-다른 launcher도 같은 방식으로 바꿔 전달할 수 있습니다.
-
-```bash
-bash benchmarks/replayer/staged_remote_replay.sh replay \
-  --topology configs/replayer/staged-remote/topology.yaml \
-  --run-name backend-wildclaw-20260813 \
-  -- bash benchmarks/replayer/replay_backend_sweep.sh \
-    --trace @TRACE_ROOT@/tensormesh/wildclaw/l2.lct \
-    --config @REPO_ROOT@/configs/replayer/fs-native.yaml \
-    --output-root @OUTPUT_ROOT@ \
-    --l2-root @L2_ROOT@/backend-wildclaw-20260813 \
-    --speedups 1,2,4
-```
+Backend/workload sweep를 포함한 다른 launcher의 option은
+[benchmark script index](../benchmarks/README.md)에서 해당 상세 가이드를 확인한 뒤
+같은 방식으로 `--` 뒤에 전달합니다.
 
 Remote command가 성공하든 실패하든 script는
 `replay_output_root/<run-name>`을 controller의
@@ -270,12 +260,14 @@ bash benchmarks/replayer/staged_remote_replay.sh all \
 
 ## 5. 안전 동작과 재실행
 
-- 원격 repository, `.venv`, archive, 추출 trace가 이미 있으면 경고하고 해당 전송/추출을
-  건너뜁니다. 기존 runtime을 자동으로 삭제하거나 덮어쓰지 않습니다.
-- 동일한 `run-name`의 remote 또는 controller output이 이미 있으면 replay를 시작하지
-  않습니다. 새 run-name을 사용하세요.
-- `prepare-trace`/`prepare-replay`/`replay` 자체에는 기존 파일을 지우는 옵션이 없습니다.
-  replay node를 깨끗한 상태로 되돌리려면 별도 `reset` phase를 씁니다(아래).
+- 원격 repository, `.venv`, archive, 추출 trace가 이미 있으면 경고하고 해당 준비 작업을
+  건너뜁니다. 준비 phase는 기존 runtime이나 asset을 자동으로 덮어쓰지 않습니다.
+- 기본 동작은 동일한 `run-name`의 remote 또는 controller output이 있으면 replay를
+  시작하지 않습니다.
+- 실패한 동일 case를 의도적으로 다시 실행할 때만 `--replace-existing`을 사용합니다.
+  이 option은 정확히 해당 run의 remote/controller output만 교체하며 symlink 대상은
+  거부합니다.
+- replay node 전체를 초기화해야 할 때는 별도 `reset` phase를 씁니다(아래).
 - `--dry-run`은 HF/SSH/전송/replay command를 실행하지 않고 계획만 출력합니다.
 
 ### Replay node 리셋
@@ -312,5 +304,7 @@ bash benchmarks/replayer/staged_remote_replay.sh all \
   --speedups 1
 ```
 
-재실행이 필요하면 기존 run-name을 재사용하지 말고 날짜나 실험 조건을 포함한
-새 이름을 지정하세요.
+새 실험은 날짜나 조건을 포함한 새 `run-name`을 사용합니다. 실패한 동일 case의
+재시도에만 `--replace-existing`을 사용하세요. Report matrix runner는 완료 marker와
+state를 확인해 완료 case를 건너뛰고 미완료 case만 이 option으로 교체합니다. 자세한
+재실행 기준은 [report runner guide](../benchmarks/report/README.md)를 따릅니다.

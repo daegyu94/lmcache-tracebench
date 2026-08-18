@@ -48,18 +48,15 @@ E3~E5는 대표 workload를 사용하며, node scaling은 `SWE-bench` `x2`에서
 ### 2.1 LMCache Tracing
 
 LMCache에는 `StorageManager` 수준의 trace record/replay 기능이 있다.
-이 방식은 replay 과정에서 L1 reserve, lock, eviction, store, prefetch lifecycle을 다시 구성하므로, source와 target의 L1 상태나 정책이 다르면 실제 L2 I/O 요청 순서와 양도 달라질 수 있다.
-따라서 동일한 L2 부하를 각 storage backend에 제공해야 하는 본 평가에는 그대로 사용하기 어렵다.
+Replay가 L1 reserve, lock, eviction과 async completion을 다시 계산하므로 source와 target의 L1 상태 또는 L2 latency가 달라지면 downstream L2 요청도 달라질 수 있다.
+따라서 이 trace는 고정된 L2 I/O workload가 아니며 backend 통제 비교에는 적합하지 않다.
 
 Tracebench는 이 제약을 피하기 위해 LMCache의 adapter-level L2 tracing으로 기록한 `l2.lct`를 사용한다.
-Record 단계는 실제 L2 adapter task의 submission/completion, timestamp, key, object size와 outcome을 기록하고, replay 단계는 이를 하나의 target L2 adapter에 직접 제출한다.
-Store→lookup과 lookup→load→unlock처럼 source 실행에 필요했던 causal dependency만 보존하며, 독립 task의 동시성과 submission 간격은 유지한다.
-Replay speedup은 이 submission 간격만 축소하고 target adapter의 I/O latency는 변경하지 않는다.
+각 backend에는 같은 adapter operation sequence와 timestamp plan을 전달하고 source의 causal dependency만 보존한다.
+독립 operation에는 global barrier를 두지 않는다.
 
-L2 replay는 source의 L1 상태나 원본 KV payload를 복원하지 않는다.
-Trace 시작 전부터 존재한 read object가 필요하면 같은 key와 byte size의 synthetic object를 측정 전에 준비하며, 준비 I/O는 결과에서 제외한다.
-Source/target outcome 차이는 비교 metric으로 남기고, malformed trace, event drop, dependency 위반 또는 drain 실패는 유효하지 않은 replay로 처리한다.
-Event 범위, dependency 규칙, object 준비와 유효성 contract의 상세 내용은 [L2 tracing guide](../docs/l2-tracing.md), 결과 지표는 [L2 replay metric guide](../docs/l2-replay-metrics.md)를 따른다.
+Event 범위, dependency, object 준비와 유효성 contract는 [L2 tracing guide](../docs/l2-tracing.md),
+결과 field와 판정 기준은 [L2 replay metric guide](../docs/l2-replay-metrics.md)를 따른다.
 
 ### 2.2 L2 storage backend
 
@@ -90,8 +87,8 @@ Mooncake의 `ToolAgent`는 tool-interaction 패턴, `Conversation`은 conversati
 | Mooncake | Conversation | `mooncake-conversation` | 축소한 timed trace 범위 명시 |
 
 동일 workload의 backend/speedup 비교에는 같은 `.lct` 파일과 축소 조건(`trace_percent` 또는 고정 시간 구간)을 사용한다.
-Replay의 `--speedup s`는 source submission 간격을 `s`로 나눈 scaled-open replay다.
-backend가 offered load를 따라가지 못하면 실제 submission window, schedule lag, drain time이 증가할 수 있으므로 throughput 하나만으로 speedup 효과를 판정하지 않는다.
+Speedup의 실험 해석과 saturation 기준은 3.3절에서 정의하고, 정확한 timestamp scheduling은
+[Replayer guide](../docs/replayer.md#how-timestamp-scaling-works)를 따른다.
 
 ## 3. 실험
 

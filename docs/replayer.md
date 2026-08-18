@@ -3,46 +3,20 @@
 설치 profile과 공통 경로 표기는 [README](../README.md)의
 [Prerequisites](../README.md#prerequisites)를 먼저 참고하세요.
 
-## 왜 L2 trace를 사용하는가
-
-처음에는 LMCache의 기존 StorageManager-level record/replay를 사용하려 했지만,
-이 방식은 replay-side에서 L1 reserve, lock, eviction과 async controller lifecycle을
-다시 계산합니다. Record와 replay 환경의 L1 상태나 backend 완료 timing이 다르면
-실제 L2 operation sequence도 달라져 backend 자체를 통제된 조건으로 비교할 수
-없습니다. 그래서 Tracebench는 LMCache `priv/dg/l2-tracing` branch에서 실제 adapter
-task를 기록한 `l2.lct`를 사용합니다.
-
-L2 방식이 필요한 이유와 정확한 event/dependency contract는
-[L2-level tracing](l2-tracing.md)을 authoritative reference로 사용합니다.
-
 ## L2 adapter trace
 
 Backend I/O 비교에는 recorder의 `--trace-kind l2`로 생성한 `l2.lct`를
-사용합니다. 이 trace는 StorageManager lifecycle 대신 실제 adapter의
-`store`, `lookup_and_lock`, `load`, `unlock`, `delete` task와 source completion
-결과를 기록합니다. KV payload는 포함하지 않고 `cache_salt`를 포함한 완전한 object key, batch,
-byte size, aggregate store 결과와 lookup/load result index를 저장합니다.
-`cache_salt`가 없는 legacy trace는 빈 문자열로 읽지만, non-empty salt를 사용하는
-workload는 현재 branch에서 다시 record해야 namespace를 보존할 수 있습니다.
-Replay는 trace 종료 marker가 없거나 중복되거나 recorder/EventBus drop count가
-0이 아니면 불완전한 입력으로 판단해 실행하지 않습니다.
+사용합니다. 이 문서는 replay CLI와 실행 결과를 설명하며, trace level 선택 이유,
+event/dependency, object preparation과 validity contract는
+[L2 tracing guide](l2-tracing.md)를 기준으로 합니다.
 
-L2 replay는 source lookup hit 중 선행 successful store가 없는 object만 dummy
-data로 먼저 저장한 뒤 측정을 시작합니다. Trace 안의 `store → read` object와 lookup
-miss는 prepare하지 않습니다. Tracebench replayer가 이 prepare 단계를 자동으로
-실행하며, prepare I/O는 storage-node profiling 구간에서 제외됩니다. 이후 L2
-adapter를 직접 구동하므로 record/replay 환경의 L1 상태 차이로 인한
-`finish_write` 또는 `finish_read` warning은 발생하지 않습니다.
+Tracebench replayer는 L2 trace의 필요한 object preparation을 measured replay 전에
+자동 실행합니다. Event 범위, synthetic object와 source/target outcome의 의미는
+L2 tracing guide에서 관리합니다.
 
-Replay는 source L2 submission을 보존하는 causal, timestamp-scaled 방식입니다.
-`store → lookup → load → unlock` dependency만 target backend의 completion으로
-보장하고, 관계없는 task는 원본 제출 시각에 따라 계속 제출합니다. 현재는 source와
-target이 각각 하나의 L2 adapter인 trace만 지원합니다.
-
-긴 L2 trace의 앞부분만 실행하려면 `--trace-percent 10`처럼 지정합니다. 이 값은
-시간이 아니라 source submission 개수 기준이며, 선택 개수는 올림합니다. Prepare도
-같은 prefix에 필요한 object만 대상으로 하고, `l2_replay_stats.json`에는
-`trace_percent`, 전체/선택 operation 수가 기록됩니다.
+긴 trace의 앞부분만 실행하려면 `--trace-percent 10`처럼 지정합니다. 이 값은
+시간이 아닌 source submission 개수 기준이며, 같은 prefix에 필요한 preparation만
+수행합니다. 결과 field는 [L2 replay metric guide](l2-replay-metrics.md)를 따릅니다.
 
 `--speedup`은 workload나 GPU compute를 배속하지 않고 기록된 submission 간격만
 압축하는 scaled-open replay 옵션입니다. 예를 들어 `--speedup 5`는 L2 task 목표

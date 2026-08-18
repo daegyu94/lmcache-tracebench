@@ -1,290 +1,117 @@
 # Benchmark guide
 
-이 디렉터리의 script는 LMCache trace를 record하고 replay하는 반복 실험을 위한
-실행 진입점입니다. recorder와 replayer를 디렉터리로 분리해 각 workflow의 옵션과
-출력 구조를 독립적으로 관리합니다. `.lct` contract와 replay semantics의 상세 설명은
-[Replayer guide](../docs/replayer.md), recorder 설정은
-[Recorder guide](../docs/recorder.md)를 기준으로 합니다.
-처음 설치하는 환경에서 검증된 순서대로 실행하려면
-[L2 benchmark quickstart](../docs/benchmark-quickstart.md)를 먼저 참고하세요.
+이 디렉터리는 recorder와 replayer의 반복 실행 launcher를 제공합니다. 각 script의
+옵션·실행 순서와 artifact layout만 이 문서에서 관리합니다. Workload 설정은
+[Recorder guide](../docs/recorder.md), replay 의미론과 backend 설정은
+[Replayer guide](../docs/replayer.md), metric 정의는
+[L2 replay metric guide](../docs/l2-replay-metrics.md)를 기준으로 합니다.
 
 ```text
 benchmarks/
 ├── recorder/   # workload를 실행해 l2.lct 생성
-├── replayer/   # L2 trace를 backend/speedup별로 replay
-└── report/     # staged remote report matrix와 resume runner
+├── replayer/   # trace를 workload/backend/speedup별로 replay
+└── report/     # staged remote report matrix와 resume state 관리
 ```
 
-## Before running
+## 실행 전 확인
 
-- recorder를 실행하려면 프로젝트 환경을 설치합니다.
-
-  ```bash
-  bash scripts/setup_runtime.sh --profile recorder
-  ```
-
-- replayer만 실행하려면 replayer profile을 설치합니다.
-
-  ```bash
-  bash scripts/setup_runtime.sh --profile replayer-cpu
-  ```
-
-  GPU가 있는 replay node에서 CUDA torch 기반으로 replay하려면 `replayer-gpu`를
-  사용합니다. 기본값은 CPU torch 기반의 `replayer-cpu`입니다.
-
-- `replay_speed_sweep.sh`는 각 case 직전에 같은 `l2-root` base path를 삭제하고
-  다시 만듭니다. speedup별 L2 하위 디렉터리는 만들지 않습니다. 기존 replay 결과가
-  있는 output case 디렉터리는 계속 실행 전에 비어 있어야 합니다. `--keep-l2`를
-  사용하면 L2 contents를 case 사이에 재사용하며, base path는 실행 시작 시 비어
-  있어야 합니다.
-- `replay_instances.sh`는 각 instance L2 path를 reset합니다.
-- 실행 전에 `--dry-run`으로 trace, config, L2 path, output path와 최종 command를
-  확인합니다.
-- Speedup sweep에서 `--output-root BASE`를 지정하면
-  `<BASE>-<UTC timestamp>/`를 자동 생성합니다. 생략하면 recorder output의 trace
-  이름을 base로 사용합니다. 이미 `-YYYYMMDD-HHMMSS`가 붙은 경로는 그대로 사용합니다.
-- `--l2-root`는 실제 storage mount를 가리키는 absolute path를 사용합니다.
-  `--output-root`에는 JSON summary와 launcher log가 저장됩니다.
-
-## Recorder scripts
-
-| Script | 용도 |
-| --- | --- |
-| `recorder/record_source_traces.sh` | source별 baseline trace 생성 |
-| `recorder/record_speed_sweep.sh` | workload speedup별 `.lct` 생성 |
-
-`record_source_traces.sh`는 기본적으로 GAIA, WildClaw, SWE-bench의
-`storage.lct`를 생성합니다. `--sources`에는 다음 source 이름을 사용할 수
-있습니다.
-
-- Tensormesh: `gaia`, `wildclaw`, `swebench`
-- Mooncake: `mooncake-toolagent`, `mooncake-conversation`
-
-L2 adapter trace가 필요하면 다음처럼 source와 trace 종류를 지정합니다.
+Runtime profile과 설치 명령은 root [README](../README.md#prerequisites)를
+사용합니다. 각 launcher는 다음 두 명령으로 현재 옵션과 최종 경로를 먼저
+확인할 수 있습니다.
 
 ```bash
-bash benchmarks/recorder/record_source_traces.sh \
-  --mountpoint /MNTPNT \
-  --output-root outputs/source-traces \
-  --trace-kind l2 \
-  --sources gaia,wildclaw
+bash <script> --help
+bash <script> ... --dry-run
 ```
 
-Mooncake Tool/Agent와 Conversation을 기록하려면 다음처럼 실행합니다.
+> [!CAUTION]
+> Replay launcher의 L2 target은 benchmark 전용 disposable directory여야 합니다.
+> 기본 동작은 case 전에 해당 L2 경로를 비우거나 다시 만드는 것입니다. 기존 데이터,
+> mount root, symlink 또는 다른 실험과 공유하는 경로를 지정하지 마세요.
 
-```bash
-bash benchmarks/recorder/record_source_traces.sh \
-  --mountpoint /MNTPNT \
-  --output-root outputs/source-traces \
-  --trace-kind l2 \
-  --sources mooncake-toolagent,mooncake-conversation
-```
+공통 동작은 다음과 같습니다.
 
-Mooncake 입력 trace는 config의 `path`를 사용하며, 없으면 recorder가 다운로드합니다.
-각 결과는 `mooncake-toolagent/` 또는 `mooncake-conversation/` 아래에 생성됩니다.
-Mooncake trace의 전체 request를 선택하려면 `--dataset-percent 100`을 추가합니다.
+- `--l2-root`는 target storage mount 아래의 absolute path를 사용합니다.
+- `--output-root`는 결과와 launcher log를 저장하며 L2 target과 분리합니다.
+- 기존 output case를 덮어쓰지 않습니다. 새 output root를 사용하거나 해당
+  launcher의 resume 정책을 따릅니다.
+- `--keep-l2`를 지원하는 launcher에서는 case 사이의 L2 content를 유지하지만,
+  시작 시 target path가 비어 있어야 합니다.
+- Timestamp가 없는 output root에는 UTC suffix가 자동으로 추가됩니다.
 
-`record_speed_sweep.sh`는 workload별 speedup마다 독립 trace를 생성합니다.
-`--trace-kind l2`를 추가하면 각 speedup 디렉터리에 `l2.lct`를 생성합니다.
+## Script catalog
 
-## Replayer scripts
+### Recorder
 
-| Script | 용도 |
-| --- | --- |
-| `replayer/replay_speed_sweep.sh` | 하나의 `.lct`를 여러 storage arrival-rate로 replay |
-| `replayer/replay_backend_sweep.sh` | backend별 speedup sweep 실행 |
-| `replayer/replay_workload_sweep.sh` | 여러 workload에 동일한 replay speedup sweep 적용 |
-| `replayer/replay_instances.sh` | 하나의 trace를 여러 replay process로 복제 실행 |
-
-실행 가능한 옵션은 각 script의 `--help`를 사용합니다.
-
-### Sweep script overview
-
-| Script | Sweep unit | Case execution order |
+| Script | 역할 | 상세 기준 |
 | --- | --- | --- |
-| `replayer/replay_speed_sweep.sh` | 하나의 trace × speedup | `x1 → x2 → x4 → x8` |
-| `replayer/replay_workload_sweep.sh` | workload × speedup | workload 순서 안에서 speedup 순서 |
-| `replayer/replay_backend_sweep.sh` | backend × speedup | backend 순서 안에서 speedup 순서 |
+| `recorder/record_source_traces.sh` | 선택한 source별 baseline trace 생성 | [Recorder guide](../docs/recorder.md) |
+| `recorder/record_speed_sweep.sh` | workload speed별 독립 trace 생성 | [Recorder speed sweep](../docs/recorder.md#speed-sweep) |
 
-각 case는 별도의 `python -m replayer.main` 실행이며, sweep script들은 이 단일
-replay를 반복 호출하는 launcher입니다. 실제 LMCache L2 replay는
-`src/replayer/runner.py`가 실행하는 `lmcache trace replay` subprocess가 담당합니다.
-입력이 `l2.lct`이면 measured replay 전에 source-resident read object를 준비하며,
-`lmcache-prepare.log`와 `l2_prepare_manifest.json`도 case 디렉터리에 생성됩니다.
+지원 source와 `--dataset-percent`, Mooncake 입력, recorder output은 Recorder
+guide에서 관리합니다.
 
-## Recommended workflow
+### Replayer
 
-### 1. Record or obtain traces
+| Script | Sweep unit | Case 실행 |
+| --- | --- | --- |
+| `replayer/replay_speed_sweep.sh` | trace × speedup | speedup 순서대로 실행 |
+| `replayer/replay_workload_sweep.sh` | workload × speedup | workload 안에서 speedup 순서 |
+| `replayer/replay_backend_sweep.sh` | backend × speedup | backend 안에서 speedup 순서 |
+| `replayer/replay_instances.sh` | 동일 trace × process | 독립 process를 병렬 실행 |
+| `replayer/replay_l1_size_sweep.sh` | replay buffer size | L1 hit/miss 실험이 아닌 buffer 민감도 |
 
-trace asset을 준비한 뒤 workload별로 다음 구조를 유지합니다.
+각 case는 별도의 `python -m replayer.main` 실행입니다. Launcher는 case matrix,
+L2 reset, output 보호와 summary 생성을 담당하고, 실제 adapter replay는
+`lmcache trace replay`가 수행합니다. 명령 예시는
+[Replayer guide](../docs/replayer.md)를 사용합니다.
 
-```text
-trace-root/
-└── <workload>/
-    └── l2.lct
-```
+### Staged remote와 report
 
-외부 trace asset의 다운로드와 directory layout은
-[Trace assets guide](../docs/trace-assets.md)를 참고합니다.
+| Script | 역할 | 기준 문서 |
+| --- | --- | --- |
+| `replayer/staged_remote_replay.sh` | Trace/repository 준비, 원격 실행과 결과 회수 | [Staged remote replay](../docs/staged-remote-replay.md) |
+| `report/run_report_experiments.sh` | Figure별 matrix, resume와 retry | [Report runner](report/README.md) |
 
-### 2. Replay one trace across speedups
-
-```bash
-bash benchmarks/replayer/replay_speed_sweep.sh \
-  --trace /path/to/workload/l2.lct \
-  --config configs/replayer/fs-native.yaml \
-  --l2-root /mnt/lmcache-replay/workload \
-  --output-root outputs/replay-l2/workload \
-  --speedups 1,2,4,8
-```
-
-각 speedup은 같은 L2 base path를 실행 직전에 reset하고, 독립적인
-`x<SPEEDUP>/` output directory를 사용합니다.
-단일 speedup만 확인할 때도 `--speedups 8`처럼 실행할 수 있습니다.
-float speedup도 지원하므로 `--speedups 1.0,1.5,2.0`처럼 지정할 수 있습니다.
-위 예시의 실제 output root는
-`outputs/replay-l2/workload-<UTC timestamp>/`입니다. Shell에서 `$(date ...)`를
-직접 붙일 필요가 없습니다.
-
-### 3. Replay multiple workloads
-
-```bash
-bash benchmarks/replayer/replay_workload_sweep.sh \
-  --trace-root /mnt/lmcache-traces/tensormesh \
-  --config configs/replayer/fs-native.yaml \
-  --workloads wildclaw,gaia,swebench \
-  --l2-root /mnt/lmcache-replay \
-  --output-root outputs/replay-workload-sweep \
-  --speedups 1,2,4,8
-```
-
-이 script는 workload를 순차 실행합니다. 한 workload가 실패해도 다음 workload를
-계속 실행하고, 마지막 exit code와 summary에 실패를 반영합니다.
-
-### 4. Sweep storage backends
-
-backend별 adapter/config와 L2 경로를 바꿔가며 speedup sweep을 하려면
-`replayer/replay_backend_sweep.sh`를 사용합니다. `NAME`은 결과 label이고, 실제 adapter는
-`CONFIG`, storage target은 `L2_PATH`가 결정합니다. 따라서 `xfs`와 `pnfs`는 같은
-`fs-native.yaml`을 사용하되 mount path를 다르게 지정하고, `3fs`는
-`nixl-hf3fs.yaml`을 사용합니다.
-
-```bash
-bash benchmarks/replayer/replay_backend_sweep.sh \
-  --trace /mnt/nvme/lmcache-traces/tensormesh/wildclaw/l2.lct \
-  --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
-  --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \
-  --backend-spec '3fs=configs/replayer/nixl-hf3fs.yaml@/mnt/3fs/lmcache-replay' \
-  --experiment speedup \
-  --speedups 1,2,4,8 \
-  --output-root outputs/replay-backend-sweep/tensormesh-wildclaw
-```
-
-`--backend-spec`가 입력된 순서대로 backend가 실행되고, 각 backend 안에서는
-`--speedups`에 입력한 순서대로 case가 실행됩니다. 위 명령의 전체 순서는 다음과
-같습니다.
+## 실행 계층
 
 ```text
-xfs:x1 → xfs:x2 → xfs:x4 → xfs:x8
-  → pnfs:x1 → pnfs:x2 → pnfs:x4 → pnfs:x8
-  → 3fs:x1 → 3fs:x2 → 3fs:x4 → 3fs:x8
+report runner 또는 backend/workload launcher
+└── replay_speed_sweep.sh
+    └── python -m replayer.main
+        └── lmcache trace replay
 ```
 
-실행 흐름을 한 단계 확장하면 다음과 같습니다.
+상위 launcher가 실패를 기록하고 다음 case를 계속할 수 있으므로, 최종 exit code와
+상위 summary를 함께 확인합니다. Report runner만 case별 state marker를 사용해
+완료 case를 건너뛰고 미완료 case를 재시도합니다.
+
+## Artifact layout
+
+단일 L2 replay case의 기본 결과는 다음과 같습니다.
 
 ```text
-replay_backend_sweep.sh
-├── replay_speed_sweep.sh --config fs-native.yaml --l2-root /mnt/xfs/...
-│   ├── python -m replayer.main --speedup 1 --l2-path /mnt/xfs/...
-│   ├── python -m replayer.main --speedup 2 --l2-path /mnt/xfs/...
-│   ├── python -m replayer.main --speedup 4 --l2-path /mnt/xfs/...
-│   └── python -m replayer.main --speedup 8 --l2-path /mnt/xfs/...
-├── replay_speed_sweep.sh --config fs-native.yaml --l2-root /mnt/pnfs/...
-│   └── ... 같은 pnfs L2 base를 case마다 reset
-└── replay_speed_sweep.sh --config nixl-hf3fs.yaml --l2-root /mnt/3fs/...
-    └── ... 같은 3fs L2 base를 case마다 reset
-```
-
-backend sweep은 병렬 실행하지 않습니다. 한 backend의 speedup sweep이 끝난 뒤
-다음 backend로 넘어갑니다. 개별 replay가 실패해도 다음 case를 계속 시도하고,
-최종 summary와 exit code에 실패를 기록합니다. speedup 하위 sweep은
-각 case 직전에 같은 L2 base directory를 기본적으로 reset하며, 기존 output case directory가 남아 있으면
-결과 보호를 위해 해당 sweep이 중단될 수 있습니다.
-
-결과는 `output-root/<BACKEND>/` 아래에 저장되고, 상위
-`backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log`와 backend별
-speedup summary/log가 생성됩니다. 각 backend에는 새로운 L2 path를 사용하고, mount가
-실제로 해당 backend인지 확인하세요.
-
-### 5. Inspect artifacts
-
-L2 adapter trace replay case의 output은 다음과 같습니다.
-
-```text
-x8/
+<case>/
 ├── l2_prepare_manifest.json
 ├── l2_replay_stats.json
 ├── l2_replay_summary.md
 ├── lmcache-prepare.log
-└── lmcache-replay.log
+├── lmcache-replay.log
+└── profile/                    # --io-profile 사용 시
 ```
 
-- `l2_prepare_manifest.json`: measured replay 전에 준비한 object/byte와 elapsed time
-- `l2_replay_stats.json`: read/write task latency, bytes, throughput, submission timing,
-  wait/drain 및 source/target outcome 비교 metric
-- `l2_replay_summary.md`: 주요 metric의 사람이 읽는 요약
-- `lmcache-prepare.log`, `lmcache-replay.log`: LMCache prepare/replay 원문 출력
+각 파일의 field와 유효성 판정은
+[L2 replay metric guide](../docs/l2-replay-metrics.md)를 참고합니다. Launcher가
+추가하는 상위 artifact는 다음과 같습니다.
 
-L2 outcome mismatch는 다른 backend나 source concurrency를 재현하는 과정에서 생길
-수 있는 비교 지표이며 그 자체로 replay 실패나 case 무효를 뜻하지 않습니다. Trace
-구조 오류, missing/duplicate end marker, event drop, dispatch 오류 또는 drain timeout은
-실패로 처리합니다.
+| Launcher | 상위 artifact |
+| --- | --- |
+| Speedup | `sweep-summary.json`, `sweep-summary.csv`, `sweep-results.jsonl`, `sweep.log` |
+| Workload | `workload-summary.json`, `workload-results.jsonl`, `workload-sweep.log` |
+| Backend | `backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log` |
+| Instances | `instances-summary.json`, instance별 `launcher.log` |
+| Report | `run-config.json`, `matrix-plan.json`, `matrix-results.jsonl`, `matrix-summary.json` |
 
-speedup sweep은 `sweep-summary.json`, 비교용 `sweep-summary.csv`,
-`sweep-results.jsonl`, `sweep.log`를 추가로 생성합니다. workload sweep은 상위 output root에
-`workload-summary.json`, `workload-results.jsonl`, `workload-sweep.log`를
-생성합니다. backend sweep은 상위 output root에 backend별 결과와
-`backend-summary.json`, `backend-results.jsonl`, `backend-sweep.log`를 생성합니다.
-
-### 6. Run report experiment matrix on staged remote
-
-report의 그림별 실험은 benchmarks/report/run_report_experiments.sh를 사용합니다.
-이 runner는 staged_remote_replay.sh로 trace/repository를 준비하고, 그래프별
-각 matrix cell을 독립된 remote run-name으로 실행합니다.
-
-    bash benchmarks/report/run_report_experiments.sh \
-      --topology configs/replayer/staged-remote/b300.yaml \
-      --graph speedup \
-      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
-      --backend-spec '3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs.yaml|@L2_ROOT@/3fs' \
-      --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/pnfs' \
-      --trace-percent 10 \
-      --repeats 3
-
-graph preset은 throughput(그림 1–2), speedup(그림 3), latency(그림 4),
-resource(그림 5), nodewise(그림 6), scaling(그림 7)이다. --workloads,
---speedups, --node-counts로 preset을 좁히거나 확장할 수 있다.
-SWE-bench, mooncake-toolagent, mooncake-conversation은 trace가 크므로
---trace-percent 또는 동일한 timed subset 조건을 사용하고, 그 값을
-matrix case metadata에 남긴다.
-
-기본 state root는 outputs/report-experiments-staged이며, 성공 case는 재실행 시
-건너뛴다. 중단된 case는 다음 실행에서 runner가 staged_remote_replay.sh의
---replace-existing를 사용해 remote와 controller의 해당 run directory만 교체하고
-다시 시작한다. 자세한 backend
-template, node scaling, output schema는 [staged remote report guide](report/README.md)를
-참고한다.
-
-## Interpretation
-
-`--speedup`은 workload나 GPU compute를 배속하는 옵션이 아니라 기록된 L2
-submission gap을 축소해 offered I/O rate를 높이는 scaled-open replay입니다.
-Speedup별 `l2_replay_stats.json`의 latency/throughput뿐 아니라 schedule lag,
-dependency/buffer wait와 drain time을 함께 비교해야 합니다.
-이 결과만으로 application TTFT나 end-to-end throughput을 의미한다고 해석하지
-않습니다. 각 field의 계산식과 해석은
-[L2 replay metric guide](../docs/l2-replay-metrics.md)를 참고합니다.
-
-동일 workload의 speedup 비교에서는 config, L2 backend, L1 설정을 고정하고
-case별 L2 path를 분리합니다. 여러 replay process를 같은 physical storage에
-동시에 실행하는 aggregate contention 실험은 `replay_instances.sh`를 사용합니다.
+Trace archive의 canonical layout은 [Trace assets](../docs/trace-assets.md), report
+figure와 artifact의 연결은 [Performance report](../report/performance-evaluation.md)를
+따릅니다.
