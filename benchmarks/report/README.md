@@ -72,7 +72,11 @@ Generator의 target mapping은 fixed-percent preflight row를 보수적으로
 interpolate한다. 대용량 trace를 target별로 다시 읽어 검증하려면
 `--validate-targets`를 추가한다.
 
-## 3. 실제로 돌려보기 (검증됨: b300 / weka01, fs-native)
+## 3. Replay 실행
+
+먼저 단일 case로 topology와 backend를 검증한 뒤, 여러 workload/backend/speedup을 한 번에 실행한다.
+
+### 단일 실행 (검증됨: b300 / weka01, fs-native)
 
 아래 명령은 b300.yaml topology로 weka01에서 실제로 성공한 명령이다. trace와
 replay repository/venv가 이미 준비돼 있다는 전제로 --skip-prepare를 쓰고,
@@ -106,12 +110,9 @@ case 상태와 실제 metric은 다음으로 확인한다.
 뜻한다.
 
 
-## 4. 여러 backend/speedup을 한 번에 (참고용, b300에서는 fs-native만 검증됨)
+### 여러 backend/speedup 실행
 
-아래는 backend 3종과 여러 speedup/repeat을 한 번에 도는 원래 예시다. 형식은
-맞지만 3FS와 pNFS는 지금 b300/weka01에 아직 설정돼 있지 않으므로 그대로
-실행하면 두 backend에서 실패한다. 3FS/pNFS가 실제로 준비된 cluster에서
-참고하거나, `--backend-spec`을 fs-native 하나만 남겨서 사용한다.
+아래는 여러 backend와 speedup/repeat을 한 번에 실행하는 예시다.
 
     bash benchmarks/report/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
@@ -131,7 +132,7 @@ Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
 [Documentation guidelines](../../docs/documentation-guidelines.md#tracereplay-실험-기록)를
 따른다.
 
-## 5. 그래프 preset
+## 4. 그래프 preset
 
 | --graph | report 그림 | 기본 workload | 기본 speedup |
 | --- | --- | --- | --- |
@@ -147,7 +148,7 @@ Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
 --repeats로 변경한다. resource/nodewise/scaling에는 같은 remote profiler
 설정을 --profile로 전달한다.
 
-## 6. Backend와 node scaling
+## 5. Backend와 node scaling
 
 일반 backend spec 형식은 다음과 같다.
 
@@ -169,7 +170,7 @@ config 또는 L2 path에 포함한다.
 확장은 경로만 바꾸므로 실제 3FS/pNFS node activation, mount, striping,
 replication 설정은 topology/config에서 별도로 확정해야 한다.
 
-## 7. Resume와 output
+## 6. Resume와 output
 
 state root는 기본적으로 outputs/report-experiments-staged이며, 같은 명령을
 다시 실행해도 성공한 case.json은 건너뛴다.
@@ -199,7 +200,7 @@ l2_replay_stats.json, l2_io_interval.tsv, profile 결과에서 읽는다.
 Artifact를 figure 입력으로 정규화하는 명령과 schema는
 [Report data contract](../../report/data/README.md)를 따른다.
 
-## 8. 기존 replayer script와의 관계
+## 7. 기존 replayer script와의 관계
 
 replay_speed_sweep.sh는 하나의 trace와 speedup 목록을 실행하는 공통 primitive로
 남겨 두었다. replay_backend_sweep.sh와 replay_workload_sweep.sh도 report 외
