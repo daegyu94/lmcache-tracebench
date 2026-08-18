@@ -60,13 +60,13 @@ python -m report.plot_results \
 
 The importer reads `l2_replay_stats.json`, `l2_io_interval.tsv` and
 `profile/<node>/{disk,network}.tsv`. Network utilization needs the directional
-link capacity supplied by `--network-link-gbps`; without it, the importer
+link capacity supplied by `--network-link-gbps`; without it, the importer leaves
+that metric out and records a warning in the measured manifest.
+
 Distributed backend aggregate는 `storage` role, `fs-native` aggregate는 `replay`
 role을 우선 사용합니다. Importer의 aggregate는 선택된 node p95의 equal-weight
 mean입니다. Device/link capacity가 서로 다른 cluster에서는 capacity-weighted 값을
 계산해 `metrics.csv`의 `aggregate` row를 교체하고 provenance에 방법을 기록합니다.
-
-leaves that metric out and records a warning in the measured manifest.
 
 By default measured data and figures are generated under ignored
 `report/data/measured/` and `report/figures/measured/`. After checking coverage,

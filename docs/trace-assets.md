@@ -5,6 +5,11 @@
 `--help`를 제외한 모든 command는 `gh` CLI 설치와 GitHub 인증이 필요합니다.
 관련 helper의 역할과 dependency는 [Tools index](../tools/README.md)를 참고하세요.
 
+아래 예시의 HF 저장소 `daegyu94/lmcache-storage-traces`와 파일 경로(`/mnt/nvme/...`,
+`/MNTPNT/...`)는 이 저장소 관리자의 canonical 환경입니다. 다른 계정이나
+host에서 실행할 때는 해당 값을 실제 본인의 저장소·mount 경로로 바꾸세요.
+`gh` CLI 인증은 다음 명령으로 한 번 수행합니다(대화형 로그인).
+
 ```bash
 gh auth login
 ```

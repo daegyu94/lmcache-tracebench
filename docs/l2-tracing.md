@@ -139,7 +139,7 @@ Read object는 모두 미리 만들어 두지 않습니다. 각 object의 첫 lo
 
 2. **Lookup 중에 store가 끝난 hit**
 
-   Store가 lookup 제출 후, lookup 완료 전에 끝났다면 source에서도 두 작업이 겹쳐 실행된 것입니다. |
+   Store가 lookup 제출 후, lookup 완료 전에 끝났다면 source에서도 두 작업이 겹쳐 실행된 것입니다.
    이 겹침을 재현하기 위해 lookup에 store dependency를 추가하지 않으며, object도 미리 만들지 않습니다.
 
 3. **Trace 시작 전부터 있었던 것으로 보이는 hit**

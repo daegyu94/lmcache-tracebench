@@ -10,7 +10,7 @@
 
 Backend와 speedup을 비교할 때 다음 순서로 확인합니다.
 
-1. `pending`과 submitted/completed 수로 replay가 모두 drain됐는지 확인합니다.
+1. `pending`이 0인지와 submitted/completed 수로 replay가 모두 drain됐는지 확인합니다.
 2. `total_replay_seconds`와 `throughput_bytes_per_second`로 전체 replay 결과를
    비교합니다.
 3. Read/write의 p50, p90, p99 latency로 task latency 분포를 비교합니다.
@@ -86,7 +86,7 @@ task 통계입니다. Lookup, unlock, delete latency는 이 표에 포함되지 
 | `average_latency_us` | task별 submission-to-completion latency 평균 |
 | `p50_latency_us`, `p90_latency_us`, `p99_latency_us` | task latency percentile |
 | `min_latency_us`, `max_latency_us` | 최소 및 최대 task latency |
-| `aggregate_throughput_gbps` | `total_bytes / sum(task_latency)`로 계산한 decimal GB/s |
+| `aggregate_throughput_gbps` | `total_bytes`(byte) / 모든 task latency의 합(초)로 계산한 decimal GB/s |
 
 `aggregate_throughput_gbps`는 JSON schema의 기존 이름을 유지하지만 bit/s가 아니라
 decimal GB/s입니다. 또한 여러 task가 비동기로 겹쳐 실행되어도 task latency를 모두
