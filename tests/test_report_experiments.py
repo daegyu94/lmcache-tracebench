@@ -86,7 +86,7 @@ def test_report_runner_overwrite_re_runs_successful_cases(tmp_path):
     assert first_summary["completed"] == 2
     assert first_summary["resume_skipped"] == 0
 
-    overwrite_command = [*_command(state_root), "--overwrite"]
+    overwrite_command = [*_command(state_root), "--overwrite-output", "all"]
     second = subprocess.run(
         overwrite_command,
         check=True,
@@ -97,6 +97,34 @@ def test_report_runner_overwrite_re_runs_successful_cases(tmp_path):
     second_summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert second_summary["completed"] == 2
     assert second_summary["resume_skipped"] == 0
+
+
+def test_report_runner_overwrite_none_skips_all_markers(tmp_path):
+    state_root = tmp_path / "overwrite-none-state"
+
+    first = subprocess.run(
+        _command(state_root),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    summary_path = state_root / "matrix-summary.json"
+    first_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert first_summary["planned"] == 2
+    assert first_summary["completed"] == 2
+    assert first_summary["resume_skipped"] == 0
+
+    none_command = [*_command(state_root), "--overwrite-output", "none"]
+    second = subprocess.run(
+        none_command,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "Case " not in second.stdout
+    second_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert second_summary["completed"] == 2
+    assert second_summary["resume_skipped"] == 2
 
 
 def test_report_runner_full_preset_resolves_full_trace(tmp_path):

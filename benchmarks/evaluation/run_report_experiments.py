@@ -742,28 +742,22 @@ def read_marker(case: Case) -> dict[str, Any] | None:
 def prepare_case(
     case: Case,
     args: argparse.Namespace,
-) -> tuple[dict[str, Any] | None, bool, bool]:
+) -> tuple[dict[str, Any] | None, bool]:
     state_dir = Path(case.state_dir)
     if state_dir.is_symlink():
         raise RunnerError(f"case state directory is a symlink: {state_dir}")
     marker = read_marker(case)
-    had_marker = marker is not None
     fingerprint = marker_fingerprint(case, args)
-    if marker is not None and not args.overwrite:
+    if marker is not None:
         successful = (
             marker.get("status") in {"ok", "dry_run"}
             and marker.get("returncode") == 0
             and marker.get("fingerprint") == fingerprint
         )
-        if args.resume and successful:
-            return marker, True, had_marker
-        if (
-            args.resume
-            and not args.retry_incomplete
-            and marker.get("status") not in {"ok", "dry_run"}
-        ):
-            return marker, True, had_marker
-    if marker is not None:
+        if args.overwrite_output == "none":
+            return marker, True
+        if successful and args.overwrite_output == "failed":
+            return marker, True
         if state_dir.is_symlink():
             raise RunnerError(f"case state directory is a symlink: {state_dir}")
         shutil.rmtree(state_dir)
@@ -776,7 +770,7 @@ def prepare_case(
                 f"remove it: {state_dir}"
             )
     state_dir.mkdir(parents=True, exist_ok=True)
-    return {"fingerprint": fingerprint}, False, had_marker
+    return {"fingerprint": fingerprint}, False
 
 
 def build_replay_command(case: Case, args: argparse.Namespace) -> list[str]:
@@ -804,8 +798,6 @@ def build_replay_command(case: Case, args: argparse.Namespace) -> list[str]:
 def execute_case(
     case: Case,
     args: argparse.Namespace,
-    *,
-    replace_existing: bool,
 ) -> dict[str, Any]:
     fingerprint = marker_fingerprint(case, args)
     started_at = utc_now()
@@ -827,9 +819,8 @@ def execute_case(
         str(Path(args.topology).resolve()),
         "--run-name",
         case.run_name,
+        "--replace-existing",
     ]
-    if replace_existing:
-        command.append("--replace-existing")
     if args.dry_run:
         command.append("--dry-run")
     command.extend(["--", *build_replay_command(case, args)])
@@ -982,18 +973,13 @@ def run_matrix(args: argparse.Namespace) -> int:
     interrupted = False
     resumed_ids: set[str] = set()
     for case in cases:
-        _marker, skipped, had_marker = prepare_case(case, args)
+        _marker, skipped = prepare_case(case, args)
         if skipped:
             resumed_ids.add(case.case_id)
             write_results(state_root, cases, skipped_ids=resumed_ids)
             continue
-        replace_existing = True
         try:
-            execute_case(
-                case,
-                args,
-                replace_existing=replace_existing,
-            )
+            execute_case(case, args)
         except KeyboardInterrupt:
             interrupted = True
             write_results(state_root, cases, skipped_ids=resumed_ids)
@@ -1133,24 +1119,14 @@ successful cases and retries incomplete cases.
         help="do not run staged_remote_replay prepare-trace/prepare-replay",
     )
     parser.add_argument(
-        "--resume",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="skip successful case markers (default: true)",
-    )
-    parser.add_argument(
-        "--retry-incomplete",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="retry failed/interrupted cases by replacing their run directory",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
+        "--overwrite-output",
+        choices=["failed", "all", "none"],
+        default="failed",
         help=(
-            "re-execute every case regardless of prior status and replace the "
-            "remote run directory; default preserves successful cases and "
-            "only overwrites failed/interrupted ones"
+            "remote output overwrite policy: 'failed' (default) re-executes "
+            "failed/interrupted cases and preserves successful ones; 'all' "
+            "re-executes every case; 'none' skips every case with an existing "
+            "marker"
         ),
     )
     parser.add_argument(

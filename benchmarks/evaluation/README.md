@@ -199,19 +199,18 @@ state root는 기본적으로 outputs/report-experiments-staged이며, 같은 �
 안에는 staged remote output 경로와 실행 command가 함께 기록된다.
 
 실행 도중 중단되면 현재 case marker가 running 또는 interrupted로 남는다.
-기본 정책은 성공한 case는 건너뛰어 원격 output을 보존하고, 실패/중단 case만
-재실행하여 원격 run directory를 교체한다. runner가 case를 실행할 때는
-항상 staged_remote_replay.sh의 --replace-existing를 전달해 그 run name의
-remote와 controller output directory만 교체한다. 임의의 state directory나
-symlink는 삭제하지 않는다.
+`--overwrite-output` 정책에 따라 marker가 있는 case를 건너뛸지 결정한다.
+runner가 case를 실행할 때는 항상 staged_remote_replay.sh의
+--replace-existing를 전달해 그 run name의 remote와 controller output
+directory만 교체한다. 임의의 state directory나 symlink는 삭제하지 않는다.
 
-- `--overwrite`: 성공 case도 포함해 모든 case를 재실행하고 원격 run
-  directory를 교체한다. 성공 output까지 덮어쓰므로 이전 결과를 유지하려면
-  별도 state-root를 사용하거나 원격 directory를 직접 백업한다.
-- `--no-retry-incomplete`: 실패/중단 case도 건너뛴다. 실패 output을
-  보존해야 할 때 사용한다.
-- `--no-resume`: `--overwrite`와 같지만 resume 자체를 끄는 이름으로
-  쓴다.
+- `--overwrite-output failed` (기본): 성공한 case는 건너뛰고 실패/중단
+  case만 재실행해 원격 run directory를 교체한다.
+- `--overwrite-output all`: 성공/실패 관계없이 모든 case를 재실행하고
+  원격 run directory를 교체한다. 이전 결과를 유지하려면 별도 state-root를
+  사용하거나 원격 directory를 직접 백업한다.
+- `--overwrite-output none`: marker가 있는 case는 모두 건너뛴다. 실패
+  output도 보존한다.
 
 matrix-summary.json의 completed, failed, interrupted, pending, resume_skipped와
 matrix-results.jsonl의 각 case status를 plot 단계의 입력 검증에 사용한다.

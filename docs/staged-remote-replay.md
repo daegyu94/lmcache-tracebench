@@ -303,6 +303,7 @@ bash benchmarks/replayer/staged_remote_replay.sh all \
 ```
 
 새 실험은 날짜나 조건을 포함한 새 `run-name`을 사용합니다. 실패한 동일 case의
-재시도에만 `--replace-existing`을 사용하세요. Report matrix runner는 완료 marker와
-state를 확인해 완료 case를 건너뛰고 미완료 case만 이 option으로 교체합니다. 자세한
-재실행 기준은 [report runner guide](../benchmarks/evaluation/README.md)를 따릅니다.
+재시도에만 `--replace-existing`을 사용하세요. Report matrix runner는 case를
+실행할 때 항상 `--replace-existing`을 전달하며, `--overwrite-output` 정책으로
+완료 case 건너뛰기와 미완료 case 재실행을 결정합니다. 자세한 재실행 기준은
+[report runner guide](../benchmarks/evaluation/README.md)를 따릅니다.
