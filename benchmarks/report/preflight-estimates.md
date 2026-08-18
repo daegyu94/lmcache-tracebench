@@ -77,7 +77,7 @@ Trace SHA-256: `0d82f3a4abe02e28cf9892685f896f005efdfeb97e0763f593f3ad6dbc0f2914
 
 ## Presets
 
-`report`는 가벼운 `GAIA/WildClaw`는 full trace로 유지하고, 나머지 workload는 1 TB target을 사용한다. `report-0.5tb`, `report-2tb`, `report-4tb`도 같은 light-workload 정책을 따른다.
+`full`은 모든 workload에서 full trace를 사용한다.
 엄격하게 모든 workload를 target 안에 넣으려면 `0.5tb`, `1tb`, `2tb`, `4tb` preset을 사용한다.
 
 | preset | workload | target GB | trace_percent | source window s | estimated peak GB |
@@ -107,40 +107,15 @@ Trace SHA-256: `0d82f3a4abe02e28cf9892685f896f005efdfeb97e0763f593f3ad6dbc0f2914
 | `4tb` | `tensormesh-swebench` | 4000.000 | 71.43% | 15179.611 | 3778.917 |
 | `4tb` | `mooncake-toolagent` | 4000.000 | 14.15% | 8921.181 | 3799.770 |
 | `4tb` | `mooncake-conversation` | 4000.000 | 13.34% | 7966.041 | 3799.981 |
-| `report-0.5tb` | `tensormesh-gaia` | full | 100% | 1597.828 | 580.685 |
-| `report-0.5tb` | `tensormesh-wildclaw` | full | 100% | 305.650 | 59.681 |
-| `report-0.5tb` | `tensormesh-swebench` | 500.000 | 9.63% | 2060.152 | 474.587 |
-| `report-0.5tb` | `mooncake-toolagent` | 500.000 | 1.76% | 1109.631 | 472.622 |
-| `report-0.5tb` | `mooncake-conversation` | 500.000 | 1.66% | 991.277 | 472.861 |
-| `report-1tb` | `tensormesh-gaia` | full | 100% | 1597.828 | 580.685 |
-| `report-1tb` | `tensormesh-wildclaw` | full | 100% | 305.650 | 59.681 |
-| `report-1tb` | `tensormesh-swebench` | 1000.000 | 19.25% | 4118.164 | 948.681 |
-| `report-1tb` | `mooncake-toolagent` | 1000.000 | 3.53% | 2225.567 | 947.928 |
-| `report-1tb` | `mooncake-conversation` | 1000.000 | 3.33% | 1988.525 | 948.571 |
-| `report-2tb` | `tensormesh-gaia` | full | 100% | 1597.828 | 580.685 |
-| `report-2tb` | `tensormesh-wildclaw` | full | 100% | 305.650 | 59.681 |
-| `report-2tb` | `tensormesh-swebench` | 2000.000 | 37.15% | 7771.685 | 1895.749 |
-| `report-2tb` | `mooncake-toolagent` | 2000.000 | 7.07% | 4457.438 | 1898.542 |
-| `report-2tb` | `mooncake-conversation` | 2000.000 | 6.67% | 3983.021 | 1899.991 |
-| `report-4tb` | `tensormesh-gaia` | full | 100% | 1597.828 | 580.685 |
-| `report-4tb` | `tensormesh-wildclaw` | full | 100% | 305.650 | 59.681 |
-| `report-4tb` | `tensormesh-swebench` | 4000.000 | 71.43% | 15179.611 | 3778.917 |
-| `report-4tb` | `mooncake-toolagent` | 4000.000 | 14.15% | 8921.181 | 3799.770 |
-| `report-4tb` | `mooncake-conversation` | 4000.000 | 13.34% | 7966.041 | 3799.981 |
-| `report` | `tensormesh-gaia` | full | 100% | 1597.828 | 580.685 |
-| `report` | `tensormesh-wildclaw` | full | 100% | 305.650 | 59.681 |
-| `report` | `tensormesh-swebench` | 1000.000 | 19.25% | 4118.164 | 948.681 |
-| `report` | `mooncake-toolagent` | 1000.000 | 3.53% | 2225.567 | 947.928 |
-| `report` | `mooncake-conversation` | 1000.000 | 3.33% | 1988.525 | 948.571 |
 
 ### Usage
 
 ```bash
-# Report preset: GAIA/WildClaw full, other workloads 1 TB
+# Full-trace preset for all workloads
 bash benchmarks/report/run_report_experiments.sh \
   --topology configs/replayer/staged-remote/b300.yaml \
   --graph speedup \
-  --workload-preset report \
+  --workload-preset full \
   --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native'
 ```
 

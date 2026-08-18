@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Generate workload preflight tables and report trace-percent presets.
+"""Generate workload preflight tables and trace-percent presets.
 
 The generator reads the same L2 ``.lct`` files used by the replay runner and
 calls :func:`replayer.preflight.analyze_l2_trace`.  The resulting Markdown is
@@ -48,7 +48,6 @@ TRACE_DIRS = {
     "mooncake-toolagent": "mooncake/toolagent",
     "mooncake-conversation": "mooncake/conversation",
 }
-LIGHT_WORKLOADS = {"tensormesh-gaia", "tensormesh-wildclaw"}
 DEFAULT_PERCENTAGES = (20.0, 40.0, 60.0, 80.0, 100.0)
 DEFAULT_TARGETS_GB = {
     "0.5tb": 500.0,
@@ -110,8 +109,7 @@ def _peak(summary: dict[str, Any]) -> float:
 
 
 def _floor_percent(value: float) -> float:
-    # Two decimal places are enough for a report preset and avoid rounding a
-    # conservative estimate upward over its requested target.
+    # Two decimal places avoid rounding a conservative target estimate upward.
     return math.floor(max(value, 0.01) * 100.0) / 100.0
 
 
@@ -324,9 +322,7 @@ def _markdown(
             "## Presets",
             "",
             (
-                "`report`는 가벼운 `GAIA/WildClaw`는 full trace로 유지하고, "
-                "나머지 workload는 1 TB target을 사용한다. `report-0.5tb`, "
-                "`report-2tb`, `report-4tb`도 같은 light-workload 정책을 따른다."
+                "`full`은 모든 canonical workload에서 full trace를 사용한다."
             ),
             (
                 "엄격하게 모든 workload를 target 안에 넣으려면 `0.5tb`, `1tb`, `2tb`, "
@@ -357,11 +353,11 @@ def _markdown(
             "### Usage",
             "",
             "```bash",
-            "# Report preset: GAIA/WildClaw full, other workloads 1 TB",
+            "# Full-trace preset for all workloads",
             "bash benchmarks/report/run_report_experiments.sh \\",
             "  --topology configs/replayer/staged-remote/b300.yaml \\",
             "  --graph speedup \\",
-            "  --workload-preset report \\",
+            "  --workload-preset full \\",
             "  --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native'",
             "```",
             "",
@@ -449,7 +445,7 @@ def generate(args: argparse.Namespace) -> None:
         }
 
     # A generated file always includes every canonical workload.  This keeps
-    # report preset lookup deterministic; a subset run is useful for debugging
+    # preset lookup deterministic; a subset run is useful for debugging
     # but cannot replace the checked-in preset file.
     if set(records) != set(WORKLOADS):
         missing = ", ".join(sorted(set(WORKLOADS) - set(records)))
@@ -489,28 +485,6 @@ def generate(args: argparse.Namespace) -> None:
                 workload: strict_item(workload, target.name) for workload in WORKLOADS
             },
         }
-    # The report presets keep the two small traces complete, while applying a
-    # target to the large Mooncake/SWE-bench traces.
-    for target in targets:
-        name = f"report-{target.name}"
-        presets[name] = {
-            "description": (
-                f"GAIA/WildClaw full trace; other workloads target {target.gb:g} GB"
-            ),
-            "target_gb": target.gb,
-            "light_workloads_full": True,
-            "workloads": {
-                workload: (
-                    full_item(workload)
-                    if workload in LIGHT_WORKLOADS
-                    else strict_item(workload, target.name)
-                )
-                for workload in WORKLOADS
-            },
-        }
-    # Short name requested by the report docs: it is the 1 TB light/full mix.
-    if "1tb" in presets:
-        presets["report"] = presets["report-1tb"]
 
     generated_at = args.generated_at or "local preflight run"
     source_revision = args.source_revision or str(trace_root)

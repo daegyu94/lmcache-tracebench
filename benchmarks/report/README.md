@@ -38,18 +38,15 @@ shell entrypoint를 사용한다.
 [`preflight-estimates.md`](preflight-estimates.md)에는 각 workload의
 `trace_percent=20,40,60,80,100`에 대한 operation 분포와 logical KV `peak_gb`가
 정리되어 있다. `workload-presets.json`은 이 preflight 표에서 계산한
-`full`, `0.5tb`, `1tb`, `2tb`, `4tb` 및 `report` preset을 제공한다.
+`full`과 `0.5tb`, `1tb`, `2tb`, `4tb` strict target preset을 제공한다.
 
-`report`는 `GAIA`와 `WildClaw`를 full trace로 사용하고,
-`SWE-bench`, `ToolAgent`, `Conversation`은 1 TB target에 맞춘 percent를
-사용한다. `report-0.5tb`, `report-2tb`, `report-4tb`도 같은 light-workload
-정책을 따른다. 모든 workload를 target 안에 넣으려면 strict preset인
-`0.5tb`, `1tb`, `2tb`, `4tb`를 선택한다.
+`full`은 모든 workload를 full trace로 사용한다. 모든 workload를 target 안에 넣으려면
+strict preset 중 하나를 선택한다.
 
     bash benchmarks/report/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
-      --workload-preset report \
+      --workload-preset full \
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native'
 
 Preset을 쓰면 workload마다 서로 다른 `--trace-percent`가 replay command와

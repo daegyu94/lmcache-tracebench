@@ -1105,7 +1105,7 @@ successful cases and retries incomplete cases.
         metavar="NAME",
         help=(
             "use per-workload trace-percent from workload-presets.json; available "
-            "names include report, full, 0.5tb, 1tb, 2tb and 4tb"
+            "names include full, 0.5tb, 1tb, 2tb and 4tb"
         ),
     )
     parser.add_argument(

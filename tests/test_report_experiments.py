@@ -69,8 +69,8 @@ def test_report_runner_dry_run_resumes_completed_cases(tmp_path):
     assert second_summary["resume_skipped"] == 2
 
 
-def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
-    state_root = tmp_path / "report-preset-state"
+def test_report_runner_full_preset_resolves_full_trace(tmp_path):
+    state_root = tmp_path / "full-preset-state"
     command = [
         "bash",
         str(RUNNER),
@@ -83,7 +83,7 @@ def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
         "--workloads",
         "tensormesh-gaia,mooncake-toolagent",
         "--workload-preset",
-        "report",
+        "full",
         "--repeats",
         "1",
         "--skip-prepare",
@@ -93,7 +93,6 @@ def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
     ]
     result = subprocess.run(command, check=True, capture_output=True, text=True)
     assert "--trace-percent 100" in result.stdout
-    assert "--trace-percent 3.53" in result.stdout
     assert "Replay schedule estimate" in result.stdout
     assert "Minimum sequential replay schedule" in result.stdout
 
@@ -105,7 +104,7 @@ def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
     }
     assert percents == {
         "tensormesh-gaia": 100.0,
-        "mooncake-toolagent": 3.53,
+        "mooncake-toolagent": 100.0,
     }
     for case in plan["cases"]:
         assert case["source_submission_window_seconds"] > 0
