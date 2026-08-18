@@ -67,3 +67,41 @@ def test_report_runner_dry_run_resumes_completed_cases(tmp_path):
     second_summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert second_summary["completed"] == 2
     assert second_summary["resume_skipped"] == 2
+
+
+def test_report_runner_workload_preset_resolves_per_workload_percent(tmp_path):
+    state_root = tmp_path / "report-preset-state"
+    command = [
+        "bash",
+        str(RUNNER),
+        "--topology",
+        str(TOPOLOGY),
+        "--graph",
+        "throughput",
+        "--backend-spec",
+        "fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native",
+        "--workloads",
+        "tensormesh-gaia,mooncake-toolagent",
+        "--workload-preset",
+        "report",
+        "--repeats",
+        "1",
+        "--skip-prepare",
+        "--dry-run",
+        "--state-root",
+        str(state_root),
+    ]
+    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    assert "--trace-percent 100" in result.stdout
+    assert "--trace-percent 3.53" in result.stdout
+
+    plan = json.loads(
+        (state_root / "matrix-plan.json").read_text(encoding="utf-8")
+    )
+    percents = {
+        case["workload"]: case["trace_percent"] for case in plan["cases"]
+    }
+    assert percents == {
+        "tensormesh-gaia": 100.0,
+        "mooncake-toolagent": 3.53,
+    }

@@ -27,7 +27,8 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STAGED_REMOTE_SCRIPT = PROJECT_ROOT / "benchmarks/replayer/staged_remote_replay.sh"
-RUNNER_VERSION = 1
+RUNNER_VERSION = 2
+PRESETS_PATH = Path(__file__).with_name("workload-presets.json")
 _TEMPLATE_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -89,6 +90,7 @@ class Case:
     node_count: str
     speedup: float
     repeat: int
+    trace_percent: float
     trace: str
     config: str
     l2_path: str
@@ -107,6 +109,7 @@ class Case:
             "node_count": self.node_count,
             "speedup": self.speedup,
             "repeat": self.repeat,
+            "trace_percent": self.trace_percent,
             "trace": self.trace,
             "config": self.config,
             "l2_path": self.l2_path,
@@ -251,6 +254,63 @@ def local_trace_metadata(
     return metadata
 
 
+def load_workload_presets(path: Path = PRESETS_PATH) -> dict[str, Any]:
+    if not path.is_file():
+        raise RunnerError(
+            f"workload preset file not found: {path}; run "
+            "benchmarks/report/generate_preflight_estimates.py first"
+        )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise RunnerError(f"invalid workload preset file: {path}") from exc
+    presets = payload.get("presets")
+    if not isinstance(presets, dict):
+        raise RunnerError(f"workload preset file has no presets object: {path}")
+    return payload
+
+
+def resolve_trace_percents(
+    args: argparse.Namespace,
+    workloads: Iterable[str],
+) -> tuple[dict[str, float], str | None]:
+    if args.workload_preset:
+        payload = load_workload_presets()
+        presets = payload["presets"]
+        preset = presets.get(args.workload_preset)
+        if not isinstance(preset, dict):
+            choices = ", ".join(sorted(presets))
+            raise RunnerError(
+                f"unknown --workload-preset {args.workload_preset!r}; choose from {choices}"
+            )
+        entries = preset.get("workloads")
+        if not isinstance(entries, dict):
+            raise RunnerError(
+                f"preset {args.workload_preset!r} has no workload mapping"
+            )
+        values: dict[str, float] = {}
+        for workload in workloads:
+            item = entries.get(workload)
+            if not isinstance(item, dict) or "trace_percent" not in item:
+                raise RunnerError(
+                    f"preset {args.workload_preset!r} has no entry for {workload}"
+                )
+            percent = float(item["trace_percent"])
+            if not math.isfinite(percent) or not 0 < percent <= 100:
+                raise RunnerError(
+                    f"preset {args.workload_preset!r} has invalid trace_percent "
+                    f"for {workload}: {percent}"
+                )
+            values[workload] = percent
+        source = payload.get("source_revision")
+        return values, str(source) if source else None
+
+    raw_percent = 100.0 if args.trace_percent is None else float(args.trace_percent)
+    if not math.isfinite(raw_percent) or not 0 < raw_percent <= 100:
+        raise RunnerError("--trace-percent must be finite and in (0, 100]")
+    return {workload: raw_percent for workload in workloads}, None
+
+
 def expand_graphs(requested: Iterable[str]) -> tuple[str, ...]:
     expanded: list[str] = []
     for graph in requested:
@@ -296,9 +356,6 @@ def build_cases(
     backends = tuple(parse_backend_spec(raw) for raw in args.backend_spec)
     if not backends:
         raise RunnerError("at least one --backend-spec is required")
-    trace_percent = float(args.trace_percent)
-    if not math.isfinite(trace_percent) or not 0 < trace_percent <= 100:
-        raise RunnerError("--trace-percent must be finite and in (0, 100]")
     if "/" in args.trace_name or args.trace_name in {".", "..", ""}:
         raise RunnerError("--trace-name must be a file name without '/'")
     if args.repeats <= 0:
@@ -311,6 +368,19 @@ def build_cases(
     workloads_override = (
         parse_csv(args.workloads, "--workloads") if args.workloads else None
     )
+    selected_workloads = tuple(
+        dict.fromkeys(
+            workload
+            for graph in graphs
+            for workload in (workloads_override or GRAPH_SPECS[graph].workloads)
+        )
+    )
+    trace_percents, preset_source = resolve_trace_percents(
+        args,
+        selected_workloads,
+    )
+    args.resolved_trace_percents = trace_percents
+    args.preset_source = preset_source
     speedups_override = (
         parse_float_list(args.speedups, "--speedups") if args.speedups else None
     )
@@ -325,7 +395,7 @@ def build_cases(
             local_trace_root,
             workload,
             args.trace_name,
-            trace_percent,
+            trace_percents[workload],
         )
         for graph in graphs
         for workload in (workloads_override or GRAPH_SPECS[graph].workloads)
@@ -444,6 +514,7 @@ def build_cases(
                                     node_count=node_label,
                                     speedup=speedup,
                                     repeat=repeat,
+                                    trace_percent=trace_percents[workload],
                                     trace=trace,
                                     config=config,
                                     l2_path=l2_path,
@@ -516,7 +587,8 @@ def marker_fingerprint(case: Case, args: argparse.Namespace) -> str:
     payload = {
         "runner_version": RUNNER_VERSION,
         "case": case.as_dict(),
-        "trace_percent": float(args.trace_percent),
+        "workload_preset": args.workload_preset,
+        "preset_source": getattr(args, "preset_source", None),
         "profile": args.profile,
         "dry_run": bool(args.dry_run),
     }
@@ -591,7 +663,7 @@ def build_replay_command(case: Case, args: argparse.Namespace) -> list[str]:
         "--speedups",
         format_number(case.speedup),
         "--trace-percent",
-        format_number(float(args.trace_percent)),
+        format_number(case.trace_percent),
     ]
     if case.profile:
         command.extend(["--io-profile", case.profile])
@@ -881,11 +953,20 @@ successful cases and retries incomplete cases.
         "--speedups",
         help="comma-separated positive replay speedups; graph presets otherwise apply",
     )
-    parser.add_argument(
+    trace_selection = parser.add_mutually_exclusive_group()
+    trace_selection.add_argument(
         "--trace-percent",
         type=float,
-        default=100.0,
-        help="replay the first N percent of L2 submissions (default: 100)",
+        default=None,
+        help="replay the first N percent for every workload (default: 100)",
+    )
+    trace_selection.add_argument(
+        "--workload-preset",
+        metavar="NAME",
+        help=(
+            "use per-workload trace-percent from workload-presets.json; available "
+            "names include report, full, 0.5tb, 1tb, 2tb and 4tb"
+        ),
     )
     parser.add_argument(
         "--repeats",

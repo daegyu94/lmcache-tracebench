@@ -1,0 +1,1438 @@
+{
+  "generated_at": "2026-08-18",
+  "percentages": [
+    20.0,
+    40.0,
+    60.0,
+    80.0,
+    100.0
+  ],
+  "presets": {
+    "0.5tb": {
+      "description": "strict logical KV target of 500 GB for every workload",
+      "target_gb": 500.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 472.8612089999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 1.66,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 472.62151199999994,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 1.76,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 480.22462799999994,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 77.96,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 474.58710450000007,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 9.63,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 500.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "1tb": {
+      "description": "strict logical KV target of 1000 GB for every workload",
+      "target_gb": 1000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 948.5709795,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.33,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 947.9283734999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.53,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace is already within target",
+          "target_gb": 1000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 948.6813875,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 19.25,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 1000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "2tb": {
+      "description": "strict logical KV target of 2000 GB for every workload",
+      "target_gb": 2000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 1899.9905205,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 6.67,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 1898.5420965,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 7.07,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace is already within target",
+          "target_gb": 2000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 1895.7489099999998,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 37.15,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 2000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "4tb": {
+      "description": "strict logical KV target of 4000 GB for every workload",
+      "target_gb": 4000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 3799.981041,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 13.34,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 3799.7695424999997,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 14.15,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace is already within target",
+          "target_gb": 4000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 3778.917436,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 71.43,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 4000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "full": {
+      "description": "all canonical workloads use their full trace",
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 24831.687,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 23763.755,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 5361.638,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "report": {
+      "description": "GAIA/WildClaw full trace; other workloads target 1000 GB",
+      "light_workloads_full": true,
+      "target_gb": 1000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 948.5709795,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.33,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 947.9283734999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.53,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 948.6813875,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 19.25,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "report-0.5tb": {
+      "description": "GAIA/WildClaw full trace; other workloads target 500 GB",
+      "light_workloads_full": true,
+      "target_gb": 500.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 472.8612089999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 1.66,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 472.62151199999994,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 1.76,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 474.58710450000007,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 9.63,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "report-1tb": {
+      "description": "GAIA/WildClaw full trace; other workloads target 1000 GB",
+      "light_workloads_full": true,
+      "target_gb": 1000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 948.5709795,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.33,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 947.9283734999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.53,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 948.6813875,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 19.25,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "report-2tb": {
+      "description": "GAIA/WildClaw full trace; other workloads target 2000 GB",
+      "light_workloads_full": true,
+      "target_gb": 2000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 1899.9905205,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 6.67,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 1898.5420965,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 7.07,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 1895.7489099999998,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 37.15,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    },
+    "report-4tb": {
+      "description": "GAIA/WildClaw full trace; other workloads target 4000 GB",
+      "light_workloads_full": true,
+      "target_gb": 4000.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 3799.981041,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 13.34,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 3799.7695424999997,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 14.15,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 3778.917436,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 71.43,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace",
+          "target_gb": null,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      }
+    }
+  },
+  "schema_version": 1,
+  "source_revision": "HF daegyu94/lmcache-storage-traces@main",
+  "targets_gb": {
+    "0.5tb": 500.0,
+    "1tb": 1000.0,
+    "2tb": 2000.0,
+    "4tb": 4000.0
+  },
+  "unit": "decimal_gb",
+  "workloads": {
+    "mooncake-conversation": {
+      "percentages": [
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 5697.123,
+            "final_objects": 701058,
+            "peak_gb": 5697.123,
+            "peak_objects": 701058,
+            "store_submission_gb": 6161.249,
+            "unique_candidate_gb": 5697.123,
+            "unit": "GB"
+          },
+          "operations_selected": 62227,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 912,
+            "lookup_task": 2181,
+            "store": 57637,
+            "unlock": 1497
+          },
+          "schema_version": 1,
+          "source_operations_total": 311133,
+          "source_submission_window_seconds": 11943.09062081296,
+          "trace_path": "mooncake/conversation/l2.lct",
+          "trace_percent": 20.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 10855.006,
+            "final_objects": 1335760,
+            "peak_gb": 10855.006,
+            "peak_objects": 1335760,
+            "store_submission_gb": 11510.462,
+            "unique_candidate_gb": 10855.006,
+            "unit": "GB"
+          },
+          "operations_selected": 124454,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 1872,
+            "lookup_task": 4586,
+            "store": 115527,
+            "unlock": 2469
+          },
+          "schema_version": 1,
+          "source_operations_total": 311133,
+          "source_submission_window_seconds": 22616.606048041023,
+          "trace_path": "mooncake/conversation/l2.lct",
+          "trace_percent": 40.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 15562.975,
+            "final_objects": 1915098,
+            "peak_gb": 15562.975,
+            "peak_objects": 1915098,
+            "store_submission_gb": 16580.124,
+            "unique_candidate_gb": 15562.975,
+            "unit": "GB"
+          },
+          "operations_selected": 186680,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 2814,
+            "lookup_task": 7017,
+            "store": 173421,
+            "unlock": 3428
+          },
+          "schema_version": 1,
+          "source_operations_total": 311133,
+          "source_submission_window_seconds": 32724.33663948998,
+          "trace_path": "mooncake/conversation/l2.lct",
+          "trace_percent": 60.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 20181.074,
+            "final_objects": 2483377,
+            "peak_gb": 20181.074,
+            "peak_objects": 2483377,
+            "store_submission_gb": 21365.498,
+            "unique_candidate_gb": 20181.074,
+            "unit": "GB"
+          },
+          "operations_selected": 248907,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 3867,
+            "lookup_task": 9517,
+            "store": 231031,
+            "unlock": 4492
+          },
+          "schema_version": 1,
+          "source_operations_total": 311133,
+          "source_submission_window_seconds": 42161.93565440504,
+          "trace_path": "mooncake/conversation/l2.lct",
+          "trace_percent": 80.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 24831.687,
+            "final_objects": 3055657,
+            "peak_gb": 24831.687,
+            "peak_objects": 3055657,
+            "store_submission_gb": 26339.552,
+            "unique_candidate_gb": 24831.687,
+            "unit": "GB"
+          },
+          "operations_selected": 311133,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 4890,
+            "lookup_task": 12027,
+            "store": 288678,
+            "unlock": 5538
+          },
+          "schema_version": 1,
+          "source_operations_total": 311133,
+          "source_submission_window_seconds": 51799.581343194935,
+          "trace_path": "mooncake/conversation/l2.lct",
+          "trace_percent": 100.0
+        }
+      ],
+      "sha256": "0d82f3a4abe02e28cf9892685f896f005efdfeb97e0763f593f3ad6dbc0f2914",
+      "size_bytes": 1907780211,
+      "targets": {
+        "0.5tb": {
+          "estimated_peak_gb": 472.8612089999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 1.66,
+          "within_target": true
+        },
+        "1tb": {
+          "estimated_peak_gb": 948.5709795,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.33,
+          "within_target": true
+        },
+        "2tb": {
+          "estimated_peak_gb": 1899.9905205,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 6.67,
+          "within_target": true
+        },
+        "4tb": {
+          "estimated_peak_gb": 3799.981041,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 13.34,
+          "within_target": true
+        }
+      },
+      "trace_path": "mooncake/conversation/l2.lct"
+    },
+    "mooncake-toolagent": {
+      "percentages": [
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 5370.699,
+            "final_objects": 660890,
+            "peak_gb": 5370.699,
+            "peak_objects": 660890,
+            "store_submission_gb": 5972.699,
+            "unique_candidate_gb": 5370.699,
+            "unit": "GB"
+          },
+          "operations_selected": 77853,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 2248,
+            "lookup_task": 4213,
+            "store": 68119,
+            "unlock": 3273
+          },
+          "schema_version": 1,
+          "source_operations_total": 389262,
+          "source_submission_window_seconds": 12609.442506893072,
+          "trace_path": "mooncake/toolagent/l2.lct",
+          "trace_percent": 20.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 10383.354,
+            "final_objects": 1277721,
+            "peak_gb": 10383.354,
+            "peak_objects": 1277721,
+            "store_submission_gb": 11223.931,
+            "unique_candidate_gb": 10383.354,
+            "unit": "GB"
+          },
+          "operations_selected": 155705,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 3840,
+            "lookup_task": 8350,
+            "store": 138576,
+            "unlock": 4939
+          },
+          "schema_version": 1,
+          "source_operations_total": 389262,
+          "source_submission_window_seconds": 23143.34355709213,
+          "trace_path": "mooncake/toolagent/l2.lct",
+          "trace_percent": 40.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 14876.898,
+            "final_objects": 1830673,
+            "peak_gb": 14876.898,
+            "peak_objects": 1830673,
+            "store_submission_gb": 16072.87,
+            "unique_candidate_gb": 14876.898,
+            "unit": "GB"
+          },
+          "operations_selected": 233558,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 5466,
+            "lookup_task": 12528,
+            "store": 208633,
+            "unlock": 6931
+          },
+          "schema_version": 1,
+          "source_operations_total": 389262,
+          "source_submission_window_seconds": 33303.893115725135,
+          "trace_path": "mooncake/toolagent/l2.lct",
+          "trace_percent": 60.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 19338.815,
+            "final_objects": 2379733,
+            "peak_gb": 19338.815,
+            "peak_objects": 2379733,
+            "store_submission_gb": 20707.799,
+            "unique_candidate_gb": 19338.815,
+            "unit": "GB"
+          },
+          "operations_selected": 311410,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 7131,
+            "lookup_task": 16755,
+            "store": 278242,
+            "unlock": 9282
+          },
+          "schema_version": 1,
+          "source_operations_total": 389262,
+          "source_submission_window_seconds": 42921.45341687417,
+          "trace_path": "mooncake/toolagent/l2.lct",
+          "trace_percent": 80.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 23763.755,
+            "final_objects": 2924243,
+            "peak_gb": 23763.755,
+            "peak_objects": 2924243,
+            "store_submission_gb": 25379.418,
+            "unique_candidate_gb": 23763.755,
+            "unit": "GB"
+          },
+          "operations_selected": 389262,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 8760,
+            "lookup_task": 20989,
+            "store": 347962,
+            "unlock": 11551
+          },
+          "schema_version": 1,
+          "source_operations_total": 389262,
+          "source_submission_window_seconds": 52621.880661497125,
+          "trace_path": "mooncake/toolagent/l2.lct",
+          "trace_percent": 100.0
+        }
+      ],
+      "sha256": "7f1744ec2384edd788506a3bb126bd77a2cc3df58eca2f759f07ba6d62bda13d",
+      "size_bytes": 2066595738,
+      "targets": {
+        "0.5tb": {
+          "estimated_peak_gb": 472.62151199999994,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 1.76,
+          "within_target": true
+        },
+        "1tb": {
+          "estimated_peak_gb": 947.9283734999999,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 3.53,
+          "within_target": true
+        },
+        "2tb": {
+          "estimated_peak_gb": 1898.5420965,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 7.07,
+          "within_target": true
+        },
+        "4tb": {
+          "estimated_peak_gb": 3799.7695424999997,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 14.15,
+          "within_target": true
+        }
+      },
+      "trace_path": "mooncake/toolagent/l2.lct"
+    },
+    "tensormesh-gaia": {
+      "percentages": [
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 144.879,
+            "final_objects": 17828,
+            "peak_gb": 144.879,
+            "peak_objects": 17828,
+            "store_submission_gb": 144.992,
+            "unique_candidate_gb": 144.879,
+            "unit": "GB"
+          },
+          "operations_selected": 3400,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 251,
+            "lookup_task": 297,
+            "store": 2579,
+            "unlock": 273
+          },
+          "schema_version": 1,
+          "source_operations_total": 16999,
+          "source_submission_window_seconds": 209.48532296484336,
+          "trace_path": "tensormesh/gaia/l2.lct",
+          "trace_percent": 20.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 252.213,
+            "final_objects": 31036,
+            "peak_gb": 252.213,
+            "peak_objects": 31036,
+            "store_submission_gb": 252.327,
+            "unique_candidate_gb": 252.213,
+            "unit": "GB"
+          },
+          "operations_selected": 6800,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 502,
+            "lookup_task": 568,
+            "store": 5206,
+            "unlock": 524
+          },
+          "schema_version": 1,
+          "source_operations_total": 16999,
+          "source_submission_window_seconds": 443.7037618539762,
+          "trace_path": "tensormesh/gaia/l2.lct",
+          "trace_percent": 40.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 388.282,
+            "final_objects": 47780,
+            "peak_gb": 388.282,
+            "peak_objects": 47780,
+            "store_submission_gb": 388.396,
+            "unique_candidate_gb": 388.282,
+            "unit": "GB"
+          },
+          "operations_selected": 10200,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 744,
+            "lookup_task": 830,
+            "store": 7846,
+            "unlock": 780
+          },
+          "schema_version": 1,
+          "source_operations_total": 16999,
+          "source_submission_window_seconds": 788.3414008510299,
+          "trace_path": "tensormesh/gaia/l2.lct",
+          "trace_percent": 60.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 490.668,
+            "final_objects": 60379,
+            "peak_gb": 490.668,
+            "peak_objects": 60379,
+            "store_submission_gb": 490.782,
+            "unique_candidate_gb": 490.668,
+            "unit": "GB"
+          },
+          "operations_selected": 13600,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 966,
+            "lookup_task": 1070,
+            "store": 10561,
+            "unlock": 1003
+          },
+          "schema_version": 1,
+          "source_operations_total": 16999,
+          "source_submission_window_seconds": 1091.0271024189424,
+          "trace_path": "tensormesh/gaia/l2.lct",
+          "trace_percent": 80.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 580.685,
+            "final_objects": 71456,
+            "peak_gb": 580.685,
+            "peak_objects": 71456,
+            "store_submission_gb": 580.798,
+            "unique_candidate_gb": 580.685,
+            "unit": "GB"
+          },
+          "operations_selected": 16999,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 1192,
+            "lookup_task": 1302,
+            "store": 13276,
+            "unlock": 1229
+          },
+          "schema_version": 1,
+          "source_operations_total": 16999,
+          "source_submission_window_seconds": 1597.8278644660022,
+          "trace_path": "tensormesh/gaia/l2.lct",
+          "trace_percent": 100.0
+        }
+      ],
+      "sha256": "bc58456784fdb23a775b4763233e8fa77d10f028a937133e0bf67757314e7e76",
+      "size_bytes": 198378721,
+      "targets": {
+        "0.5tb": {
+          "estimated_peak_gb": 480.22462799999994,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 77.96,
+          "within_target": true
+        },
+        "1tb": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace is already within target",
+          "target_gb": 1000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "2tb": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace is already within target",
+          "target_gb": 2000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "4tb": {
+          "estimated_peak_gb": 580.685,
+          "selection": "full trace is already within target",
+          "target_gb": 4000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      },
+      "trace_path": "tensormesh/gaia/l2.lct"
+    },
+    "tensormesh-swebench": {
+      "percentages": [
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 985.643,
+            "final_objects": 121288,
+            "peak_gb": 985.643,
+            "peak_objects": 121288,
+            "store_submission_gb": 1038.188,
+            "unique_candidate_gb": 985.643,
+            "unit": "GB"
+          },
+          "operations_selected": 61551,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 4286,
+            "lookup_task": 4436,
+            "store": 48509,
+            "unlock": 4320
+          },
+          "schema_version": 1,
+          "source_operations_total": 307754,
+          "source_submission_window_seconds": 4278.611827188171,
+          "trace_path": "tensormesh/swebench/l2.lct",
+          "trace_percent": 20.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 2046.991,
+            "final_objects": 251892,
+            "peak_gb": 2046.991,
+            "peak_objects": 251892,
+            "store_submission_gb": 2113.515,
+            "unique_candidate_gb": 2046.991,
+            "unit": "GB"
+          },
+          "operations_selected": 123102,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 8719,
+            "lookup_task": 9011,
+            "store": 96609,
+            "unlock": 8763
+          },
+          "schema_version": 1,
+          "source_operations_total": 307754,
+          "source_submission_window_seconds": 8352.16624480416,
+          "trace_path": "tensormesh/swebench/l2.lct",
+          "trace_percent": 40.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 3107.917,
+            "final_objects": 382444,
+            "peak_gb": 3107.917,
+            "peak_objects": 382444,
+            "store_submission_gb": 3267.212,
+            "unique_candidate_gb": 3107.917,
+            "unit": "GB"
+          },
+          "operations_selected": 184653,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 13290,
+            "lookup_task": 13728,
+            "store": 144244,
+            "unlock": 13391
+          },
+          "schema_version": 1,
+          "source_operations_total": 307754,
+          "source_submission_window_seconds": 12647.284650875023,
+          "trace_path": "tensormesh/swebench/l2.lct",
+          "trace_percent": 60.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 4282.021,
+            "final_objects": 526923,
+            "peak_gb": 4282.021,
+            "peak_objects": 526923,
+            "store_submission_gb": 4728.513,
+            "unique_candidate_gb": 4282.021,
+            "unit": "GB"
+          },
+          "operations_selected": 246204,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 17950,
+            "lookup_task": 18573,
+            "store": 191557,
+            "unlock": 18124
+          },
+          "schema_version": 1,
+          "source_operations_total": 307754,
+          "source_submission_window_seconds": 17078.301665059058,
+          "trace_path": "tensormesh/swebench/l2.lct",
+          "trace_percent": 80.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 5361.638,
+            "final_objects": 659775,
+            "peak_gb": 5361.638,
+            "peak_objects": 659775,
+            "store_submission_gb": 6204.425,
+            "unique_candidate_gb": 5361.638,
+            "unit": "GB"
+          },
+          "operations_selected": 307754,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 22551,
+            "lookup_task": 23354,
+            "store": 238895,
+            "unlock": 22954
+          },
+          "schema_version": 1,
+          "source_operations_total": 307754,
+          "source_submission_window_seconds": 22883.429553247057,
+          "trace_path": "tensormesh/swebench/l2.lct",
+          "trace_percent": 100.0
+        }
+      ],
+      "sha256": "5526579e09dc3c7bfdd9a73b855d3165eadbfc22b9e287c6a19c6fdc2b57f448",
+      "size_bytes": 7078031123,
+      "targets": {
+        "0.5tb": {
+          "estimated_peak_gb": 474.58710450000007,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 500.0,
+          "trace_percent": 9.63,
+          "within_target": true
+        },
+        "1tb": {
+          "estimated_peak_gb": 948.6813875,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 1000.0,
+          "trace_percent": 19.25,
+          "within_target": true
+        },
+        "2tb": {
+          "estimated_peak_gb": 1895.7489099999998,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 2000.0,
+          "trace_percent": 37.15,
+          "within_target": true
+        },
+        "4tb": {
+          "estimated_peak_gb": 3778.917436,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "target_gb": 4000.0,
+          "trace_percent": 71.43,
+          "within_target": true
+        }
+      },
+      "trace_path": "tensormesh/swebench/l2.lct"
+    },
+    "tensormesh-wildclaw": {
+      "percentages": [
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 9.947,
+            "final_objects": 1224,
+            "peak_gb": 9.947,
+            "peak_objects": 1224,
+            "store_submission_gb": 11.808,
+            "unique_candidate_gb": 9.947,
+            "unit": "GB"
+          },
+          "operations_selected": 411,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 22,
+            "lookup_task": 42,
+            "store": 298,
+            "unlock": 49
+          },
+          "schema_version": 1,
+          "source_operations_total": 2052,
+          "source_submission_window_seconds": 14.664034673944116,
+          "trace_path": "tensormesh/wildclaw/l2.lct",
+          "trace_percent": 20.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 15.367,
+            "final_objects": 1891,
+            "peak_gb": 15.367,
+            "peak_objects": 1891,
+            "store_submission_gb": 17.618,
+            "unique_candidate_gb": 15.367,
+            "unit": "GB"
+          },
+          "operations_selected": 821,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 45,
+            "lookup_task": 74,
+            "store": 597,
+            "unlock": 105
+          },
+          "schema_version": 1,
+          "source_operations_total": 2052,
+          "source_submission_window_seconds": 39.26394227403216,
+          "trace_path": "tensormesh/wildclaw/l2.lct",
+          "trace_percent": 40.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 26.476,
+            "final_objects": 3258,
+            "peak_gb": 26.476,
+            "peak_objects": 3258,
+            "store_submission_gb": 29.962,
+            "unique_candidate_gb": 26.476,
+            "unit": "GB"
+          },
+          "operations_selected": 1232,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 68,
+            "lookup_task": 100,
+            "store": 911,
+            "unlock": 153
+          },
+          "schema_version": 1,
+          "source_operations_total": 2052,
+          "source_submission_window_seconds": 79.87663188204169,
+          "trace_path": "tensormesh/wildclaw/l2.lct",
+          "trace_percent": 60.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 36.927,
+            "final_objects": 4544,
+            "peak_gb": 36.927,
+            "peak_objects": 4544,
+            "store_submission_gb": 41.388,
+            "unique_candidate_gb": 36.927,
+            "unit": "GB"
+          },
+          "operations_selected": 1642,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 85,
+            "lookup_task": 127,
+            "store": 1234,
+            "unlock": 196
+          },
+          "schema_version": 1,
+          "source_operations_total": 2052,
+          "source_submission_window_seconds": 172.12181677296758,
+          "trace_path": "tensormesh/wildclaw/l2.lct",
+          "trace_percent": 80.0
+        },
+        {
+          "assumptions": [
+            "All selected target store submissions succeed.",
+            "Store visibility and delete effects follow source submission order.",
+            "Values are logical KV payload estimates, not filesystem allocation."
+          ],
+          "logical_kv_estimate": {
+            "after_prepare_gb": 0.0,
+            "after_prepare_objects": 0,
+            "final_gb": 59.681,
+            "final_objects": 7344,
+            "peak_gb": 59.681,
+            "peak_objects": 7344,
+            "store_submission_gb": 64.142,
+            "unique_candidate_gb": 59.681,
+            "unit": "GB"
+          },
+          "operations_selected": 2052,
+          "operations_selected_by_type": {
+            "delete": 0,
+            "load_task": 106,
+            "lookup_task": 147,
+            "store": 1561,
+            "unlock": 238
+          },
+          "schema_version": 1,
+          "source_operations_total": 2052,
+          "source_submission_window_seconds": 305.64989273506217,
+          "trace_path": "tensormesh/wildclaw/l2.lct",
+          "trace_percent": 100.0
+        }
+      ],
+      "sha256": "2642f0ee5ee6b46ddaae52e3c8507a12927f2dbd0eac113a7a4cd5d3f59f82ee",
+      "size_bytes": 36940602,
+      "targets": {
+        "0.5tb": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 500.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "1tb": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 1000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "2tb": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 2000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        },
+        "4tb": {
+          "estimated_peak_gb": 59.681,
+          "selection": "full trace is already within target",
+          "target_gb": 4000.0,
+          "trace_percent": 100.0,
+          "within_target": true
+        }
+      },
+      "trace_path": "tensormesh/wildclaw/l2.lct"
+    }
+  }
+}

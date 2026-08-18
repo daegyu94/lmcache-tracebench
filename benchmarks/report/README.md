@@ -33,7 +33,38 @@ shell entrypoint를 사용한다.
       --skip-prepare \
       --dry-run
 
-## 2. 실제로 돌려보기 (검증됨: b300 / weka01, fs-native)
+## 2. Workload preset과 preflight estimate
+
+[`preflight-estimates.md`](preflight-estimates.md)에는 각 workload의
+`trace_percent=20,40,60,80,100`에 대한 operation 분포와 logical KV `peak_gb`가
+정리되어 있다. `workload-presets.json`은 이 preflight 표에서 계산한
+`full`, `0.5tb`, `1tb`, `2tb`, `4tb` 및 `report` preset을 제공한다.
+
+`report`는 `GAIA`와 `WildClaw`를 full trace로 사용하고,
+`SWE-bench`, `ToolAgent`, `Conversation`은 1 TB target에 맞춘 percent를
+사용한다. `report-0.5tb`, `report-2tb`, `report-4tb`도 같은 light-workload
+정책을 따른다. 모든 workload를 target 안에 넣으려면 strict preset인
+`0.5tb`, `1tb`, `2tb`, `4tb`를 선택한다.
+
+    bash benchmarks/report/run_report_experiments.sh \
+      --topology configs/replayer/staged-remote/b300.yaml \
+      --graph speedup \
+      --workload-preset report \
+      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native'
+
+Preset을 쓰면 workload마다 서로 다른 `--trace-percent`가 replay command와
+`case.json`에 기록된다. Trace archive가 바뀌면 replay node 또는 controller에
+같은 trace root를 준비하고 다음 generator를 다시 실행한다.
+
+    python benchmarks/report/generate_preflight_estimates.py \
+      --trace-root /path/to/trace-root \
+      --source-revision 'HF daegyu94/lmcache-storage-traces@main'
+
+Generator의 target mapping은 fixed-percent preflight row를 보수적으로
+interpolate한다. 대용량 trace를 target별로 다시 읽어 검증하려면
+`--validate-targets`를 추가한다.
+
+## 3. 실제로 돌려보기 (검증됨: b300 / weka01, fs-native)
 
 아래 명령은 b300.yaml topology로 weka01에서 실제로 성공한 명령이다. trace와
 replay repository/venv가 이미 준비돼 있다는 전제로 --skip-prepare를 쓰고,
@@ -67,7 +98,7 @@ case 상태와 실제 metric은 다음으로 확인한다.
 뜻한다.
 
 
-## 3. 여러 backend/speedup을 한 번에 (참고용, b300에서는 fs-native만 검증됨)
+## 4. 여러 backend/speedup을 한 번에 (참고용, b300에서는 fs-native만 검증됨)
 
 아래는 backend 3종과 여러 speedup/repeat을 한 번에 도는 원래 예시다. 형식은
 맞지만 3FS와 pNFS는 지금 b300/weka01에 아직 설정돼 있지 않으므로 그대로
@@ -85,13 +116,14 @@ case 상태와 실제 metric은 다음으로 확인한다.
       --repeats 3
 
 Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
-매핑한다. `--trace-percent`는 모든 backend, speedup과 repeat에 동일하게 전달되어
-`case.json`에 기록된다. `--local-trace-root`를 지정하면 size와 checksum도
+매핑한다. `--trace-percent`는 모든 workload에 공통으로 적용되고,
+`--workload-preset`은 workload별 percent를 backend, speedup과 repeat에 동일하게
+전달해 `case.json`에 기록한다. `--local-trace-root`를 지정하면 size와 checksum도
 남긴다. Subset 선택 원칙은
 [Documentation guidelines](../../docs/documentation-guidelines.md#tracereplay-실험-기록)를
 따른다.
 
-## 4. 그래프 preset
+## 5. 그래프 preset
 
 | --graph | report 그림 | 기본 workload | 기본 speedup |
 | --- | --- | --- | --- |
@@ -107,7 +139,7 @@ Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
 --repeats로 변경한다. resource/nodewise/scaling에는 같은 remote profiler
 설정을 --profile로 전달한다.
 
-## 5. Backend와 node scaling
+## 6. Backend와 node scaling
 
 일반 backend spec 형식은 다음과 같다.
 
@@ -129,7 +161,7 @@ config 또는 L2 path에 포함한다.
 확장은 경로만 바꾸므로 실제 3FS/pNFS node activation, mount, striping,
 replication 설정은 topology/config에서 별도로 확정해야 한다.
 
-## 6. Resume와 output
+## 7. Resume와 output
 
 state root는 기본적으로 outputs/report-experiments-staged이며, 같은 명령을
 다시 실행해도 성공한 case.json은 건너뛴다.
@@ -159,7 +191,7 @@ l2_replay_stats.json, l2_io_interval.tsv, profile 결과에서 읽는다.
 Artifact를 figure 입력으로 정규화하는 명령과 schema는
 [Report data contract](../../report/data/README.md)를 따른다.
 
-## 7. 기존 replayer script와의 관계
+## 8. 기존 replayer script와의 관계
 
 replay_speed_sweep.sh는 하나의 trace와 speedup 목록을 실행하는 공통 primitive로
 남겨 두었다. replay_backend_sweep.sh와 replay_workload_sweep.sh도 report 외
