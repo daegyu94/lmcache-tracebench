@@ -117,3 +117,49 @@ def test_report_runner_full_preset_resolves_full_trace(tmp_path):
         (state_root / "run-config.json").read_text(encoding="utf-8")
     )
     assert run_config["duration_estimate"]["estimated_case_count"] == 2
+
+
+def test_report_runner_smoke_preset_resolves_per_workload(tmp_path):
+    state_root = tmp_path / "smoke-preset-state"
+    command = [
+        "bash",
+        str(RUNNER),
+        "--topology",
+        str(TOPOLOGY),
+        "--graph",
+        "speedup",
+        "--backend-spec",
+        "fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native",
+        "--workload-preset",
+        "smoke",
+        "--repeats",
+        "1",
+        "--skip-prepare",
+        "--dry-run",
+        "--state-root",
+        str(state_root),
+    ]
+    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    assert "Replay schedule estimate" in result.stdout
+    assert "Minimum sequential replay schedule" in result.stdout
+
+    plan = json.loads(
+        (state_root / "matrix-plan.json").read_text(encoding="utf-8")
+    )
+    percents = {
+        case["workload"]: case["trace_percent"] for case in plan["cases"]
+    }
+    assert set(percents) == {
+        "tensormesh-gaia",
+        "tensormesh-wildclaw",
+        "tensormesh-swebench",
+        "mooncake-toolagent",
+        "mooncake-conversation",
+    }
+    for workload, percent in percents.items():
+        assert 0 < percent <= 100, (workload, percent)
+    for case in plan["cases"]:
+        assert case["source_submission_window_seconds"] > 0
+        assert case["duration_estimate"]["schedule_seconds"] == (
+            case["source_submission_window_seconds"] / case["speedup"]
+        )

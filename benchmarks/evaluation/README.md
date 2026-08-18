@@ -33,15 +33,28 @@ shell entrypoint를 사용한다.
       --skip-prepare \
       --dry-run
 
+`--workload-preset smoke`를 쓰면 5개 canonical workload 전체를 10 GB 이내의
+trace prefix로 줄여 end-to-end pipeline 검증용 matrix를 빠르게 돌려볼 수 있다.
+
+    bash benchmarks/evaluation/run_report_experiments.sh \
+      --topology configs/replayer/staged-remote/example.yaml \
+      --graph speedup \
+      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --workload-preset smoke \
+      --repeats 1 \
+      --skip-prepare \
+      --dry-run
+
 ## 2. Workload preset과 preflight estimate
 
 [`preflight-estimates.md`](preflight-estimates.md)에는 workload별 preset의
 `trace_percent`, source window, estimated peak가 정리되어 있다.
-`workload-presets.json`은 이 preflight 분석에서 계산한
-`full`과 `0.5tb`, `1tb`, `2tb`, `4tb` strict target preset을 제공한다.
+`workload-presets.json`은 이 preflight 분석에서 계산한 `smoke`, `full`과
+`0.5tb`, `1tb`, `2tb`, `4tb` strict target preset을 제공한다.
 
 `full`은 모든 workload를 full trace로 사용한다. 모든 workload를 target 안에 넣으려면
-strict preset 중 하나를 선택한다.
+strict preset 중 하나를 선택한다. `smoke`는 10 GB target으로 각 workload의 trace
+prefix를 줄여 end-to-end pipeline 검증용으로 빠르게 실행한다.
 
     bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \

@@ -17,6 +17,7 @@
 
 `full`은 모든 workload에서 full trace를 사용한다.
 엄격하게 모든 workload를 target 안에 넣으려면 `0.5tb`, `1tb`, `2tb`, `4tb` preset을 사용한다.
+`smoke`는 10 GB target으로 각 workload의 trace prefix를 줄여 end-to-end pipeline 검증용으로 빠르게 실행한다.
 
 | preset | workload | target GB | trace_percent | source window s | estimated peak GB |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -45,6 +46,11 @@
 | `4tb` | `tensormesh-swebench` | 4000.000 | 71.43% | 15179.611 | 3778.917 |
 | `4tb` | `mooncake-toolagent` | 4000.000 | 14.15% | 8921.181 | 3799.770 |
 | `4tb` | `mooncake-conversation` | 4000.000 | 13.34% | 7966.041 | 3799.981 |
+| `smoke` | `tensormesh-gaia` | 10.000 | 1.31% | 13.721 | 9.490 |
+| `smoke` | `tensormesh-wildclaw` | 10.000 | 19.18% | 14.063 | 9.539 |
+| `smoke` | `tensormesh-swebench` | 10.000 | 0.19% | 40.647 | 9.364 |
+| `smoke` | `mooncake-toolagent` | 10.000 | 0.03% | 18.914 | 8.056 |
+| `smoke` | `mooncake-conversation` | 10.000 | 0.03% | 17.915 | 8.546 |
 
 ### Usage
 

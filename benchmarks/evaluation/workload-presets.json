@@ -242,6 +242,57 @@
           "within_target": true
         }
       }
+    },
+    "smoke": {
+      "description": "strict logical KV target of 10 GB for every workload",
+      "target_gb": 10.0,
+      "workloads": {
+        "mooncake-conversation": {
+          "estimated_peak_gb": 8.5456845,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 17.91463593121944,
+          "target_gb": 10.0,
+          "trace_percent": 0.03,
+          "within_target": true
+        },
+        "mooncake-toolagent": {
+          "estimated_peak_gb": 8.0560485,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 18.914163760339608,
+          "target_gb": 10.0,
+          "trace_percent": 0.03,
+          "within_target": true
+        },
+        "tensormesh-gaia": {
+          "estimated_peak_gb": 9.4895745,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 13.72128865419724,
+          "target_gb": 10.0,
+          "trace_percent": 1.31,
+          "within_target": true
+        },
+        "tensormesh-swebench": {
+          "estimated_peak_gb": 9.3636085,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 40.646812358287626,
+          "target_gb": 10.0,
+          "trace_percent": 0.19,
+          "within_target": true
+        },
+        "tensormesh-wildclaw": {
+          "estimated_peak_gb": 9.539173,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 14.062809252312407,
+          "target_gb": 10.0,
+          "trace_percent": 19.18,
+          "within_target": true
+        }
+      }
     }
   },
   "schema_version": 1,
@@ -444,6 +495,15 @@
           "target_gb": 4000.0,
           "trace_percent": 13.34,
           "within_target": true
+        },
+        "smoke": {
+          "estimated_peak_gb": 8.5456845,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 17.91463593121944,
+          "target_gb": 10.0,
+          "trace_percent": 0.03,
+          "within_target": true
         }
       },
       "trace_path": "mooncake/conversation/l2.lct"
@@ -644,6 +704,15 @@
           "target_gb": 4000.0,
           "trace_percent": 14.15,
           "within_target": true
+        },
+        "smoke": {
+          "estimated_peak_gb": 8.0560485,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 18.914163760339608,
+          "target_gb": 10.0,
+          "trace_percent": 0.03,
+          "within_target": true
         }
       },
       "trace_path": "mooncake/toolagent/l2.lct"
@@ -840,6 +909,15 @@
           "source_submission_window_seconds": 1597.8278644660022,
           "target_gb": 4000.0,
           "trace_percent": 100.0,
+          "within_target": true
+        },
+        "smoke": {
+          "estimated_peak_gb": 9.4895745,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 13.72128865419724,
+          "target_gb": 10.0,
+          "trace_percent": 1.31,
           "within_target": true
         }
       },
@@ -1041,6 +1119,15 @@
           "target_gb": 4000.0,
           "trace_percent": 71.43,
           "within_target": true
+        },
+        "smoke": {
+          "estimated_peak_gb": 9.3636085,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 40.646812358287626,
+          "target_gb": 10.0,
+          "trace_percent": 0.19,
+          "within_target": true
         }
       },
       "trace_path": "tensormesh/swebench/l2.lct"
@@ -1236,6 +1323,15 @@
           "source_submission_window_seconds": 305.64989273506217,
           "target_gb": 4000.0,
           "trace_percent": 100.0,
+          "within_target": true
+        },
+        "smoke": {
+          "estimated_peak_gb": 9.539173,
+          "operations_selected": null,
+          "selection": "interpolated from fixed-percent preflight rows with five percent headroom",
+          "source_submission_window_seconds": 14.062809252312407,
+          "target_gb": 10.0,
+          "trace_percent": 19.18,
           "within_target": true
         }
       },

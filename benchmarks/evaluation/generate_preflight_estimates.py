@@ -46,6 +46,7 @@ TRACE_DIRS = {
 }
 DEFAULT_PERCENTAGES = (20.0, 40.0, 60.0, 80.0, 100.0)
 DEFAULT_TARGETS_GB = {
+    "smoke": 10.0,
     "0.5tb": 500.0,
     "1tb": 1_000.0,
     "2tb": 2_000.0,
@@ -289,6 +290,10 @@ def _markdown(
             (
                 "엄격하게 모든 workload를 target 안에 넣으려면 `0.5tb`, `1tb`, `2tb`, "
                 "`4tb` preset을 사용한다."
+            ),
+            (
+                "`smoke`는 10 GB target으로 각 workload의 trace prefix를 줄여 end-to-end "
+                "pipeline 검증용으로 빠르게 실행한다."
             ),
             "",
             "| preset | workload | target GB | trace_percent | source window s | estimated peak GB |",
