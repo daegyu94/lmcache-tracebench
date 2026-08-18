@@ -257,14 +257,14 @@ def plot_throughput_family(
         y=0.995,
     )
     fig.text(
-        0.020,
+        0.032,
         0.48,
         "Throughput [GB/s]",
         rotation=90,
         va="center",
         ha="center",
     )
-    fig.supxlabel("Elapsed time [s]", y=0.035)
+    fig.supxlabel("Elapsed time [s]", y=0.048)
     for row, workload in enumerate(workloads):
         axes[row, -1].yaxis.set_label_position("right")
         axes[row, -1].set_ylabel(
@@ -275,7 +275,7 @@ def plot_throughput_family(
             weight="bold",
         )
     _add_dataset_mark(fig, dataset)
-    fig.tight_layout(rect=(0.045, 0.065, 0.98, 0.90), h_pad=1.2, w_pad=1.0)
+    fig.tight_layout(rect=(0.040, 0.055, 0.98, 0.90), h_pad=1.2, w_pad=1.0)
     _save(fig, output_dir / f"l2-throughput-{family}.png")
 
 
