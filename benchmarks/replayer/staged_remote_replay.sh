@@ -17,7 +17,6 @@ replay_python=""
 replay_runtime_requirements=""
 replay_package_index_url=""
 replay_extra_index_url=""
-replay_require_uv="false"
 
 declare -A topology_values=()
 
@@ -208,7 +207,6 @@ replay_python="$(topology_get replay_python || true)"
 replay_runtime_requirements="$(topology_get replay_runtime_requirements || true)"
 replay_package_index_url="$(topology_get replay_package_index_url || true)"
 replay_extra_index_url="$(topology_get replay_extra_index_url || true)"
-replay_require_uv="$(topology_get replay_require_uv || printf false)"
 git_repo_url="$(topology_get git_repo_url)"
 git_revision="$(topology_get git_revision)"
 hf_repo_id="$(topology_get hf_repo_id)"
@@ -222,10 +220,6 @@ esac
 if [[ -n "$replay_jump_user" && "$transfer_method" != rsync ]]; then
   die "transfer_method must be rsync when replay_jump_user is set (scp has no --rsync-path equivalent for sudo wrapping): $transfer_method"
 fi
-case "$replay_require_uv" in
-  true|false) ;;
-  *) die "replay_require_uv must be true or false: $replay_require_uv" ;;
-esac
 require_topology_key replay_python
 require_topology_key replay_runtime_requirements
 [[ "$replay_port" =~ ^[0-9]+$ ]] || die "replay_port must be an integer: $replay_port"
@@ -490,12 +484,6 @@ check_remote_prerequisites() {
   remote_command+='"$base_python_path" -c '\''import sys; assert sys.version_info >= (3, 10), sys.version; import ensurepip, venv'\'''$'\n'
   remote_command+='python_version="$($base_python_path -c '\''import sys; print("%d.%d" % sys.version_info[:2])'\'')"'$'\n'
   remote_command+='echo "Replay Python: $python_version ($base_python_path)"'$'\n'
-  if [[ "$replay_require_uv" == true ]]; then
-    remote_command+='command -v uv >/dev/null 2>&1 || { echo "uv is required by replay_require_uv=true but was not found." >&2; exit 1; }'$'\n'
-    remote_command+='echo "uv: $(uv --version)"'$'\n'
-  else
-    remote_command+='if command -v uv >/dev/null 2>&1; then echo "uv: $(uv --version)"; else echo "uv: not found (optional; Python venv + pip fallback will be used)"; fi'$'\n'
-  fi
   remote_command+='echo "Replay-node prerequisites: OK"'$'\n'
   remote_exec "$remote_command"
 }
