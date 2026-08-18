@@ -19,6 +19,10 @@ Trace를 직접 만들려면 [Recorder guide](recorder.md), report figure 전체
 
 검증 기준은 Ubuntu 24.04와 Python 3.12입니다. Git, build toolchain, target
 filesystem의 읽기·쓰기 권한과 trace/L2/output을 위한 공간을 확인합니다.
+Python dependency 설치와 OS build toolchain 설치는 별도 단계입니다. Native wheel이
+없는 backend를 사용할 때의 수동 설치 기준은
+[Staged remote replay의 source build 의존성](staged-remote-replay.md#source-build-의존성은-수동-설치)을
+먼저 확인하세요.
 
 ```bash
 command -v git

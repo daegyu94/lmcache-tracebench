@@ -99,9 +99,29 @@ sudo apt-get install -y bash coreutils findutils sed tar gzip git \
   python3.12 python3.12-venv
 ```
 
-사내 package index에서 native wheel을 제공하지 않아 source build가 필요하면 `build-essential`
-및 해당 backend의 compiler/toolchain도 replay node에 추가해야 합니다. 이 항목은 OS와
-package source에 따라 달라지므로 script가 자동 설치하지 않습니다.
+### Source build 의존성은 수동 설치
+
+위 명령은 staged script가 확인하는 기본 OS 도구만 준비합니다. `setup_runtime.sh`가
+설치하는 Python package와는 별개로, 사내 package index에 native wheel이 없으면
+`pip install`이 package source를 replay node에서 직접 컴파일합니다. 이 경우
+`prepare-replay`를 실행하기 전에 replay node 관리자(또는 node image)가 다음을
+수동으로 준비해야 합니다.
+
+- 기본 C/C++ 빌드 도구: `build-essential` (예: `gcc`, `g++`, `make`)
+- 선택한 backend가 요구하는 compiler/toolchain과 개발 library
+  (예: CUDA toolkit, `cmake`, Rust toolchain 또는 backend SDK)
+
+Ubuntu/Debian에서 필요한 기본 도구를 설치하는 예시는 다음과 같습니다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential
+```
+
+Backend별 추가 항목은 해당 backend와 OS 문서를 기준으로 설치합니다. 어떤 native
+wheel을 제공하는지는 package index와 Python/CPU architecture에 따라 달라지므로,
+setup script는 이 system package를 자동 설치하지 않습니다. 따라서 source build가
+필요한 환경에서는 toolchain 설치를 먼저 완료한 뒤 `prepare-replay`를 실행하세요.
 
 ## 2. Topology 작성
 
