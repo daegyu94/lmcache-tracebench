@@ -25,7 +25,7 @@ Replayer --------------------> target L2 backend
 
 Runtime source는 `src/recorder`, `src/replayer`, `src/traceprof`에 있습니다.
 반복 실행 launcher는 [Benchmark guide](benchmarks/README.md), 보고서 실험 matrix는
-[Staged remote report runner](benchmarks/report/README.md)를 참고하세요.
+[Staged remote report runner](benchmarks/evaluation/README.md)를 참고하세요.
 
 ## Repository layout
 
@@ -95,7 +95,7 @@ replay host에 준비해야 합니다. Recorder의 mount와 dataset 설정은
 - Trace 생성: [Recorder guide](docs/recorder.md)
 - 단일 replay, speedup, backend, profiling: [Replayer guide](docs/replayer.md)
 - 격리 replay node 준비와 결과 회수: [Staged remote replay](docs/staged-remote-replay.md)
-- Report figure별 matrix 실행: [Staged remote report runner](benchmarks/report/README.md)
+- Report figure별 matrix 실행: [Staged remote report runner](benchmarks/evaluation/README.md)
 - Trace archive 다운로드와 업로드: [Trace assets](docs/trace-assets.md)
 
 각 command는 실행 전에 해당 script의 `--help`와 `--dry-run`으로 경로를

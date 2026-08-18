@@ -5,7 +5,7 @@
 연결하며 여기에서 반복하지 않습니다.
 
 Trace를 직접 만들려면 [Recorder guide](recorder.md), report figure 전체 matrix를
-실행하려면 [Report runner](../benchmarks/report/README.md)를 사용하세요.
+실행하려면 [Report runner](../benchmarks/evaluation/README.md)를 사용하세요.
 
 ## 실행 경로 선택
 
@@ -13,7 +13,7 @@ Trace를 직접 만들려면 [Recorder guide](recorder.md), report figure 전체
 | --- | --- |
 | Replay host에서 repository와 storage에 직접 접근 가능 | 이 quickstart |
 | Controller만 외부망에 연결되고 replay node는 격리됨 | [Staged remote replay](staged-remote-replay.md) |
-| Figure별 workload/backend/repeat matrix가 필요함 | [Report runner](../benchmarks/report/README.md) |
+| Figure별 workload/backend/repeat matrix가 필요함 | [Report runner](../benchmarks/evaluation/README.md) |
 
 ## 1. Host와 target 확인
 
@@ -92,7 +92,7 @@ Dry-run의 경로와 command가 맞으면 `--dry-run`을 제거합니다. 성공
 | Backend/config/mount 비교 | [Backend configuration](replayer.md#backend-configuration) |
 | 동일 trace의 병렬 process 부하 | [Parallel replicated replay](replayer.md#parallel-replicated-replay) |
 | Storage/network counter 수집 | [Profiling](replayer.md#profiling) |
-| Figure별 staged remote matrix | [Report runner](../benchmarks/report/README.md) |
+| Figure별 staged remote matrix | [Report runner](../benchmarks/evaluation/README.md) |
 
 비교 case의 trace, subset, backend, mount와 반복 조건은
 [Documentation guidelines](documentation-guidelines.md#tracereplay-실험-기록)의

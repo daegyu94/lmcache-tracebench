@@ -292,7 +292,7 @@ def load_workload_presets(path: Path = PRESETS_PATH) -> dict[str, Any]:
     if not path.is_file():
         raise RunnerError(
             f"workload preset file not found: {path}; run "
-            "benchmarks/report/generate_preflight_estimates.py first"
+            "benchmarks/evaluation/generate_preflight_estimates.py first"
         )
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1015,7 +1015,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     epilog = """
 Examples:
-  bash benchmarks/report/run_report_experiments.sh \\
+  bash benchmarks/evaluation/run_report_experiments.sh \\
     --topology configs/replayer/staged-remote/topology.yaml \\
     --graph speedup \\
     --asset tensormesh/wildclaw.tar.gz \\

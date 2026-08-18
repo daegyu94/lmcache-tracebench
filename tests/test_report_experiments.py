@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-RUNNER = ROOT / "benchmarks/report/run_report_experiments.sh"
+RUNNER = ROOT / "benchmarks/evaluation/run_report_experiments.sh"
 TOPOLOGY = ROOT / "configs/replayer/staged-remote/example.yaml"
 
 

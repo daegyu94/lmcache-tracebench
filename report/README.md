@@ -2,7 +2,7 @@
 
 이 디렉터리는 LMCache L2 backend 성능 평가의 본문, 정규화된 figure 입력과
 renderer를 관리합니다. 실험 matrix 실행과 원격 artifact 회수는
-[Report runner](../benchmarks/report/README.md)가 담당합니다.
+[Report runner](../benchmarks/evaluation/README.md)가 담당합니다.
 
 Report module은 versioned data와 figure에 종속된 저장소 전용 도구입니다. 따라서
 `src/`의 설치 package에 포함하지 않고 이 디렉터리에 함께 두며, 아래 명령은

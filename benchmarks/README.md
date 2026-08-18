@@ -71,12 +71,12 @@ L2 reset, output 보호와 summary 생성을 담당하고, 실제 adapter replay
 | Script | 역할 | 기준 문서 |
 | --- | --- | --- |
 | `replayer/staged_remote_replay.sh` | Trace/repository 준비, 원격 실행과 결과 회수 | [Staged remote replay](../docs/staged-remote-replay.md) |
-| `report/run_report_experiments.sh` | Figure별 matrix, resume와 retry | [Report runner](report/README.md) |
-| `report/generate_preflight_estimates.py` | workload별 preflight 표와 trace-percent preset 생성 | [Report preflight estimates](report/preflight-estimates.md) |
+| `evaluation/run_report_experiments.sh` | Figure별 matrix, resume와 retry | [Report runner](evaluation/README.md) |
+| `evaluation/generate_preflight_estimates.py` | workload별 preflight 표와 trace-percent preset 생성 | [Report preflight estimates](evaluation/preflight-estimates.md) |
 
-Report runner의 `--workload-preset`은 `report/workload-presets.json`에서
+Report runner의 `--workload-preset`은 `evaluation/workload-presets.json`에서
 workload별 `trace_percent`를 읽는다. 이 JSON과 동반된
-[`preflight-estimates.md`](report/preflight-estimates.md)는 trace archive의
+[`preflight-estimates.md`](evaluation/preflight-estimates.md)는 trace archive의
 checksum에 묶인 입력 자료이므로 trace가 바뀌면 generator를 다시 실행한다.
 
 ## 실행 계층

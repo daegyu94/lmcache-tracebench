@@ -354,7 +354,7 @@ def _markdown(
             "",
             "```bash",
             "# Full-trace preset for all workloads",
-            "bash benchmarks/report/run_report_experiments.sh \\",
+            "bash benchmarks/evaluation/run_report_experiments.sh \\",
             "  --topology configs/replayer/staged-remote/b300.yaml \\",
             "  --graph speedup \\",
             "  --workload-preset full \\",

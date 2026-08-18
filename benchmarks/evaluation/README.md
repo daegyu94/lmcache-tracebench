@@ -16,13 +16,13 @@ placeholder가 포함된 `CONFIG`와 `L2_ROOT` 사이를 `|`로 구분한다.
 기본적으로 controller의 project virtual environment를 자동으로 활성화하는
 shell entrypoint를 사용한다.
 
-    bash benchmarks/report/run_report_experiments.sh --help
+    bash benchmarks/evaluation/run_report_experiments.sh --help
 
 ## 1. 가장 작은 dry-run
 
 실제 SSH나 replay를 시작하지 않고 matrix와 remote command만 확인한다.
 
-    bash benchmarks/report/run_report_experiments.sh \
+    bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/example.yaml \
       --graph speedup \
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
@@ -43,7 +43,7 @@ shell entrypoint를 사용한다.
 `full`은 모든 workload를 full trace로 사용한다. 모든 workload를 target 안에 넣으려면
 strict preset 중 하나를 선택한다.
 
-    bash benchmarks/report/run_report_experiments.sh \
+    bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
       --workload-preset full \
@@ -64,7 +64,7 @@ window는 fixed-percent preflight row에서 보간한 값이므로 실제 trace�
 재분석하지 않은 경우에는 대략적인 계획값이다. Trace archive가 바뀌면 replay node
 또는 controller에 같은 trace root를 준비하고 다음 generator를 다시 실행한다.
 
-    python benchmarks/report/generate_preflight_estimates.py \
+    python benchmarks/evaluation/generate_preflight_estimates.py \
       --trace-root /path/to/trace-root \
       --source-revision 'HF daegyu94/lmcache-storage-traces@main'
 
@@ -83,7 +83,7 @@ replay repository/venv가 이미 준비돼 있다는 전제로 --skip-prepare를
 가장 빠르게 끝나도록 workload/speedup/repeat을 하나씩만 남겼다. 처음 이 문서를
 보는 사람도 그대로 복사해서 실행하면 실제 replay 결과를 받을 수 있다.
 
-    bash benchmarks/report/run_report_experiments.sh \
+    bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph throughput \
       --workloads tensormesh-wildclaw \
@@ -114,7 +114,7 @@ case 상태와 실제 metric은 다음으로 확인한다.
 
 아래는 여러 backend와 speedup/repeat을 한 번에 실행하는 예시다.
 
-    bash benchmarks/report/run_report_experiments.sh \
+    bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
       --asset tensormesh/swebench.tar.gz \

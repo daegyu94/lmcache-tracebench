@@ -11,4 +11,4 @@ if [[ ! -f .venv/bin/activate ]]; then
   exit 1
 fi
 source .venv/bin/activate
-exec python benchmarks/report/run_report_experiments.py "$@"
+exec python benchmarks/evaluation/run_report_experiments.py "$@"
