@@ -353,10 +353,6 @@ transfer_directory() {
   local remote_parent
   remote_parent="$(dirname -- "$remote_path")"
 
-  if remote_path_exists "$remote_path"; then
-    warn "Remote directory already exists; not overwriting: $remote_path"
-    return 0
-  fi
   remote_exec "mkdir -p $(shell_quote "$remote_parent")"
   if [[ "$dry_run" == true ]]; then
     printf '[DRY-RUN] %s directory %s -> %s:%s\n' "$transfer_method" \
@@ -365,7 +361,8 @@ transfer_directory() {
   fi
   require_transport_command "$transfer_method"
   if [[ "$transfer_method" == rsync ]]; then
-    rsync -a --ignore-existing -e "$rsync_ssh_command" \
+    rsync -a --delete --exclude='.venv' --exclude='__pycache__' \
+      -e "$rsync_ssh_command" \
       --rsync-path "$rsync_remote_path" \
       -- "$local_path/" "$ssh_target:$remote_path/"
   else
