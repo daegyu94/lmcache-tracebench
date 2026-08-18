@@ -275,8 +275,8 @@ speedup(N_g) <= min(
 - Workload: 전체 5개
 - 조건: speedup x1, x1.25, x1.5, x2; 나머지 설정 고정
 - 주요 원본: sweep-summary.csv, case별 l2_replay_stats.json
-- 주요 결과: wall throughput, read/write p99 latency, maximum schedule lag
-- 추가 계산: throughput_gain(s) = wall_throughput(s) / wall_throughput(x1)
+- 주요 결과: throughput, read/write p99 latency, maximum schedule lag
+- 추가 계산: throughput_gain(s) = throughput(s) / throughput(x1)
 - 유효성 확인: target/actual submission window, pending, drain time
 
 그림은 workload를 열로, 지표를 행으로 둔다.
@@ -285,17 +285,17 @@ Throughput 증가와 함께 actual submission window, p99 latency, schedule lag�
 
 ![Replay speedup 영향 더미 multiplot](figures/replay-speedup-impact.png)
 
-**그림 3.** 권장 speedup x1, x1.25, x1.5, x2에서 workload/backend별 wall throughput, read p99 latency, maximum schedule lag을 비교하는 구성 예시.
+**그림 3.** 권장 speedup x1, x1.25, x1.5, x2에서 workload/backend별 throughput, read p99 latency, maximum schedule lag을 비교하는 구성 예시.
 값과 band는 더미 데이터다.
 
 실측 결과 서술 템플릿:
 
-> [backend]는 [workload]에서 x[값]까지 wall throughput이 증가했다.
+> [backend]는 [workload]에서 x[값]까지 throughput이 증가했다.
 > x[값]부터 p99 latency와 max schedule lag이 함께 증가하면 해당 지점을 포화점으로 판단한다.
 > x1 대비 최대 유효 throughput gain은 [값]배였다.
 
 Write p99도 같은 경향인지 함께 확인한다.
-Read/write 중 하나만 악화된다면 aggregate wall throughput으로 이를 가리지 않고 operation별 결과를 설명한다.
+Read/write 중 하나만 악화된다면 aggregate throughput으로 이를 가리지 않고 operation별 결과를 설명한다.
 
 ### 3.4 실험 C: Latency breakdown과 queueing 진단
 
@@ -311,6 +311,10 @@ Read/write 중 하나만 악화된다면 aggregate wall throughput으로 이를 
 Task latency는 adapter submission부터 completion까지이고, replay delay는 목표 제출 시각에 맞춰 task를 dispatch하지 못한 원인을 진단한다.
 특히 `total_dependency_wait_seconds`와 `total_buffer_wait_seconds`는 operation별 합계이며 서로 겹칠 수 있으므로 wall-clock breakdown처럼 더하거나 stacked bar로 표시하지 않는다.
 아래 그림도 이를 별도 행과 독립 축으로 표현한다.
+세 replay-delay 값은 시간 흐름상 `목표 제출 시각 → dependency 대기 → buffer 또는 dispatch 대기 → 실제 dispatch`로 읽는다.
+`dep. max`는 causal dependency를 기다린 최대 시간이고, `buffer max`는 dependency가 준비된 뒤 buffer를 확보하거나 다음 replay loop에서 제출될 때까지의 최대 지연이다.
+`schedule max`는 목표 제출 시각부터 실제 dispatch까지의 전체 지연이므로 앞의 두 값과 별도의 세 번째 구간으로 더하지 않는다.
+실제 dispatch 이후 완료까지가 adapter task latency이며, 세 필드의 상세 정의는 [L2 replay metrics guide](../docs/l2-replay-metrics.md#schedule-lag과-wait)를 따른다.
 
 ![Task latency 분포와 replay delay 진단 더미 multiplot](figures/latency-breakdown-x2.png)
 
