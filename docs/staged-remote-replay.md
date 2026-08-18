@@ -260,11 +260,8 @@ bash benchmarks/replayer/staged_remote_replay.sh all \
 
 - 원격 repository, `.venv`, archive, 추출 trace가 이미 있으면 경고하고 해당 준비 작업을
   건너뜁니다. 준비 phase는 기존 runtime이나 asset을 자동으로 덮어쓰지 않습니다.
-- 기본 동작은 동일한 `run-name`의 remote 또는 controller output이 있으면 replay를
-  시작하지 않습니다.
-- 실패한 동일 case를 의도적으로 다시 실행할 때만 `--replace-existing`을 사용합니다.
-  이 option은 정확히 해당 run의 remote/controller output만 교체하며 symlink 대상은
-  거부합니다.
+- replay phase는 동일한 `run-name`의 remote와 controller output을 항상 교체합니다.
+  symlink 대상이나 root 경로는 거부합니다.
 - replay node 전체를 초기화해야 할 때는 별도 `reset` phase를 씁니다(아래).
 - `--dry-run`은 HF/SSH/전송/replay command를 실행하지 않고 계획만 출력합니다.
 
@@ -302,8 +299,8 @@ bash benchmarks/replayer/staged_remote_replay.sh all \
   --speedups 1
 ```
 
-새 실험은 날짜나 조건을 포함한 새 `run-name`을 사용합니다. 실패한 동일 case의
-재시도에만 `--replace-existing`을 사용하세요. Report matrix runner는 case를
-실행할 때 항상 `--replace-existing`을 전달하며, `--overwrite-output` 정책으로
-완료 case 건너뛰기와 미완료 case 재실행을 결정합니다. 자세한 재실행 기준은
+새 실험은 날짜나 조건을 포함한 새 `run-name`을 사용합니다. Report matrix runner는
+`--overwrite-output` 정책으로 완료 case 건너뛰기와 미완료 case 재실행을 결정하며,
+case를 실행할 때마다 해당 run name의 remote/controller output을 교체합니다.
+자세한 재실행 기준은
 [report runner guide](../benchmarks/evaluation/README.md)를 따릅니다.

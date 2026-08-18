@@ -819,7 +819,6 @@ def execute_case(
         str(Path(args.topology).resolve()),
         "--run-name",
         case.run_name,
-        "--replace-existing",
     ]
     if args.dry_run:
         command.append("--dry-run")

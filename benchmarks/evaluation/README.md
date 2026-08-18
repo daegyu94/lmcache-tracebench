@@ -200,9 +200,8 @@ state root는 기본적으로 outputs/report-experiments-staged이며, 같은 �
 
 실행 도중 중단되면 현재 case marker가 running 또는 interrupted로 남는다.
 `--overwrite-output` 정책에 따라 marker가 있는 case를 건너뛸지 결정한다.
-runner가 case를 실행할 때는 항상 staged_remote_replay.sh의
---replace-existing를 전달해 그 run name의 remote와 controller output
-directory만 교체한다. 임의의 state directory나 symlink는 삭제하지 않는다.
+runner는 case를 실행할 때 항상 그 run name의 remote와 controller output
+directory를 교체한다. 임의의 state directory나 symlink는 삭제하지 않는다.
 
 - `--overwrite-output failed` (기본): 성공한 case는 건너뛰고 실패/중단
   case만 재실행해 원격 run directory를 교체한다.
