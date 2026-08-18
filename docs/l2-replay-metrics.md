@@ -116,6 +116,26 @@ timing 차이 등을 관찰하는 진단 지표입니다. Mismatch가 0이 아�
 실패를 뜻하지 않습니다. 반면 malformed trace, missing/duplicate end marker,
 dispatch 오류와 drain timeout은 replay 실패입니다.
 
+## Replay 전 logical KV estimate
+
+`l2_preflight.json`은 target을 변경하기 전에 선택된 `trace_percent` prefix를
+분석한 결과입니다. `--dry-run`에서도 trace가 현재 host에 있으면 같은 내용을
+터미널에 출력하되 파일은 생성하지 않습니다.
+
+| JSON field | 의미 |
+| --- | --- |
+| `operations_selected_by_type` | 선택될 store, lookup, load, unlock과 delete submission 수 |
+| `logical_kv_estimate.after_prepare_gb` | preparation으로 먼저 생성될 logical KV payload |
+| `logical_kv_estimate.store_submission_gb` | 선택된 store submission의 누적 payload; footprint가 아님 |
+| `logical_kv_estimate.unique_candidate_gb` | prepare/store에 등장한 unique key별 최대 payload 합 |
+| `logical_kv_estimate.peak_gb` | submission 순서대로 overwrite/delete를 적용한 예상 최대 payload |
+| `logical_kv_estimate.final_gb` | 선택 prefix 종료 시점의 예상 payload |
+
+모든 용량은 decimal GB(`1 GB = 1,000,000,000 byte`)로 표시합니다. Estimate는
+선택된 target store가 모두 성공하고 store visibility와 delete 효과가 source
+submission 순서를 따른다고 가정합니다. 실제 target의 async completion 순서와
+성공 결과가 다르면 값도 달라질 수 있습니다.
+
 ## L2 namespace 사용량
 
 `l2_usage.json`은 replay client에서 접근하는 L2 directory를 `du -sb`로 측정한
@@ -150,6 +170,7 @@ distributed storage replication과 storage node의 physical usage를 의미하�
 
 - `l2_replay_stats.json`: 모든 원본 field를 보존한 기계 처리용 결과
 - `l2_replay_summary.md`: 주요 값과 주의사항을 담은 사람용 요약
+- `l2_preflight.json`: target preparation 전의 op 분포와 logical KV estimate
 - `l2_io_interval.tsv`: adapter가 interval log를 지원할 때의 시간 구간별 I/O
 - `l2_prepare_manifest.json`: 측정 전에 준비한 object와 byte
 - `l2_usage.json`: prepare/replay 뒤의 client-visible L2 namespace 크기

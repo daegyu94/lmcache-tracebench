@@ -92,6 +92,7 @@ report runner 또는 backend/workload launcher
 
 ```text
 <case>/
+├── l2_preflight.json
 ├── l2_prepare_manifest.json
 ├── l2_replay_stats.json
 ├── l2_replay_summary.md

@@ -80,12 +80,18 @@ python -m replayer.main \
   --trace-percent 10
 ```
 
-실행 전 명령만 확인하려면 `--dry-run`을 추가합니다.
+실행 전 명령만 확인하려면 `--dry-run`을 추가합니다. 지정한 trace가 현재
+host에서 읽을 수 있는 L2 trace이면 target을 변경하지 않고 선택된 op 수와
+prepare/peak/final logical KV payload estimate를 GB 단위로 함께 출력합니다.
+Trace가 없거나 유효한 L2 trace가 아니면 command는 계속 표시하고 preflight를
+건너뛴 이유를 warning으로 출력합니다.
 실행 중에는 터미널에 record 진행률을 표시하며, LMCache 원문 로그는
 `output_dir/lmcache-replay.log`에 저장됩니다. `--l2-path`는 `fs_native`의
 `l2_adapter.base_path`를, NIXL config에서는 `backend_params.file_path`를 덮어씁니다.
 `--output-dir`는 L2 prepare manifest, replay 통계와 로그를 저장할 디렉터리를
 덮어씁니다.
+실제 replay에서는 같은 preflight를 L2 preparation 전에 실행하고
+`l2_preflight.json`에 보관합니다.
 Prepare와 replay 종료 뒤의 client-visible L2 namespace 크기는
 `l2_usage.json`에 기록하며, field 의미는
 [L2 replay metric guide](l2-replay-metrics.md#l2-namespace-사용량)를 따릅니다.

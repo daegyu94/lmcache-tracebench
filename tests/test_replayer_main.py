@@ -1,5 +1,6 @@
 import json
 
+import replayer.main as main_module
 import replayer.runner as runner_module
 from replayer.config import apply_overrides, load_config
 from replayer.main import main
@@ -130,6 +131,38 @@ def test_trace_percent_override_is_reflected_in_dry_run(capsys, tmp_path):
         == 0
     )
 
+    assert "--trace-percent 10.0" in capsys.readouterr().out
+
+
+def test_l2_dry_run_prints_preflight_estimate(capsys, monkeypatch, tmp_path):
+    trace = tmp_path / "l2.lct"
+    trace.write_bytes(b"trace")
+    calls = []
+    monkeypatch.setattr(main_module, "read_trace_level", lambda _: "l2")
+    monkeypatch.setattr(
+        main_module,
+        "run_l2_preflight",
+        lambda trace_path, trace_percent: calls.append(
+            (trace_path, trace_percent)
+        ),
+    )
+
+    assert (
+        main(
+            [
+                "--trace",
+                str(trace),
+                "--config",
+                "configs/replayer/smoke.yaml",
+                "--trace-percent",
+                "10",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    assert calls == [(trace, 10.0)]
     assert "--trace-percent 10.0" in capsys.readouterr().out
 
 
@@ -299,7 +332,8 @@ def test_l2_replay_reports_start_and_submission_progress(capsys, monkeypatch, tm
         l2_path=str(l2_path),
         output_dir=str(output_dir),
     )
-    monkeypatch.setattr(runner_module, "_read_trace_level", lambda _: "l2")
+    monkeypatch.setattr(runner_module, "read_trace_level", lambda _: "l2")
+    monkeypatch.setattr(runner_module, "run_l2_preflight", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(runner_module, "_run_prepare", lambda *_: 0)
     monkeypatch.setattr(
         runner_module,
@@ -373,7 +407,8 @@ def test_l2_replay_writes_interval_io_tsv(monkeypatch, tmp_path):
         load_config("configs/replayer/smoke.yaml"),
         output_dir=str(output_dir),
     )
-    monkeypatch.setattr(runner_module, "_read_trace_level", lambda _: "l2")
+    monkeypatch.setattr(runner_module, "read_trace_level", lambda _: "l2")
+    monkeypatch.setattr(runner_module, "run_l2_preflight", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(runner_module, "_run_prepare", lambda *_: 0)
     monkeypatch.setattr(
         runner_module.subprocess,

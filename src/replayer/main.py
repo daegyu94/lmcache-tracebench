@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from .config import apply_overrides, load_config
+from .preflight import read_trace_level, run_l2_preflight
 from .runner import build_command, run_command
 
 
@@ -50,7 +52,11 @@ def _parser() -> argparse.ArgumentParser:
         dest="profile_config",
         help="profile storage/replay nodes with the supplied YAML config",
     )
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the command and L2 GB preflight without replaying",
+    )
     return parser
 
 
@@ -82,6 +88,25 @@ def main(argv: list[str] | None = None) -> int:
         )
     if not args.dry_run:
         return run_command(config, args.trace, profiler_config=profiler_config)
+
+    trace_path = Path(args.trace).expanduser()
+    if not trace_path.is_file():
+        print(f"[WARN] L2 preflight skipped: trace file not found: {trace_path}")
+        return 0
+    try:
+        if trace_path.stat().st_size == 0:
+            print(f"[WARN] L2 preflight skipped: trace file is empty: {trace_path}")
+            return 0
+        trace_level = read_trace_level(trace_path)
+        if trace_level == "l2":
+            run_l2_preflight(trace_path, config.trace_percent)
+        else:
+            print(
+                "[INFO] L2 preflight skipped: "
+                f"trace level is {trace_level!r}, not 'l2'"
+            )
+    except Exception as exc:  # noqa: BLE001 - dry-run preflight is best effort
+        print(f"[WARN] L2 preflight skipped: {exc}")
     return 0
 
 

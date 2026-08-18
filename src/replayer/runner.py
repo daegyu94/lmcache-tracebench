@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import ReplayerConfig
+from .preflight import read_trace_level, run_l2_preflight
 
 if TYPE_CHECKING:
     from traceprof.config import ProfilerConfig
@@ -306,14 +307,6 @@ def build_prepare_command(config: ReplayerConfig, trace_path: str) -> list[str]:
     return [*build_command(config, trace_path), "--prepare-l2", "--prepare-only"]
 
 
-def _read_trace_level(trace_path: Path) -> str:
-    """Read the trace header level through the installed LMCache runtime."""
-    from lmcache.v1.mp_observability.trace.reader import TraceReader
-
-    with TraceReader(str(trace_path)) as reader:
-        return reader.header.level
-
-
 def _run_prepare(config: ReplayerConfig, trace: Path, output_dir: Path) -> int:
     log_path = output_dir / "lmcache-prepare.log"
     with log_path.open("w", encoding="utf-8") as log_file:
@@ -339,12 +332,18 @@ def run_command(
     output_dir = Path(config.output_dir).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
     log_path = output_dir / "lmcache-replay.log"
-    trace_level = _read_trace_level(trace)
+    trace_level = read_trace_level(trace)
     l2_usage: dict[str, object] | None = None
     io_interval_path = (
         output_dir / "l2_io_interval.tsv" if trace_level == "l2" else None
     )
     if trace_level == "l2":
+        print("[INFO] Analyzing L2 trace before target preparation", flush=True)
+        run_l2_preflight(
+            trace,
+            config.trace_percent,
+            output_dir=output_dir,
+        )
         namespace_path = _l2_namespace_path(config)
         l2_usage = {
             "schema_version": 1,
