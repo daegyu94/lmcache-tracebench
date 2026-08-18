@@ -128,6 +128,7 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
       --backend-spec '3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs.yaml|@L2_ROOT@/3fs' \
       --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/pnfs' \
+      --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml \
       --trace-percent 10 \
       --repeats 3
 
@@ -153,7 +154,11 @@ Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
 --workloads와 --speedups를 주면 해당 graph preset을 덮어쓴다. --graph all은
 위 preset을 모두 순서대로 실행한다. 각 matrix cell은 기본 3회 반복하며
 --repeats로 변경한다. resource/nodewise/scaling에는 같은 remote profiler
-설정을 --profile로 전달한다.
+설정을 --profile로 전달한다. profiler YAML은 `configs/profiling/` 아래
+예제(예: `storage.yaml`, `b300_storage.yaml`)를 참고해 작성하고,
+`@REPO_ROOT@` placeholder와 함께 전달한다.
+
+    --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml
 
 ## 5. Backend와 node scaling
 
@@ -190,15 +195,16 @@ state root는 기본적으로 outputs/report-experiments-staged이며, 같은 �
     └── cases/<graph>/<workload>/<backend>/n<node>/s<speedup>/r<repeat>/case.json
 
 실제 replay 결과는 topology의 controller_output_root 아래에
-report-<graph>-<workload>-<backend>-... run name으로 저장된다. case directory
+<graph>-<workload>-<backend>-... run name으로 저장된다. case directory
 안에는 staged remote output 경로와 실행 command가 함께 기록된다.
 
 실행 도중 중단되면 현재 case marker가 running 또는 interrupted로 남는다.
-다음 실행은 완료 case를 재사용하고 미완료 case만 다시 시도한다. runner는 재시도할 때
-staged_remote_replay.sh의 --replace-existing를 사용해 그 run name의 remote와
-controller output directory만 교체한다. 임의의 state directory나 symlink는
-삭제하지 않는다. 실패 output을 보존하고 싶으면 --no-retry-incomplete를
-사용하고, 전체 matrix를 처음부터 다시 하려면 --no-resume을 사용한다.
+다음 실행은 완료 case를 재사용하고 미완료 case만 다시 시도한다. runner는
+실행할 때마다 staged_remote_replay.sh의 --replace-existing를 전달해 그 run
+name의 remote와 controller output directory만 교체한다. 임의의 state
+directory나 symlink는 삭제하지 않는다. 실패 output을 보존하고 싶으면
+--no-retry-incomplete를 사용하고, 전체 matrix를 처음부터 다시 하려면
+--no-resume을 사용한다.
 
 matrix-summary.json의 completed, failed, interrupted, pending, resume_skipped와
 matrix-results.jsonl의 각 case status를 plot 단계의 입력 검증에 사용한다.

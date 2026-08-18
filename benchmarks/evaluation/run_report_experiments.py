@@ -390,7 +390,7 @@ def make_run_name(
 ) -> str:
     node_label = "base" if node_count == "baseline" else f"n{node_count}"
     raw = (
-        f"report-{graph}-{workload}-{backend}-{node_label}"
+        f"{graph}-{workload}-{backend}-{node_label}"
         f"-s{format_number(speedup)}-r{repeat}"
     )
     raw = safe_label(raw)
@@ -986,7 +986,7 @@ def run_matrix(args: argparse.Namespace) -> int:
             resumed_ids.add(case.case_id)
             write_results(state_root, cases, skipped_ids=resumed_ids)
             continue
-        replace_existing = had_marker
+        replace_existing = True
         try:
             execute_case(
                 case,
