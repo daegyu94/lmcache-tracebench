@@ -128,7 +128,7 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
       --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \
       --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \
-      --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml \
+      --profile @REPO_ROOT@/configs/profiling/storage02-07.yaml \
       --workload-preset 1tb \
       --repeats 3
 
@@ -183,10 +183,10 @@ workload/backend/node마다 `s<speedup>`이 오름차순으로 이어지고 그 
 위 preset을 모두 순서대로 실행한다. 각 matrix cell은 기본 3회 반복하며
 --repeats로 변경한다. resource/nodewise/scaling에는 같은 remote profiler
 설정을 --profile로 전달한다. profiler YAML은 `configs/profiling/` 아래
-예제(예: `storage.yaml`, `b300_storage.yaml`)를 참고해 작성하고,
+예제(예: `storage.yaml`, `storage02-07.yaml`)를 참고해 작성하고,
 `@REPO_ROOT@` placeholder와 함께 전달한다.
 
-    --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml
+    --profile @REPO_ROOT@/configs/profiling/storage02-07.yaml
 
 ## 5. Backend와 node scaling
 

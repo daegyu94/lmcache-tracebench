@@ -200,8 +200,8 @@ def test_expand_brace_pattern_rejects_malformed_groups(spec):
         expand_brace_pattern(spec)
 
 
-def test_b300_storage_config_expands_every_node_device_range():
-    config = load_config("configs/profiling/b300_storage.yaml")
+def test_weka_storage_config_expands_every_node_device_range():
+    config = load_config("configs/profiling/storage02-07.yaml")
 
     devices_by_node = {node.hostname: node.devices for node in config.nodes}
     assert devices_by_node["weka02"] == (
