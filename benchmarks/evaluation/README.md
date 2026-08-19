@@ -124,7 +124,6 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
     bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
-      --asset tensormesh/swebench \
       --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \
       --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \
@@ -141,11 +140,21 @@ checksum도 남긴다. Subset 선택 원칙은
 
 ### Case iteration 순서
 
-`--asset`은 case를 생성하지 않고, matrix에 필요한 trace archive를 전부 미리
-staging하는 용도다. case는 `--workloads`/`--workload-preset`, `--backend-spec`,
+`--asset PATH`는 선택값이며 반복 지정할 수 있다. 지정하면 해당 HF trace
+archive(예: `tensormesh/swebench`)를 matrix 실행 전에 staging(`prepare-trace`)만
+하고, case 자체는 만들지 않는다. 어느 trace를 어떤 workload에 쓸지는
+`--workloads`/`--workload-preset`과 `--trace-root`/`--trace-name`이 결정한다.
+
+case는 `--workloads`/`--workload-preset`, `--backend-spec`,
 `--speedups`, `--node-counts`, `--repeats`로 형성되며, 다음 순서로 중첩해 생성된다.
 
     graph → workload → backend → node_count → speedup → repeat
+
+`--workloads`를 생략하면 graph preset의 기본 workload 전체가 실행되고, 콤마로
+지정하면 그 부분집합만 실행된다. `--workload-preset`은 workload 목록을 정하는
+대신 선택된 workload들의 `trace_percent`/source window를 채워주는 역할이다. 예를
+들어 `--workloads tensormesh-swebench,mooncake-conversation --workload-preset 1tb`는
+두 workload만 쓰되 1tb preset의 percent를 적용한다.
 
 즉 가장 바깥쪽이 graph, 가장 안쪽이 repeat이다. 예를 들어
 `--graph speedup --workloads tensormesh-swebench,tensormesh-gaia
