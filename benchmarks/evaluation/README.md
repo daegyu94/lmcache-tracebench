@@ -214,6 +214,15 @@ fs-native.yaml은 filesystem backend들이 공통으로 상속하는 템플릿�
 pNFS도 각각 3fs.yaml, pnfs.yaml을 쓴다. 자세한 backend config 목록은
 [replayer guide](../../docs/replayer.md#backend-configuration)를 따른다.
 
+3FS FUSE 경로가 아닌 NIXL usrbio 경로로 동일 storage에 접근하는 HF3FS backend는
+`hf3fs.yaml`을 쓴다. 이 backend는 pip NIXL wheel에 없는 `libplugin_HF3FS.so`를
+요구하므로 별도 빌드/배포가 필요하다.
+
+    HF3FS=@REPO_ROOT@/configs/replayer/hf3fs.yaml|@L2_ROOT@/hf3fs
+
+빌드 절차와 mount_point 설정, backend 비교는
+[HF3FS backend guide](../../docs/hf3fs-backend.md)를 따른다.
+
 scaling graph에서 distributed backend를 node 수에 맞춰 바꾸려면 {nodes}를
 config 또는 L2 path에 포함한다.
 

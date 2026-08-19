@@ -6,6 +6,9 @@ l2_adapter:
   backend: HF3FS
   backend_params:
     file_path: /mnt/l2/hf3fs
+    # NIXL/HF3FS plugin resolves the usrbio mount from this HF3FS FUSE mount
+    # root (must contain a "3fs-virt" directory).
+    mount_point: /3fs/stage
     # NIXL/HF3FS spelling of the fs_native use_odirect option.
     use_direct_io: "true"
     max_capacity_gb: "30720"
