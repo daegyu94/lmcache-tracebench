@@ -1005,7 +1005,7 @@ Examples:
     --topology configs/replayer/staged-remote/topology.yaml \\
     --graph speedup \\
     --asset tensormesh/wildclaw.tar.gz \\
-    --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \\
+    --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \\
     --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \\
     --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \\
     --trace-percent 10 \\

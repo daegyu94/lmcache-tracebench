@@ -14,11 +14,11 @@ def _write_matrix(path: Path, case: dict) -> None:
 
 def _base_case(result_dir: Path, graph: str) -> dict:
     return {
-        "case_id": f"{graph}/tensormesh-swebench/fs-native/baseline/2/r1",
+        "case_id": f"{graph}/tensormesh-swebench/xfs/baseline/2/r1",
         "status": "ok",
         "graph": graph,
         "workload": "tensormesh-swebench",
-        "backend": "fs-native",
+        "backend": "xfs",
         "node_count": "baseline",
         "speedup": 2.0,
         "repeat": 1,
@@ -88,7 +88,7 @@ def test_import_speedup_artifacts(tmp_path):
     throughput = dataset.select(
         graph="speedup",
         workload="SWE-bench",
-        backend="fs-native",
+        backend="xfs",
         speedup=2.0,
         metric="wall_throughput_gb_per_second",
     )
@@ -96,7 +96,7 @@ def test_import_speedup_artifacts(tmp_path):
     latency = dataset.select(
         graph="speedup",
         workload="SWE-bench",
-        backend="fs-native",
+        backend="xfs",
         speedup=2.0,
         metric="read_p99_latency_ms",
     )

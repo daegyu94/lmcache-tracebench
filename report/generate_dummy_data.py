@@ -25,7 +25,7 @@ WORKLOAD_BASE = {
     "ToolAgent": 1.08,
     "Conversation": 0.82,
 }
-BACKEND_FACTOR = {"fs-native": 0.82, "3FS": 1.18, "pNFS": 1.0}
+BACKEND_FACTOR = {"xfs": 0.82, "3FS": 1.18, "pNFS": 1.0}
 
 
 def _seed(*labels: str) -> int:
@@ -80,12 +80,12 @@ def _speedup_metrics(
     capacity = (
         workload_scale
         * backend_scale
-        * {"fs-native": 1.85, "3FS": 2.55, "pNFS": 2.20}[backend]
+        * {"xfs": 1.85, "3FS": 2.55, "pNFS": 2.20}[backend]
     )
     offered = workload_scale * 0.78 * SPEEDUPS
     throughput = capacity * (1.0 - np.exp(-offered / capacity))
 
-    knee = {"fs-native": 1.4, "3FS": 2.2, "pNFS": 1.8}[backend]
+    knee = {"xfs": 1.4, "3FS": 2.2, "pNFS": 1.8}[backend]
     overload = np.maximum(SPEEDUPS / knee - 1.0, 0.0)
     read_p99_ms = (2.8 / backend_scale) * (1.0 + 0.13 * SPEEDUPS + 3.1 * overload**2)
     lag_seconds = 0.015 * SPEEDUPS + 1.9 * overload**2
@@ -100,9 +100,9 @@ def _latency_metrics(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     percentile_shape = np.array([1.0, 1.75, 4.0])
     workload_scale = 0.82 + 0.32 * WORKLOAD_BASE[workload]
-    backend_scale = {"fs-native": 1.35, "3FS": 0.78, "pNFS": 1.0}[backend]
+    backend_scale = {"xfs": 1.35, "3FS": 0.78, "pNFS": 1.0}[backend]
     overload = max(
-        REFERENCE_SPEEDUP / {"fs-native": 1.4, "3FS": 2.2, "pNFS": 1.8}[backend] - 1.0,
+        REFERENCE_SPEEDUP / {"xfs": 1.4, "3FS": 2.2, "pNFS": 1.8}[backend] - 1.0,
         0.0,
     )
     factor = 1.0 / _repeat_factor(repeat)
@@ -136,8 +136,8 @@ def _latency_metrics(
 
 def _resource_values() -> tuple[np.ndarray, np.ndarray]:
     workload_factor = np.array([0.78, 0.94, 1.08, 1.0, 0.86])
-    disk_base = {"fs-native": 82.0, "3FS": 61.0, "pNFS": 72.0}
-    network_base = {"fs-native": 12.0, "3FS": 74.0, "pNFS": 66.0}
+    disk_base = {"xfs": 82.0, "3FS": 61.0, "pNFS": 72.0}
+    network_base = {"xfs": 12.0, "3FS": 74.0, "pNFS": 66.0}
     disk = np.column_stack(
         [np.clip(disk_base[name] * workload_factor, 0, 98) for name in BACKENDS]
     )
@@ -166,7 +166,7 @@ def _node_values() -> tuple[np.ndarray, np.ndarray]:
     disk = np.full((len(BACKENDS), 6), np.nan)
     network = np.full_like(disk, np.nan)
     for index, backend in enumerate(BACKENDS):
-        if backend == "fs-native":
+        if backend == "xfs":
             continue
         disk[index] = np.clip(
             {"3FS": 61.0, "pNFS": 72.0}[backend] * 1.08 * disk_skew[backend],
@@ -294,18 +294,18 @@ def build_records() -> list:
     node_disk, node_network = _node_values()
     speedup_factors = {
         "disk": {
-            1.0: {"fs-native": 1.0, "3FS": 1.0, "pNFS": 1.0},
-            2.0: {"fs-native": 1.12, "3FS": 1.05, "pNFS": 1.09},
+            1.0: {"xfs": 1.0, "3FS": 1.0, "pNFS": 1.0},
+            2.0: {"xfs": 1.12, "3FS": 1.05, "pNFS": 1.09},
         },
         "network": {
-            1.0: {"fs-native": 1.0, "3FS": 1.0, "pNFS": 1.0},
-            2.0: {"fs-native": 1.04, "3FS": 1.10, "pNFS": 1.08},
+            1.0: {"xfs": 1.0, "3FS": 1.0, "pNFS": 1.0},
+            2.0: {"xfs": 1.04, "3FS": 1.10, "pNFS": 1.08},
         },
     }
-    aggregate_disk = {"fs-native": 82.0 * 1.08}
-    aggregate_network = {"fs-native": 12.0 * (0.86 + 0.18 * 1.08)}
+    aggregate_disk = {"xfs": 82.0 * 1.08}
+    aggregate_network = {"xfs": 12.0 * (0.86 + 0.18 * 1.08)}
     for index, backend in enumerate(BACKENDS):
-        if backend != "fs-native":
+        if backend != "xfs":
             aggregate_disk[backend] = float(np.mean(node_disk[index]))
             aggregate_network[backend] = float(np.mean(node_network[index]))
 
@@ -313,7 +313,7 @@ def build_records() -> list:
         for backend_index, backend in enumerate(BACKENDS):
             nodes = (
                 ("aggregate",)
-                if backend == "fs-native"
+                if backend == "xfs"
                 else tuple(f"storage-{index}" for index in range(1, 7)) + ("aggregate",)
             )
             for repeat in REPEATS:
@@ -354,7 +354,7 @@ def build_records() -> list:
 
     nodes = np.arange(1, 7)
     scaling = {
-        "fs-native": {
+        "xfs": {
             "throughput": np.full(6, 1.55),
             "latency": np.full(6, 10.5),
             "disk": np.full(6, 71.0),

@@ -59,7 +59,7 @@ Report runner가 만든 `matrix-results.jsonl`을 공통 dataset으로 변환합
 ```bash
 python -m report.import_artifacts \
   --state-root outputs/report-experiments-staged \
-  --network-link-gbps fs-native=100 \
+  --network-link-gbps xfs=100 \
   --network-link-gbps 3FS=100 \
   --network-link-gbps pNFS=100
 

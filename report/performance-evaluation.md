@@ -21,7 +21,7 @@
 ### 1.1 평가 목적과 범위
 
 동일한 adapter-level L2 trace를 인과 순서와 timestamp plan에 따라 재생하여
-`fs-native`, `3FS`, `pNFS`의 throughput, latency, storage/network 병목과
+`xfs`, `3FS`, `pNFS`의 throughput, latency, storage/network 병목과
 storage-node 확장성을 비교한다. 평가는 L2 adapter와 replay host·storage node의
 계측에 한정하며 application end-to-end 성능으로 일반화하지 않는다.
 
@@ -91,13 +91,21 @@ Event 범위, dependency, object preparation과 replay validity contract는
 나눈다. 공정한 비교를 위해 최종 결과에는 adapter, filesystem 또는 storage system,
 mount option, storage-node topology를 함께 기록한다.
 
+비교하는 backend는 기본적으로 모두 LMCache `fs_native` adapter를 사용한다.
+`xfs`는 replay host의 local XFS storage를, `3FS`는 3FS fuse mount를, `pNFS`는
+pNFS data path를 대상으로 한다. 즉 backend 간 차이는 adapter가 아니라 각각이
+가리키는 filesystem/storage system에서 나온다. 3FS와 pNFS는 추가로 NIXL
+adapter를 사용할 수도 있지만, 이 보고서의 범위에서는 Future Work로 두고
+우선 `fs_native` 기반 결과만 비교한다. adapter 공통 설정은 replay config의
+`base`와 `fs_native` 항목을 따른다.
+
 | 보고서 표기 | 비교 구성 | 실험에 기록할 설정 |
 | --- | --- | --- |
-| `fs-native` | LMCache `fs_native` adapter와 replay host의 local storage를 사용하는 baseline | XFS device, mount option, capacity: `[실험 설정 필요]` |
-| `3FS` | NIXL/HF3FS adapter로 접근하는 distributed filesystem | adapter/version, storage node, striping/replication, mount와 topology: `[실험 설정 필요]` |
-| `pNFS` | `fs_native` 또는 NIXL `POSIX` adapter로 접근하는 pNFS data path | adapter/version, NFS/mount option, metadata/data server와 topology: `[실험 설정 필요]` |
+| `xfs` | LMCache `fs_native` adapter와 replay host의 local XFS storage를 사용하는 baseline | XFS device, mount option, capacity: `[실험 설정 필요]` |
+| `3FS` | 3FS fuse mount를 `fs_native` adapter로 접근하는 distributed filesystem | 3FS mount/version, storage node, striping/replication, topology: `[실험 설정 필요]` |
+| `pNFS` | pNFS data path를 `fs_native` adapter로 접근하는 distributed filesystem | NFS/mount option, metadata/data server와 topology: `[실험 설정 필요]` |
 
-`fs-native`는 local baseline이며 3FS·pNFS와 동일한 durability나 failure model을
+`xfs`는 local baseline이며 3FS·pNFS와 동일한 durability나 failure model을
 제공한다고 해석하지 않는다. 따라서 backend 간 비교의 주장은 동일한 L2 operation과
 offered load를 처리하는 비용·지연·확장성에 한정한다. 3FS와 pNFS의 구체적인 adapter,
 버전, storage node/device 수, replication·striping 정책과 network topology가 확정되지
@@ -183,7 +191,7 @@ Calibration은 application 성능을 주장하기 위한 실험이 아니라 두
   CPU 또는 submission path 병목을 구분한다.
 
 분산 backend의 replication과 durability 설정은 replay 실험과 동일하게 유지한다.
-Local `fs-native` ceiling은 distributed backend와 동등한 기능의 비교값이 아니라
+Local `xfs` ceiling은 distributed backend와 동등한 기능의 비교값이 아니라
 local reference로 해석한다. 본문에는 peak 값과 측정 조건을 요약하고, 전체 curve는
 appendix에 둔다.
 
@@ -453,7 +461,7 @@ traffic은 합산하지 않고 별도로 보고한다. Bond interface와 slave i
 Aggregate metric은 [Report data contract](data/README.md)의 provenance와
 집계 방법을 함께 기록한다. 기본 importer는 선택된 node p95의 equal-weight mean을
 사용한다. Device 또는 link capacity가 서로 다른 cluster에서는 capacity-weighted 값을
-다시 계산하고 그 방법을 manifest에 남긴다. `fs-native` aggregate는 distributed
+다시 계산하고 그 방법을 manifest에 남긴다. `xfs` aggregate는 distributed
 backend와 합산하지 않고 replay host의 local device와 replay-role network에서 별도로
 계산한다. Node-level storage 값은 node 내 physical device 중 최대 utilization,
 node-level network 값은 해당 node interface의 directional utilization을 사용한다.
@@ -478,7 +486,7 @@ p95와 network directional utilization p95를 비교한다. 현재 값은 dummy 
 
 **그림 6 (구성 예시).** `SWE-bench`에서 replay speedup `x1`과 `x2`의 node-wise
 utilization을 비교한다. 왼쪽 열은 storage device, 오른쪽 열은 network utilization이며,
-현재 값은 dummy data다. `fs-native`는 local baseline이므로 storage-node 행은
+현재 값은 dummy data다. `xfs`는 local baseline이므로 storage-node 행은
 `N/A`로 표시하고 aggregate에 replay host 값을 기록한다.
 
 #### 결과
@@ -497,7 +505,7 @@ utilization을 비교한다. 왼쪽 열은 storage device, 오른쪽 열은 netw
 중 어디에서 나타나는가?
 
 **측정 방법:** workload는 `SWE-bench`로 고정하고 replay speedup은 `x2`로 둔다.
-`3FS`와 `pNFS`를 storage-node scaling 대상으로 삼고, `fs-native`는 local
+`3FS`와 `pNFS`를 storage-node scaling 대상으로 삼고, `xfs`는 local
 baseline으로 함께 기록한다. Storage node 수 `N_s`는 `1, 2, 3, 4, 5, 6`으로
 변경하며 trace, L1 size, worker 수, direct I/O 설정, device 종류와 capacity,
 network link rate와 replication 정책은 가능한 한 고정한다. 각 node-count case는
@@ -510,8 +518,8 @@ case에서는 가능한 node subset을 순환하거나 assignment를 반복마�
 node 목록을 metadata에 남긴다. 단순히 replay client concurrency만 변경한 case는
 storage-node scale-out 결과로 취급하지 않는다.
 
-`fs-native`는 replay host의 local/direct-attached storage이므로 storage node 수에
-따라 확장되는 backend가 아니다. 따라서 그림에서 `fs-native`는 distributed backend와
+`xfs`는 replay host의 local/direct-attached storage이므로 storage node 수에
+따라 확장되는 backend가 아니다. 따라서 그림에서 `xfs`는 distributed backend와
 같은 scaling efficiency를 비교하는 점이 아니라 local reference로 해석한다.
 
 주요 metric은 aggregate throughput, `N_s=1` 대비 throughput gain, read p99 latency,
@@ -532,7 +540,7 @@ utilization이 어떻게 변하는지 함께 확인한다. `imbalance_max_mean`�
 **그림 7 (구성 예시).** `SWE-bench`, replay speedup `x2`에서 storage node 수를
 `1`개부터 `6`개까지 늘린다. 왼쪽 위부터 aggregate throughput, read p99 latency,
 storage utilization과 network directional utilization을 표시하며, 현재 값은 dummy data다.
-`fs-native`는 node-count scaling 대상이 아니므로 점선 local baseline으로 표시한다.
+`xfs`는 node-count scaling 대상이 아니므로 점선 local baseline으로 표시한다.
 
 #### 결과
 
@@ -549,7 +557,7 @@ application end-to-end 성능이나 다른 L1 policy로 일반화하지 않는�
 payload와 source L1 상태를 복원하지 않는다는 점도 함께 기록한다.
 
 Backend 비교에서는 adapter, filesystem 또는 storage system, mount option, replication과
-network topology를 함께 고정하거나 결과에 명시해야 한다. `fs-native`는 local baseline이고
+network topology를 함께 고정하거나 결과에 명시해야 한다. `xfs`는 local baseline이고
 distributed backend와 failure model이나 durability가 같지 않으므로, 단순히 throughput이
 높다는 이유만으로 backend 우열을 단정하지 않는다.
 

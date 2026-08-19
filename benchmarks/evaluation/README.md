@@ -25,7 +25,7 @@ shell entrypoint를 사용한다.
     bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/example.yaml \
       --graph speedup \
-      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --workloads tensormesh-swebench \
       --speedups 1,1.25 \
       --trace-percent 10 \
@@ -39,7 +39,7 @@ trace prefix로 줄여 end-to-end pipeline 검증용 matrix를 빠르게 돌려�
     bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/example.yaml \
       --graph speedup \
-      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --workload-preset smoke \
       --repeats 1 \
       --skip-prepare \
@@ -60,7 +60,7 @@ prefix를 줄여 end-to-end pipeline 검증용으로 빠르게 실행한다.
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
       --workload-preset full \
-      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native'
+      --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs'
 
 Preset을 쓰면 workload마다 서로 다른 `--trace-percent`가 replay command와
 `case.json`에 기록된다. `--dry-run`은 preset에 기록된 첫/마지막 submission
@@ -99,7 +99,7 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
       --topology <topology.yaml> \
       --graph throughput \
       --workloads tensormesh-wildclaw \
-      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --trace-percent 1 \
       --repeats 1 \
       --skip-prepare
@@ -108,7 +108,7 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
 상태와 결과를 확인한다.
 
     cat <state_root>/matrix-summary.json
-    cat <state_root>/cases/throughput/tensormesh-wildclaw/fs-native/nbaseline/s1/r1/case.json
+    cat <state_root>/cases/throughput/tensormesh-wildclaw/xfs/nbaseline/s1/r1/case.json
     python -m json.tool \
       <controller_output_root>/<run-name>/x1/l2_replay_stats.json
 
@@ -125,7 +125,7 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
       --asset tensormesh/swebench.tar.gz \
-      --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
+      --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \
       --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \
       --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml \
@@ -168,9 +168,14 @@ Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
 
 CONFIG/L2_ROOT에는 staged_remote_replay.sh가 이해하는
 @REPO_ROOT@, @TRACE_ROOT@, @OUTPUT_ROOT@, @L2_ROOT@ placeholder를 사용할 수
-있다. 예를 들어 fs-native는 다음과 같이 local XFS baseline mount를 가리킨다.
+있다. 예를 들어 xfs는 다음과 같이 local XFS baseline mount를 가리킨다.
 
-    fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native
+    xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs
+
+fs-native.yaml은 filesystem backend들이 공통으로 상속하는 템플릿이다.
+실제 로컬 파일시스템 baseline은 xfs.yaml을 사용하고, 3FS fuse mount와
+pNFS도 각각 3fs.yaml, pnfs.yaml을 쓴다. 자세한 backend config 목록은
+[replayer guide](../../docs/replayer.md#backend-configuration)를 따른다.
 
 scaling graph에서 distributed backend를 node 수에 맞춰 바꾸려면 {nodes}를
 config 또는 L2 path에 포함한다.

@@ -38,7 +38,7 @@ WORKLOAD_LABELS = {
     "mooncake-toolagent": "ToolAgent",
     "mooncake-conversation": "Conversation",
 }
-BACKENDS = ("fs-native", "3FS", "pNFS")
+BACKENDS = ("xfs", "3FS", "pNFS")
 
 METRIC_UNITS = {
     "l2_read_gb_per_second": "GB/s",

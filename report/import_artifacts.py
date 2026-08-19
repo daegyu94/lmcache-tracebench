@@ -373,7 +373,7 @@ def _profile_records(
 
     records: list[MetricRecord] = []
     for node, values in node_values.items():
-        if graph == "resource" or backend == "fs-native":
+        if graph == "resource" or backend == "xfs":
             continue
         for metric, value in values.items():
             records.append(
@@ -390,7 +390,7 @@ def _profile_records(
                 )
             )
 
-    preferred_role = "replay" if backend == "fs-native" else "storage"
+    preferred_role = "replay" if backend == "xfs" else "storage"
     aggregate_values = {
         node: values
         for node, values in node_values.items()

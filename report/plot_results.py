@@ -24,7 +24,7 @@ from report.report_data import (
 )
 
 BACKEND_COLORS = {
-    "fs-native": "#0072B2",
+    "xfs": "#0072B2",
     "3FS": "#D55E00",
     "pNFS": "#009E73",
 }
@@ -698,7 +698,7 @@ def plot_storage_node_scaling(
                 x,
                 median,
                 color=BACKEND_COLORS[backend],
-                linestyle="--" if backend == "fs-native" else "-",
+                linestyle="--" if backend == "xfs" else "-",
                 marker="o",
                 markersize=4,
                 label=backend,
@@ -731,7 +731,7 @@ def plot_storage_node_scaling(
                 [0],
                 [0],
                 color=BACKEND_COLORS[name],
-                linestyle="--" if name == "fs-native" else "-",
+                linestyle="--" if name == "xfs" else "-",
                 marker="o",
                 label=name,
             )

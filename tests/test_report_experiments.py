@@ -16,7 +16,7 @@ def _command(state_root: Path) -> list[str]:
         "--graph",
         "speedup",
         "--backend-spec",
-        "fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native",
+        "xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs",
         "--workloads",
         "tensormesh-swebench",
         "--speedups",
@@ -41,7 +41,7 @@ def test_report_runner_dry_run_resumes_completed_cases(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert "Case speedup/tensormesh-swebench/fs-native/baseline/1/r1" in first.stdout
+    assert "Case speedup/tensormesh-swebench/xfs/baseline/1/r1" in first.stdout
     assert "@TRACE_ROOT@/tensormesh/swebench/l2.lct" in first.stdout
 
     summary_path = state_root / "matrix-summary.json"
@@ -78,7 +78,7 @@ def test_report_runner_overwrite_re_runs_successful_cases(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert "Case speedup/tensormesh-swebench/fs-native/baseline/1/r1" in first.stdout
+    assert "Case speedup/tensormesh-swebench/xfs/baseline/1/r1" in first.stdout
 
     summary_path = state_root / "matrix-summary.json"
     first_summary = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -93,7 +93,7 @@ def test_report_runner_overwrite_re_runs_successful_cases(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert "Case speedup/tensormesh-swebench/fs-native/baseline/1/r1" in second.stdout
+    assert "Case speedup/tensormesh-swebench/xfs/baseline/1/r1" in second.stdout
     second_summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert second_summary["completed"] == 2
     assert second_summary["resume_skipped"] == 0
@@ -137,7 +137,7 @@ def test_report_runner_full_preset_resolves_full_trace(tmp_path):
         "--graph",
         "throughput",
         "--backend-spec",
-        "fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native",
+        "xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs",
         "--workloads",
         "tensormesh-gaia,mooncake-toolagent",
         "--workload-preset",
@@ -187,7 +187,7 @@ def test_report_runner_smoke_preset_resolves_per_workload(tmp_path):
         "--graph",
         "speedup",
         "--backend-spec",
-        "fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native",
+        "xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs",
         "--workload-preset",
         "smoke",
         "--repeats",
