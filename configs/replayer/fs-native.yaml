@@ -3,7 +3,7 @@ extends: base.yaml
 # Select an empty target directory on the local filesystem or an fs mount.
 l2_adapter:
   type: fs_native
-  base_path: /mnt/std-ssd/lmcache-trace-replay
+  base_path: /mnt/l2/fs-native
   num_workers: 32
   use_odirect: true
   io_log_interval_sec: 5

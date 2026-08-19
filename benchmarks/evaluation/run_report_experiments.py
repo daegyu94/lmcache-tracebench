@@ -1006,15 +1006,15 @@ Examples:
     --graph speedup \\
     --asset tensormesh/wildclaw.tar.gz \\
     --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \\
-    --backend-spec '3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs.yaml|@L2_ROOT@/3fs' \\
-    --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/pnfs' \\
+    --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \\
+    --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \\
     --trace-percent 10 \\
     --speedups 1,1.25,1.5,2 \\
     --repeats 3
 
 For scaling, put {nodes} in distributed backend paths:
-  --backend-spec '3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs-{nodes}.yaml|@L2_ROOT@/3fs-{nodes}'
-  --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/fs-native-{nodes}.yaml|@L2_ROOT@/pnfs-{nodes}'
+  --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs-{nodes}.yaml|@L2_ROOT@/3fs-{nodes}'
+  --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs-{nodes}.yaml|@L2_ROOT@/pnfs-{nodes}'
 
 The topology must already describe staged remote storage. Use --skip-prepare
 when the trace and replay repository are already staged. State files live under

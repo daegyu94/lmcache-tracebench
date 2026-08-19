@@ -1,0 +1,6 @@
+extends: fs-native.yaml
+
+# 3FS를 fuse mount로 노출해 일반 로컬 파일시스템처럼 취급한다.
+# NIXL/HF3FS client 대신 커널 fuse가 I/O를 통과시키므로 fs_native로 재생한다.
+l2_adapter:
+  base_path: /mnt/l2/3fs

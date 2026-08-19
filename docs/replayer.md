@@ -67,7 +67,8 @@ speedup과 별개로 in-flight store, lookup과 load task가 끝날 때까지 dr
 ## Replay
 
 Replayer는 저장된 `l2.lct`를 LMCache `trace replay` 명령으로 한 번 실행합니다.
-공용 `base.yaml`을 상속하는 `fs-native.yaml` 또는 `nixl-hf3fs.yaml`을 선택하고,
+공용 `base.yaml`을 상속하는 backend config(`fs-native.yaml`, `xfs.yaml`,
+`3fs.yaml`, `pnfs.yaml`, `hf3fs.yaml`) 중 하나를 선택하고,
 아래처럼 L2 trace를 지정합니다.
 Replay host가 목표 schedule보다 느리면 schedule lag와 drain time에 반영됩니다.
 
@@ -201,23 +202,32 @@ replayer 노드의 network locality를 그대로 재현하지는 않습니다. �
 ## Backend configuration
 
 Replay는 trace header의 원본 L2 설정을 강제하지 않고 현재 config로 target L2
-adapter를 생성합니다. 따라서 로컬 SSD의 `fs_native`로 record한 trace를 pNFS
-mount나 NIXL/HF3FS에 재생할 수 있습니다.
+adapter를 생성합니다. 따라서 로컬 SSD의 `fs_native`로 record한 trace를 pNFS,
+3FS(fuse) mount나 NIXL/HF3FS에 재생할 수 있습니다.
 
-pNFS가 `/MNTPNT`에 mount되어 있다면 `configs/replayer/fs-native.yaml`의
-`base_path`를 mount 아래 경로로 지정합니다. LMCache에서는 `fs_native`이지만 실제
-I/O는 pNFS client와 server를 통과합니다.
+`configs/replayer/`에는 backend별로 전용 config를 둡니다. filesystem mount를
+직접 쓰는 backend(`fs-native`, `xfs`, `3fs` fuse, `pNFS`)는 모두
+`fs-native.yaml`을 상속해 `base_path`만 `/mnt/l2/<backend>`로 바꿉니다. LMCache
+관점에서는 모두 `fs_native`이며 실제 I/O가 각 filesystem client/server를 통과합니다.
 
-NIXL과 HF3FS가 설치된 cluster에서는
-`configs/replayer/nixl-hf3fs.yaml`을 사용하고 `file_path`와
-`max_capacity_gb`를 환경에 맞게 바꿉니다. 설정은 다음 adapter를 생성합니다.
+| config | adapter | L2 경로 |
+| --- | --- | --- |
+| `fs-native.yaml` | `fs_native` | `/mnt/l2/fs-native` |
+| `xfs.yaml` | `fs_native` | `/mnt/l2/xfs` |
+| `3fs.yaml` (3FS fuse mount) | `fs_native` | `/mnt/l2/3fs` |
+| `pnfs.yaml` | `fs_native` | `/mnt/l2/pnfs` |
+| `hf3fs.yaml` (NIXL/HF3FS client) | `nixl_store_dynamic` | `/mnt/l2/hf3fs` (`file_path`) |
+
+NIXL과 HF3FS가 설치된 cluster에서는 `configs/replayer/hf3fs.yaml`을 사용하고
+`file_path`와 `max_capacity_gb`를 환경에 맞게 바꿉니다. 설정은 다음 adapter를
+생성합니다.
 
 ```json
 {
   "type": "nixl_store_dynamic",
   "backend": "HF3FS",
   "backend_params": {
-    "file_path": "/MNTPNT/lmcache-replay",
+    "file_path": "/mnt/l2/hf3fs",
     "use_direct_io": "true",
     "max_capacity_gb": "30720"
   }

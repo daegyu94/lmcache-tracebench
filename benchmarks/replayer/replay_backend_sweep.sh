@@ -51,17 +51,17 @@ Options:
 Examples:
   bash benchmarks/replayer/replay_backend_sweep.sh \
     --trace /path/to/storage.lct \
-    --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
-    --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \
-    --backend-spec '3fs=configs/replayer/nixl-hf3fs.yaml@/mnt/3fs/lmcache-replay' \
+    --backend-spec 'xfs=configs/replayer/xfs.yaml@/mnt/l2/xfs' \
+    --backend-spec 'pnfs=configs/replayer/pnfs.yaml@/mnt/l2/pnfs' \
+    --backend-spec '3fs=configs/replayer/3fs.yaml@/mnt/l2/3fs' \
     --experiment speedup \
     --speedups 1,2,4,8
 
   bash benchmarks/replayer/replay_backend_sweep.sh \
     --trace /path/to/storage.lct \
-    --backend-spec 'xfs=configs/replayer/fs-native.yaml@/mnt/xfs/lmcache-replay' \
-    --backend-spec 'pnfs=configs/replayer/fs-native.yaml@/mnt/pnfs/lmcache-replay' \
-    --backend-spec '3fs=configs/replayer/nixl-hf3fs.yaml@/mnt/3fs/lmcache-replay' \
+    --backend-spec 'xfs=configs/replayer/xfs.yaml@/mnt/l2/xfs' \
+    --backend-spec 'pnfs=configs/replayer/pnfs.yaml@/mnt/l2/pnfs' \
+    --backend-spec '3fs=configs/replayer/3fs.yaml@/mnt/l2/3fs' \
     --experiment l1-size \
     --l1-sizes 20,40,80,160 \
     --speedup 1

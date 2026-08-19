@@ -1,0 +1,6 @@
+extends: fs-native.yaml
+
+# pNFS mount를 일반 로컬 파일시스템처럼 취급한다.
+# 실제 I/O는 pNFS client/server를 거치지만 adapter는 fs_native로 재생한다.
+l2_adapter:
+  base_path: /mnt/l2/pnfs

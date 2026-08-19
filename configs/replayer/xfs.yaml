@@ -1,0 +1,5 @@
+extends: fs-native.yaml
+
+# XFS local mount를 일반 로컬 파일시스템처럼 취급한다.
+l2_adapter:
+  base_path: /mnt/l2/xfs

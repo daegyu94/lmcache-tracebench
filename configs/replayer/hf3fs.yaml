@@ -5,7 +5,7 @@ l2_adapter:
   type: nixl_store_dynamic
   backend: HF3FS
   backend_params:
-    file_path: /mnt/3fs/lmcache-trace-replay
+    file_path: /mnt/l2/hf3fs
     # NIXL/HF3FS spelling of the fs_native use_odirect option.
     use_direct_io: "true"
     max_capacity_gb: "30720"

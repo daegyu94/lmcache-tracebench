@@ -84,10 +84,10 @@ def test_l2_namespace_usage_reports_missing_path(tmp_path):
     assert usage["bytes"] is None
 
 
-def test_l2_namespace_path_uses_nixl_file_path():
-    config = load_config("configs/replayer/nixl-hf3fs.yaml")
+def test_l2_namespace_path_uses_hf3fs_file_path():
+    config = load_config("configs/replayer/hf3fs.yaml")
 
-    assert str(_l2_namespace_path(config)) == "/mnt/3fs/lmcache-trace-replay"
+    assert str(_l2_namespace_path(config)) == "/mnt/l2/hf3fs"
 
 
 def test_speedup_override_is_reflected_in_dry_run(capsys, tmp_path):
@@ -216,7 +216,7 @@ def test_io_profile_option_is_reflected_in_dry_run(capsys, tmp_path):
 
 def test_backend_configs_extend_common_base():
     fs_native = load_config("configs/replayer/fs-native.yaml")
-    nixl_hf3fs = load_config("configs/replayer/nixl-hf3fs.yaml")
+    nixl_hf3fs = load_config("configs/replayer/hf3fs.yaml")
 
     assert fs_native.l2_store_policy == "skip_l1"
     assert fs_native.l2_adapter["type"] == "fs_native"

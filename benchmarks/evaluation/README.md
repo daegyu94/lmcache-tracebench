@@ -126,8 +126,8 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
       --graph speedup \
       --asset tensormesh/swebench.tar.gz \
       --backend-spec 'fs-native=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/fs-native' \
-      --backend-spec '3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs.yaml|@L2_ROOT@/3fs' \
-      --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/fs-native.yaml|@L2_ROOT@/pnfs' \
+      --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \
+      --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \
       --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml \
       --trace-percent 10 \
       --repeats 3
@@ -175,7 +175,7 @@ CONFIG/L2_ROOT에는 staged_remote_replay.sh가 이해하는
 scaling graph에서 distributed backend를 node 수에 맞춰 바꾸려면 {nodes}를
 config 또는 L2 path에 포함한다.
 
-    3FS=@REPO_ROOT@/configs/replayer/nixl-hf3fs-{nodes}.yaml|@L2_ROOT@/3fs-{nodes}
+    3FS=@REPO_ROOT@/configs/replayer/3fs-{nodes}.yaml|@L2_ROOT@/3fs-{nodes}
 
 --node-counts 1,2,3,4,5,6은 {nodes} backend를 여섯 개 case로 확장한다.
 {nodes}가 없는 backend는 한 번만 실행되어 baseline으로 기록된다. placeholder
