@@ -245,9 +245,19 @@ while IFS= read -r raw_speedup; do
   fi
 done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
+speedup_count="$(printf '%s\n' "$speedups" | tr ',' '\n' | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+case_name_for() {
+  local value="$1"
+  if [[ "$speedup_count" == "1" ]]; then
+    printf '%s' ""
+  else
+    printf 'x%s' "$value"
+  fi
+}
+
 while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
-  case_name="x$speedup"
+  case_name="$(case_name_for "$speedup")"
   if [[ "$keep_l2" == true ]]; then
     ensure_case_path_available "$l2_root" "L2 root"
   else
@@ -259,7 +269,9 @@ while IFS= read -r raw_speedup; do
       die "L2 root is not a directory: $l2_root"
     fi
   fi
-  ensure_case_path_available "$output_root/$case_name" "output case path"
+  if [[ -n "$case_name" ]]; then
+    ensure_case_path_available "$output_root/$case_name" "output case path"
+  fi
 done < <(printf '%s\n' "$speedups" | tr ',' '\n')
 
 if [[ "$dry_run" == false && "$keep_l2" == true ]]; then
@@ -275,9 +287,13 @@ overall_status=0
 
 while IFS= read -r raw_speedup; do
   speedup="$(printf '%s' "$raw_speedup" | tr -d '[:space:]')"
-  case_name="x$speedup"
+  case_name="$(case_name_for "$speedup")"
   l2_path="$l2_root"
-  output_dir="$output_root/$case_name"
+  if [[ -n "$case_name" ]]; then
+    output_dir="$output_root/$case_name"
+  else
+    output_dir="$output_root"
+  fi
   if [[ "$dry_run" == false && "$keep_l2" == false ]]; then
     reset_l2_root "$l2_root" "L2 root"
   fi
