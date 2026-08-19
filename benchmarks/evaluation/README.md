@@ -257,10 +257,3 @@ replay가 성공한 case의 실제 metric은 result_dir 아래 x<SPEEDUP>/의
 l2_replay_stats.json, l2_io_interval.tsv, profile 결과에서 읽는다.
 Artifact를 figure 입력으로 정규화하는 명령과 schema는
 [Report data contract](../../report/data/README.md)를 따른다.
-
-## 7. 기존 replayer script와의 관계
-
-replay_speed_sweep.sh는 하나의 trace와 speedup 목록을 실행하는 공통 primitive로
-남겨 두었다. replay_backend_sweep.sh와 replay_workload_sweep.sh도 report 외
-반복 작업에서 사용할 수 있으므로 삭제하지 않았다. report 실험에서는 staged
-remote run 이름과 resume marker가 필요하기 때문에 이 runner를 사용한다.
