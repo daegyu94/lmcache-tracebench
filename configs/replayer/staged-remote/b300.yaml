@@ -14,7 +14,7 @@ replay_runtime_requirements: requirements/replayer.txt
 
 replay_trace_root: /mnt/replayer/traces
 replay_output_root: /mnt/replayer/outputs
-replay_l2_root: /mnt/kvcache
+replay_l2_root: /mnt/l2
 
 git_repo_url: https://github.com/daegyu94/lmcache-tracebench.git
 git_revision: main

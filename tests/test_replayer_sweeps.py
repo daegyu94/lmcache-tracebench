@@ -115,16 +115,31 @@ def test_reset_l2_root_creates_a_missing_directory(tmp_path):
     assert l2_root.is_dir()
 
 
-def test_reset_l2_root_refuses_a_symlink(tmp_path):
+def test_reset_l2_root_resolves_a_symlink_and_clears_target_contents(tmp_path):
     real_dir = tmp_path / "real"
     real_dir.mkdir()
+    (real_dir / "stale.data").write_text("leftover")
     l2_root = tmp_path / "l2-link"
     l2_root.symlink_to(real_dir)
 
     result = _run_reset_l2_root(l2_root)
 
+    assert result.returncode == 0, result.stderr
+    # The symlink and its target directory must survive; only the target's
+    # contents are cleared, mirroring the mountpoint-safe behavior.
+    assert l2_root.is_symlink()
+    assert real_dir.is_dir()
+    assert list(real_dir.iterdir()) == []
+
+
+def test_reset_l2_root_refuses_a_dangling_symlink(tmp_path):
+    l2_root = tmp_path / "l2-link"
+    l2_root.symlink_to(tmp_path / "nonexistent")
+
+    result = _run_reset_l2_root(l2_root)
+
     assert result.returncode != 0
-    assert "is a symlink" in result.stderr
+    assert "symlink target is not a directory" in result.stderr
 
 
 def test_reset_l2_root_refuses_filesystem_root(tmp_path):

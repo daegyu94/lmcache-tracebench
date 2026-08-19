@@ -215,22 +215,26 @@ ensure_case_path_available() {
 reset_l2_root() {
   local path="$1"
   local label="$2"
+  local target="$path"
   if [[ -L "$path" ]]; then
-    die "$label is a symlink; refusing to reset it: $path"
+    target="$(readlink -f -- "$path")" || die "$label is a dangling symlink: $path"
+    if [[ ! -d "$target" ]]; then
+      die "$label symlink target is not a directory: $path -> $target"
+    fi
   fi
-  if [[ -e "$path" && ! -d "$path" ]]; then
+  if [[ -e "$target" && ! -d "$target" ]]; then
     die "$label is not a directory: $path"
   fi
-  if [[ "$path" == "/" ]]; then
+  if [[ "$target" == "/" ]]; then
     die "$label must not be the filesystem root"
   fi
-  echo "[INFO] Resetting $label: $path"
-  mkdir -p -- "$path"
+  echo "[INFO] Resetting $label ($path): $target"
+  mkdir -p -- "$target"
   # $path may itself be a mountpoint (a real pNFS/3FS mount, unlike today's
-  # plain fs-native directory), so only its contents are cleared. rm -rf on
-  # the path itself would try to rmdir an active mountpoint and fail with
-  # "Device or resource busy".
-  find "$path" -xdev -mindepth 1 -delete
+  # plain fs-native directory) or a symlink onto one, so only its contents are
+  # cleared. rm -rf on the path itself would try to rmdir an active mountpoint
+  # and fail with "Device or resource busy".
+  find "$target" -xdev -mindepth 1 -delete
 }
 
 while IFS= read -r raw_speedup; do
@@ -247,12 +251,12 @@ while IFS= read -r raw_speedup; do
   if [[ "$keep_l2" == true ]]; then
     ensure_case_path_available "$l2_root" "L2 root"
   else
-    reset_path="$l2_root"
-    if [[ -L "$reset_path" ]]; then
-      die "L2 root is a symlink; refusing to reset it: $reset_path"
+    reset_target="$l2_root"
+    if [[ -L "$reset_target" ]]; then
+      reset_target="$(readlink -f -- "$reset_target")" || die "L2 root is a dangling symlink: $l2_root"
     fi
-    if [[ -e "$reset_path" && ! -d "$reset_path" ]]; then
-      die "L2 root is not a directory: $reset_path"
+    if [[ -e "$reset_target" && ! -d "$reset_target" ]]; then
+      die "L2 root is not a directory: $l2_root"
     fi
   fi
   ensure_case_path_available "$output_root/$case_name" "output case path"
