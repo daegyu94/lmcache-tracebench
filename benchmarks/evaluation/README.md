@@ -215,6 +215,13 @@ config 또는 L2 path에 포함한다.
 확장은 경로만 바꾸므로 실제 3FS/pNFS node activation, mount, striping,
 replication 설정은 topology/config에서 별도로 확정해야 한다.
 
+case_id와 상태 경로의 `n<node>` 부분은 node-count 세그먼트다. `{nodes}`를 쓰지
+않는(즉 node scaling이 아닌) backend는 node 수가 없으므로 `nbaseline`으로
+기록된다. node scaling을 하는 backend(`--node-counts`로 확장)는 `n1`, `n2`,
+`n3`처럼 실제 node 수가 들어간다. 따라서 `nbaseline`은 "node scaling이 아닌
+단일/기본 실행"을 뜻하는 라벨이며, report 데이터에서는 node 수 `None`으로
+해석된다(`import_artifacts.py`가 `"baseline"`을 node 수 미지정으로 정규화한다).
+
 ## 6. Resume와 output
 
 state root는 기본적으로 outputs/report-experiments-staged이며, 같은 명령을
