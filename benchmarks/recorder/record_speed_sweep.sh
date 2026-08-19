@@ -222,7 +222,7 @@ record_case_l2_usage() {
   local bytes=""
 
   if [[ -d "$l2_path" ]]; then
-    if ! bytes="$(du -sb -- "$l2_path" | awk 'NR == 1 {print $1}')"; then
+    if ! bytes="$(du -sbL -- "$l2_path" | awk 'NR == 1 {print $1}')"; then
       usage_status="measurement_failed"
       bytes=""
     fi

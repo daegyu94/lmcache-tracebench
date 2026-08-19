@@ -83,7 +83,7 @@ def _measure_l2_namespace_usage(path: Path | None) -> dict[str, object]:
         }
     try:
         result = subprocess.run(
-            ["du", "-sb", "--", str(path)],
+            ["du", "-sbL", "--", str(path)],
             capture_output=True,
             text=True,
             check=False,
@@ -351,7 +351,7 @@ def run_command(
             "scope": "client_visible_namespace",
             "adapter_type": config.l2_adapter.get("type"),
             "path": str(namespace_path) if namespace_path is not None else None,
-            "measurement_method": "du -sb",
+            "measurement_method": "du -sbL",
         }
         print("[INFO] Preparing L2 replay target", flush=True)
         prepare_code = _run_prepare(config, trace, output_dir)
