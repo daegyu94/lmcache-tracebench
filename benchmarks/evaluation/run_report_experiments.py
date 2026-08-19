@@ -1004,7 +1004,7 @@ Examples:
   bash benchmarks/evaluation/run_report_experiments.sh \\
     --topology configs/replayer/staged-remote/topology.yaml \\
     --graph speedup \\
-    --asset tensormesh/wildclaw.tar.gz \\
+    --asset tensormesh/wildclaw \\
     --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \\
     --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \\
     --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \\
@@ -1049,7 +1049,7 @@ successful cases and retries incomplete cases.
         "--asset",
         action="append",
         default=[],
-        help="optional HF .tar.gz asset to stage before the matrix",
+        help="optional HF asset to stage before the matrix (extension optional)",
     )
     parser.add_argument(
         "--trace-root",

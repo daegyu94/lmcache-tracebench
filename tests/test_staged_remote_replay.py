@@ -3,6 +3,8 @@ import subprocess
 import tarfile
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).parents[1] / "benchmarks/replayer/staged_remote_replay.sh"
 
 
@@ -152,6 +154,131 @@ transfer_method: scp
     assert (
         controller_outputs / "remote-failure/remote_exit_code"
     ).read_text().strip() == "7"
+
+
+@pytest.mark.parametrize("asset_arg", ["tensormesh/wildclaw", "tensormesh/wildclaw.tar.gz"])
+def test_asset_accepts_extension_and_without(tmp_path, asset_arg):
+    controller = tmp_path / "controller"
+    controller_repo = controller / "lmcache-tracebench"
+    controller_traces = controller / "traces"
+    controller_outputs = controller / "outputs"
+    remote = tmp_path / "remote"
+    remote_repo = remote / "lmcache-tracebench"
+    remote_traces = remote / "traces"
+    remote_outputs = remote / "outputs"
+    remote_l2 = remote / "kvcache"
+    fake_bin = tmp_path / "fake-bin"
+
+    (controller_repo / "scripts").mkdir(parents=True)
+    _write_executable(
+        controller_repo / "scripts/setup_runtime.sh",
+        """#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mkdir -p "$repo_root/.venv/bin"
+ln -sfn "$(command -v python3.12)" "$repo_root/.venv/bin/python"
+printf 'home = /usr\\nversion_info = 3.12.3\\n' > "$repo_root/.venv/pyvenv.cfg"
+""",
+    )
+
+    archive = controller_traces / "tensormesh/wildclaw.tar.gz"
+    archive.parent.mkdir(parents=True)
+    payload = tmp_path / "payload/wildclaw"
+    payload.mkdir(parents=True)
+    (payload / "l2.lct").write_text("fake trace\\n")
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(payload, arcname="wildclaw")
+
+    fake_bin.mkdir()
+    _write_executable(
+        fake_bin / "python3.12",
+        """#!/usr/bin/env bash
+if [[ "$1" == "-c" ]]; then
+  if [[ "$2" == *sys.version_info* ]]; then printf "3.12\\n"; fi
+  if [[ "$2" == *sys.base_prefix* ]]; then printf "/usr\\n"; fi
+fi
+exit 0
+""",
+    )
+    _write_executable(
+        fake_bin / "ssh",
+        """#!/usr/bin/env bash
+set -euo pipefail
+while (($#)); do
+  case "$1" in
+    -o|-p) shift 2 ;;
+    *) target="$1"; shift; break ;;
+  esac
+done
+exec bash -lc "$*"
+""",
+    )
+    _write_executable(
+        fake_bin / "scp",
+        """#!/usr/bin/env bash
+set -euo pipefail
+args=()
+while (($#)); do
+  case "$1" in
+    -q|-r|--) shift ;;
+    -P|-o) shift 2 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+src="${args[${#args[@]}-2]}"
+dst="${args[${#args[@]}-1]}"
+map_path() { case "$1" in *@*:*) printf '%s\\n' "${1#*:}" ;; *) printf '%s\\n' "$1" ;; esac; }
+src_path="$(map_path "$src")"
+dst_path="$(map_path "$dst")"
+mkdir -p -- "$(dirname -- "$dst_path")"
+cp -a -- "$src_path" "$dst_path"
+""",
+    )
+
+    topology = tmp_path / "topology.yaml"
+    topology.write_text(
+        f"""controller_repo_root: {controller_repo}
+controller_trace_root: {controller_traces}
+controller_output_root: {controller_outputs}
+replay_host: fake-replay
+replay_user: fake
+replay_port: 22
+replay_repo_root: {remote_repo}
+replay_venv_root: {remote_repo}/.venv
+replay_python: python3.12
+replay_runtime_requirements: requirements/replayer.txt
+replay_package_index_url: https://pypi.intra.example.com/simple
+replay_trace_root: {remote_traces}
+replay_output_root: {remote_outputs}
+replay_l2_root: {remote_l2}
+git_repo_url: git@github.com:daegyu94/lmcache-tracebench.git
+git_revision: main
+hf_repo_id: daegyu94/lmcache-storage-traces
+hf_revision: main
+transfer_method: scp
+"""
+    )
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    result = subprocess.run(
+        [
+            "bash",
+            str(SCRIPT),
+            "prepare-trace",
+            "--topology",
+            str(topology),
+            "--asset",
+            asset_arg,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (remote_traces / "tensormesh/wildclaw/l2.lct").is_file()
 
 
 def _write_fake_ssh(fake_bin: Path) -> None:

@@ -39,8 +39,8 @@ Phases:
 
 Options:
   --topology PATH  Required flat-scalar topology YAML. It has no implicit defaults.
-  --asset PATH     HF path such as tensormesh/wildclaw.tar.gz. Repeatable for
-                   prepare-trace and all.
+  --asset PATH     HF path such as tensormesh/wildclaw (or ...wildclaw.tar.gz).
+                   Extension is optional. Repeatable for prepare-trace and all.
   --run-name NAME  Required for replay and all. Must be unique on both nodes.
   --target NAME    Required for reset. One of repo, trace, output, l2, or all.
                    Repeatable. repo/trace/output are removed and recreated; l2
@@ -56,7 +56,7 @@ Replay command:
 Example:
   bash benchmarks/replayer/staged_remote_replay.sh all \
     --topology configs/replayer/staged-remote/topology.yaml \
-    --asset tensormesh/wildclaw.tar.gz \
+    --asset tensormesh/wildclaw \
     --run-name wildclaw-speedup \
     -- bash benchmarks/replayer/replay_speed_sweep.sh \
       --trace @TRACE_ROOT@/tensormesh/wildclaw/l2.lct \
@@ -413,6 +413,7 @@ fi
 prepare_trace_asset() {
   local asset="$1"
   local local_archive remote_archive asset_dir archive_name trace_name
+  [[ "$asset" == *.tar.gz ]] || asset="$asset.tar.gz"
   validate_asset "$asset"
   local_archive="$controller_trace_root/$asset"
   remote_archive="$replay_trace_root/$asset"

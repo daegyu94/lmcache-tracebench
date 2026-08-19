@@ -124,21 +124,49 @@ backend, repeat만 실행해 command와 결과 수집 경로를 확인한다. �
     bash benchmarks/evaluation/run_report_experiments.sh \
       --topology configs/replayer/staged-remote/b300.yaml \
       --graph speedup \
-      --asset tensormesh/swebench.tar.gz \
+      --asset tensormesh/swebench \
       --backend-spec 'xfs=@REPO_ROOT@/configs/replayer/xfs.yaml|@L2_ROOT@/xfs' \
       --backend-spec '3FS=@REPO_ROOT@/configs/replayer/3fs.yaml|@L2_ROOT@/3fs' \
       --backend-spec 'pNFS=@REPO_ROOT@/configs/replayer/pnfs.yaml|@L2_ROOT@/pnfs' \
       --profile @REPO_ROOT@/configs/profiling/b300_storage.yaml \
-      --trace-percent 10 \
+      --workload-preset 1tb \
       --repeats 3
 
 Runner는 report workload label을 `<suite>/<workload>/l2.lct` archive layout에
-매핑한다. `--trace-percent`는 모든 workload에 공통으로 적용되고,
-`--workload-preset`은 workload별 percent를 backend, speedup과 repeat에 동일하게
-전달해 `case.json`에 기록한다. `--local-trace-root`를 지정하면 size와 checksum도
-남긴다. Subset 선택 원칙은
+매핑한다. `--workload-preset`은 workload별 percent를 backend, speedup과 repeat에
+동일하게 전달해 `case.json`에 기록한다. `--local-trace-root`를 지정하면 size와
+checksum도 남긴다. Subset 선택 원칙은
 [Documentation guidelines](../../docs/documentation-guidelines.md#tracereplay-실험-기록)를
 따른다.
+
+### Case iteration 순서
+
+`--asset`은 case를 생성하지 않고, matrix에 필요한 trace archive를 전부 미리
+staging하는 용도다. case는 `--workloads`/`--workload-preset`, `--backend-spec`,
+`--speedups`, `--node-counts`, `--repeats`로 형성되며, 다음 순서로 중첩해 생성된다.
+
+    graph → workload → backend → node_count → speedup → repeat
+
+즉 가장 바깥쪽이 graph, 가장 안쪽이 repeat이다. 예를 들어
+`--graph speedup --workloads tensormesh-swebench,tensormesh-gaia
+--backend-spec 'xfs=...|...' --backend-spec '3FS=...|...' --repeats 2`를 주면
+생성 순서는 다음과 같다.
+
+    speedup/tensormesh-swebench/xfs/nbaseline/s1/r1
+    speedup/tensormesh-swebench/xfs/nbaseline/s1/r2
+    speedup/tensormesh-swebench/3FS/nbaseline/s1/r1
+    speedup/tensormesh-swebench/3FS/nbaseline/s1/r2
+    speedup/tensormesh-gaia/xfs/nbaseline/s1/r1
+    speedup/tensormesh-gaia/xfs/nbaseline/s1/r2
+    speedup/tensormesh-gaia/3FS/nbaseline/s1/r1
+    speedup/tensormesh-gaia/3FS/nbaseline/s1/r2
+
+speedup이 여러 개면 repeat 안쪽이 아니라 speedup 아래 repeat이므로, 각
+workload/backend/node마다 `s<speedup>`이 오름차순으로 이어지고 그 안에서
+`r1..rN`이 반복된다. scaling graph에서는 backend가 `{nodes}`를 쓰면 `node_count`가
+`--node-counts`로 확장되어 repeat보다 한 단계 더 바깥으로 끼어든다. 상태 저장
+경로도 이 `cases/<graph>/<workload>/<backend>/n<node>/s<speedup>/r<repeat>`를
+그대로 따른다.
 
 ## 4. 그래프 preset
 

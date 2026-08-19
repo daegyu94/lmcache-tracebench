@@ -181,10 +181,11 @@ HF archive를 controller에 받고 replay node로 전송한 뒤, replay trace ro
 ```bash
 bash benchmarks/replayer/staged_remote_replay.sh prepare-trace \
   --topology configs/replayer/staged-remote/topology.yaml \
-  --asset tensormesh/wildclaw.tar.gz
+  --asset tensormesh/wildclaw
 ```
 
-`--asset`을 반복 지정하면 여러 archive를 함께 준비할 수 있습니다. Archive layout과
+`--asset`은 `.tar.gz` 확장자를 붙여도 되고 생략해도 됩니다. 반복 지정하면 여러
+archive를 함께 준비할 수 있습니다. Archive layout과
 수동 압축 해제 방법은 [Trace assets guide](trace-assets.md)를 기준으로 하며, staged
 script는 기존 파일을 덮어쓰지 않도록 archive를 풉니다.
 
@@ -208,12 +209,18 @@ Python과 맞지 않거나 import/pip 검증에 실패하면 중단합니다.
 sweep launcher 또는 별도 replay command를 `--` 뒤에 전달하면 됩니다. 따라서 아직
 실험 모드를 정하지 않았어도 동일한 staged workflow를 사용할 수 있습니다.
 
-Placeholder는 script가 replay node의 topology 값으로 치환합니다.
+Placeholder는 script가 replay node의 topology 값으로 치환합니다. 각
+`@...@` 자리표시자는 직접 경로를 적는 대신, `--topology` YAML에서 이미 읽어둔
+기존 설정값(`replay_repo_root`, `replay_trace_root`, `replay_output_root`,
+`replay_l2_root`)에 매핑됩니다. 따라서 replay command에는 고정 경로를 하드코딩하지
+않고 placeholder를 써서, topology 한 곳을 바꾸면 path가 함께 바뀌도록 합니다.
+치환은 replay node에 전달하기 직전에 각 command 인자에 대해 단순 문자열 치환으로
+수행됩니다.
 
-- `@REPO_ROOT@`: replay node의 tracebench 경로
-- `@TRACE_ROOT@`: replay node의 압축 해제 trace 경로
+- `@REPO_ROOT@`: replay node의 tracebench 경로 (`topology.replay_repo_root`)
+- `@TRACE_ROOT@`: replay node의 압축 해제 trace 경로 (`topology.replay_trace_root`)
 - `@OUTPUT_ROOT@`: `replay_output_root/<run-name>`
-- `@L2_ROOT@`: topology의 L2 base path
+- `@L2_ROOT@`: topology의 L2 base path (`topology.replay_l2_root`)
 - `@RUN_NAME@`: 현재 run 이름
 
 예를 들어 speedup sweep은 다음처럼 실행합니다.
@@ -246,7 +253,7 @@ Remote command가 성공하든 실패하든 script는
 ```bash
 bash benchmarks/replayer/staged_remote_replay.sh all \
   --topology configs/replayer/staged-remote/topology.yaml \
-  --asset tensormesh/wildclaw.tar.gz \
+  --asset tensormesh/wildclaw \
   --run-name wildclaw-speedup-20260813 \
   -- bash benchmarks/replayer/replay_speed_sweep.sh \
     --trace @TRACE_ROOT@/tensormesh/wildclaw/l2.lct \
@@ -288,7 +295,7 @@ point가 되므로, 디렉터리를 지우고 다시 만드는 대신 **내용�
 ```bash
 bash benchmarks/replayer/staged_remote_replay.sh all \
   --topology configs/replayer/staged-remote/topology.yaml \
-  --asset tensormesh/wildclaw.tar.gz \
+  --asset tensormesh/wildclaw \
   --run-name dry-run-example \
   --dry-run -- \
   bash benchmarks/replayer/replay_speed_sweep.sh \
