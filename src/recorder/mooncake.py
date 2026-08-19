@@ -44,7 +44,7 @@ class MooncakePlan:
 
     @property
     def source_counts(self) -> dict[str, int]:
-        return {f"mooncake:{self.trace}": self.selected_requests}
+        return {f"mooncake-{self.trace}": self.selected_requests}
 
 
 def _trace_url(config: MooncakeWorkloadConfig) -> str:
