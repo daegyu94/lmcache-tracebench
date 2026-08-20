@@ -218,7 +218,7 @@ pNFS도 각각 3fs.yaml, pnfs.yaml을 쓴다. 자세한 backend config 목록은
 `hf3fs.yaml`을 쓴다. 이 backend는 pip NIXL wheel에 없는 `libplugin_HF3FS.so`를
 요구하므로 별도 빌드/배포가 필요하다.
 
-    HF3FS=@REPO_ROOT@/configs/replayer/hf3fs.yaml|@L2_ROOT@/hf3fs
+    HF3FS=@REPO_ROOT@/configs/replayer/hf3fs.yaml|@L2_ROOT@/3fs/nixl
 
 빌드 절차와 mount_point 설정, backend 비교는
 [HF3FS backend guide](../../docs/hf3fs-backend.md)를 따른다.

@@ -40,28 +40,27 @@ l2_adapter:
   type: nixl_store_dynamic
   backend: HF3FS
   backend_params:
-    file_path: /mnt/l2/hf3fs        # LMCache가 보는 L2 namespace (FUSE mount 상의 symlink)
-    mount_point: /3fs/stage         # HF3FS FUSE mount root (3fs-virt 디렉터리를 포함)
+    file_path: /mnt/l2/3fs/nixl     # LMCache가 보는 L2 namespace (mount root 아래 일반 디렉터리)
+    mount_point: /mnt/l2/3fs        # HF3FS FUSE mount root (3fs-virt 디렉터리를 포함)
     use_direct_io: "true"           # NIXL/HF3FS 식의 O_DIRECT (fs_native use_odirect 대응)
     max_capacity_gb: "30720"
 ```
 
-- `file_path`는 LMCache가 데이터 위치를 기록할 클라이언트-가시 경로입니다. 실제
-  storage layout은 `/mnt/l2/hf3fs -> /3fs/stage/l2-nixl` 식의 symlink로 잡습니다.
+- `file_path`는 LMCache가 데이터를 놓는 클라이언트-가시 경로로, mount root 아래
+  일반 디렉터리(`/mnt/l2/3fs/nixl`)를 가리킵니다.
 - `mount_point`는 NIXL HF3FS 플러그인이 읽는 전용 parameter이며 `file_path`와
   무관합니다. `/proc/self/mountinfo`의 `fuse.hf3fs` mount root를 가리켜야 하고,
   mount root 아래에 `3fs-virt` 디렉터리가 존재해야 합니다. 생략하면 플러그인
   default `/mnt/3fs/`를 사용해 이 경로가 존재하지 않을 때
   `boost::filesystem::canonical: No such file or directory`로 실패합니다.
-- usrbio 기록은 FUSE namespace에 일반 파일을 남기지 않습니다. 쓰기는
-  `{mount_point}/3fs-virt/iovs/{uuid}...` 형태의 transient symlink(iov)를
-  `/dev/shm` shared-memory buffer로 매핑하고, storage node가 그 buffer에서
-  데이터를 direct-transfer로 읽어 볼륨 chain에 적는 방식입니다. 따라서
-  `du -sbL <file_path>`로 측정하는 L2 namespace usage는 HF3FS backend에서
-  항상 `0 bytes`로 집계됩니다. 이는 측정 방식의 한계이며 저장 실패를 뜻하지
-  않습니다. 실제 저장 여부는 replay summary(`l2_replay_stats.json`)의
-  Write/Read op 완료로 확인하고, 저장량은 run 전후 `df`(`hf3fs.*` Used)
-  증가분 또는 `admin_cli`의 볼륨 audit으로 관측합니다.
+- LMCache adapter는 `file_path` 아래에 실제 파일을 만들고(임시 파일에 쓴 뒤
+  원자적으로 rename) 그 파일을 NIXL FILE_SEG로 등록합니다. 따라서 HF3FS
+  backend도 `fs_native`와 동일하게 FUSE namespace에 일반 파일로 남으며,
+  L2 namespace usage는 `du -sbL <file_path>`로 측정할 수 있습니다.
+- `{mount_point}/3fs-virt/iovs/{uuid}`에 잠깐 보이는 symlink는 파일 저장 경로가
+  아니라, L1 메모리 버퍼를 usrbio zero-copy로 storage node와 공유하기 위한
+  임시 iov입니다. `/dev/shm` shm을 가리키고 I/O가 끝나면 제거되므로
+  `file_path`의 `du` 측정에는 영향이 없습니다.
 
 플러그인은 `mount_point` 외에 다음 custom parameter도 인식합니다.
 
@@ -141,7 +140,7 @@ python -m replayer.main \
   --config configs/replayer/hf3fs.yaml \
   --speedup 2 \
   --trace-percent 100 \
-  --l2-path /mnt/l2/hf3fs \
+  --l2-path /mnt/l2/3fs/nixl \
   --output-dir /tmp/hf3fs-check \
   --prepare-l2 --prepare-only
 ```
@@ -163,9 +162,9 @@ python -m replayer.main \
 | --- | --- | --- |
 | I/O 경로 | HF3FS FUSE mount, POSIX 파일 I/O | usrbio driver, user-space RDMA I/O |
 | 커널 page cache | 사용 | 우회 |
-| L2 namespace | FUSE에서 일반 파일로 보임 (`du` 측정 가능) | usrbio 채널에 기록 (`du`로는 0) |
+| L2 namespace | FUSE에서 일반 파일로 보임 (`du` 측정 가능) | FUSE에서 일반 파일로 보임 (`du` 측정 가능) |
 | config | `configs/replayer/3fs.yaml` | `configs/replayer/hf3fs.yaml` |
 
 성능 비교를 원하면 speedup graph를 두 backend로 각각 실행해
-`sweep-summary.csv`의 throughput을 비교합니다. 기존 `3fs.yaml`(`fs_native`) 경로는
-건드리지 않고, HF3FS는 별도 `mount_point` 경로(`/3fs/stage`)로 운용합니다.
+`sweep-summary.csv`의 throughput을 비교합니다. 기존 `3fs.yaml`(`fs_native`)은
+`/mnt/l2/3fs/fs-native`, HF3FS는 `/mnt/l2/3fs/nixl`를 namespace로 운용합니다.

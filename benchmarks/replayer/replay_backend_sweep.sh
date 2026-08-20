@@ -53,7 +53,7 @@ Examples:
     --trace /path/to/storage.lct \
     --backend-spec 'xfs=configs/replayer/xfs.yaml@/mnt/l2/xfs' \
     --backend-spec 'pnfs=configs/replayer/pnfs.yaml@/mnt/l2/pnfs' \
-    --backend-spec '3fs=configs/replayer/3fs.yaml@/mnt/l2/3fs' \
+    --backend-spec '3fs=configs/replayer/3fs.yaml@/mnt/l2/3fs/fs-native' \
     --experiment speedup \
     --speedups 1,2,4,8
 
@@ -61,7 +61,7 @@ Examples:
     --trace /path/to/storage.lct \
     --backend-spec 'xfs=configs/replayer/xfs.yaml@/mnt/l2/xfs' \
     --backend-spec 'pnfs=configs/replayer/pnfs.yaml@/mnt/l2/pnfs' \
-    --backend-spec '3fs=configs/replayer/3fs.yaml@/mnt/l2/3fs' \
+    --backend-spec '3fs=configs/replayer/3fs.yaml@/mnt/l2/3fs/fs-native' \
     --experiment l1-size \
     --l1-sizes 20,40,80,160 \
     --speedup 1

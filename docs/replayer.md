@@ -207,27 +207,29 @@ adapter를 생성합니다. 따라서 로컬 SSD의 `fs_native`로 record한 tra
 
 `configs/replayer/`에는 backend별로 전용 config를 둡니다. filesystem mount를
 직접 쓰는 backend(`fs-native`, `xfs`, `3fs` fuse, `pNFS`)는 모두
-`fs-native.yaml`을 상속해 `base_path`만 `/mnt/l2/<backend>`로 바꿉니다. LMCache
-관점에서는 모두 `fs_native`이며 실제 I/O가 각 filesystem client/server를 통과합니다.
+`fs-native.yaml`을 상속해 `base_path`만 `/mnt/l2/<backend>`로 바꿉니다(3FS는
+공용 mount root 아래 `/mnt/l2/3fs/fs-native`). LMCache 관점에서는 모두
+`fs_native`이며 실제 I/O가 각 filesystem client/server를 통과합니다.
 
 | config | adapter | L2 경로 |
 | --- | --- | --- |
 | `fs-native.yaml` | `fs_native` | `/mnt/l2/fs-native` |
 | `xfs.yaml` | `fs_native` | `/mnt/l2/xfs` |
-| `3fs.yaml` (3FS fuse mount) | `fs_native` | `/mnt/l2/3fs` |
+| `3fs.yaml` (3FS fuse mount) | `fs_native` | `/mnt/l2/3fs/fs-native` |
 | `pnfs.yaml` | `fs_native` | `/mnt/l2/pnfs` |
-| `hf3fs.yaml` (NIXL/HF3FS client) | `nixl_store_dynamic` | `/mnt/l2/hf3fs` (`file_path`) |
+| `hf3fs.yaml` (NIXL/HF3FS client) | `nixl_store_dynamic` | `/mnt/l2/3fs/nixl` (`file_path`) |
 
 NIXL과 HF3FS가 설치된 cluster에서는 `configs/replayer/hf3fs.yaml`을 사용하고
-`file_path`와 `max_capacity_gb`를 환경에 맞게 바꿉니다. 설정은 다음 adapter를
-생성합니다.
+`file_path`, `mount_point`, `max_capacity_gb`를 환경에 맞게 바꿉니다. 설정은
+다음 adapter를 생성합니다.
 
 ```json
 {
   "type": "nixl_store_dynamic",
   "backend": "HF3FS",
   "backend_params": {
-    "file_path": "/mnt/l2/hf3fs",
+    "file_path": "/mnt/l2/3fs/nixl",
+    "mount_point": "/mnt/l2/3fs",
     "use_direct_io": "true",
     "max_capacity_gb": "30720"
   }

@@ -87,7 +87,7 @@ def test_l2_namespace_usage_reports_missing_path(tmp_path):
 def test_l2_namespace_path_uses_hf3fs_file_path():
     config = load_config("configs/replayer/hf3fs.yaml")
 
-    assert str(_l2_namespace_path(config)) == "/mnt/l2/hf3fs"
+    assert str(_l2_namespace_path(config)) == "/mnt/l2/3fs/nixl"
 
 
 def test_speedup_override_is_reflected_in_dry_run(capsys, tmp_path):
